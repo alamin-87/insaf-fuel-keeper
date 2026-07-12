@@ -3,27 +3,41 @@ import {
   Outlet, Link, createRootRouteWithContext, useRouter, useRouterState,
   HeadContent, Scripts, redirect,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { Layout } from "@/components/layout/Layout";
 import { getSessionFn } from "@/lib/auth.functions";
 import type { AuthUser } from "@/types";
 
 import appCss from "../styles.css?url";
+import { I18nProvider, useT } from "@/i18n";
+import { ThemeProvider } from "@/lib/theme";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 
+/** Fallback client if route context is unavailable during a hard navigation. */
+const fallbackQueryClient = new QueryClient({
+  defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
+});
+
 function NotFoundComponent() {
+  return (
+    <I18nProvider>
+      <NotFoundInner />
+    </I18nProvider>
+  );
+}
+
+function NotFoundInner() {
+  const t = useT();
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold">Page not found</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          The page you're looking for doesn't exist.
-        </p>
+        <h2 className="mt-4 text-xl font-semibold">{t("error.404")}</h2>
+        <p className="mt-2 text-sm text-muted-foreground">{t("error.404hint")}</p>
         <div className="mt-6">
-          <Link to="/" className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-            Go to Dashboard
+          <Link to="/login" search={{ redirect: "/" }} className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+            {t("common.home")}
           </Link>
         </div>
       </div>
@@ -32,19 +46,36 @@ function NotFoundComponent() {
 }
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+  return (
+    <I18nProvider>
+      <ErrorInner error={error} reset={reset} />
+    </I18nProvider>
+  );
+}
+
+function ErrorInner({ error, reset }: { error: Error; reset: () => void }) {
+  const t = useT();
   const router = useRouter();
   useEffect(() => { reportLovableError(error, { boundary: "tanstack_root_error_component" }); }, [error]);
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold">Something went wrong</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Try again or head back home.</p>
+        <h1 className="text-xl font-semibold">{t("error.title")}</h1>
+        <p className="mt-2 text-sm text-muted-foreground">{t("error.hint")}</p>
+        {error?.message && (
+          <p className="mt-3 break-words rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-left font-mono text-xs text-destructive">
+            {error.message}
+          </p>
+        )}
         <div className="mt-6 flex justify-center gap-2">
-          <button onClick={() => { router.invalidate(); reset(); }}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-            Try again
+          <button
+            type="button"
+            onClick={() => { router.invalidate(); reset(); }}
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            {t("common.tryAgain")}
           </button>
-          <a href="/" className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent">Home</a>
+          <a href="/login" className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent">{t("common.home")}</a>
         </div>
       </div>
     </div>
@@ -58,16 +89,23 @@ export type RouterContext = {
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   beforeLoad: async ({ location }): Promise<{ user: AuthUser | null }> => {
-    const session = await getSessionFn();
-    const user = session?.user ?? null;
     const isLogin = location.pathname === "/login";
-    if (!user && !isLogin) {
-      throw redirect({
-        to: "/login",
-        search: { redirect: location.href },
-      });
+    try {
+      const session = await getSessionFn();
+      const user = session?.user ?? null;
+      if (!user && !isLogin) {
+        throw redirect({
+          to: "/login",
+          search: { redirect: location.href },
+        });
+      }
+      return { user };
+    } catch (e) {
+      if (e && typeof e === "object" && "to" in e) throw e;
+      // Session/Mongo failure should not block the login homepage.
+      if (isLogin) return { user: null };
+      throw redirect({ to: "/login", search: { redirect: location.href } });
     }
-    return { user };
   },
   head: () => ({
     meta: [
@@ -87,6 +125,12 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "preconnect", href: "https://fonts.googleapis.com" },
+      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Noto+Sans+Bengali:wght@400;500;600;700&family=Outfit:wght@500;600;700&family=Sora:wght@400;500;600;700&display=swap",
+      },
     ],
   }),
   shellComponent: RootShell,
@@ -97,22 +141,34 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="bn">
       <head><HeadContent /></head>
-      <body>{children}<Scripts /></body>
+      <body>
+        <QueryClientProvider client={fallbackQueryClient}>
+          <I18nProvider>
+            <ThemeProvider>
+              {children}
+            </ThemeProvider>
+          </I18nProvider>
+        </QueryClientProvider>
+        <Scripts />
+      </body>
     </html>
   );
 }
 
 function RootComponent() {
-  const { queryClient } = Route.useRouteContext();
+  const ctx = Route.useRouteContext();
+  const queryClient = ctx.queryClient ?? fallbackQueryClient;
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const isLogin = pathname === "/login";
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   return (
     <QueryClientProvider client={queryClient}>
       {isLogin ? <Outlet /> : <Layout><Outlet /></Layout>}
-      <Toaster richColors position="top-right" />
+      {mounted && <Toaster richColors position="top-right" />}
     </QueryClientProvider>
   );
 }

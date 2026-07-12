@@ -1,15 +1,21 @@
+import { Link } from "@tanstack/react-router";
 import { Card, CardContent } from "@/components/ui/card";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+type StatLink =
+  | string
+  | { to: string; params?: Record<string, string>; search?: Record<string, unknown> };
+
 export function StatCard({
-  title, value, icon: Icon, hint, tone = "default",
+  title, value, icon: Icon, hint, tone = "default", to,
 }: {
   title: string;
   value: string;
   icon: LucideIcon;
   hint?: string;
   tone?: "default" | "positive" | "warning" | "danger" | "info";
+  to?: StatLink;
 }) {
   const toneMap = {
     default: "bg-primary/10 text-primary",
@@ -18,8 +24,14 @@ export function StatCard({
     danger: "bg-destructive/10 text-destructive",
     info: "bg-info/15 text-info",
   } as const;
-  return (
-    <Card className="relative overflow-hidden border-border/60 shadow-sm transition hover:shadow-md">
+
+  const body = (
+    <Card
+      className={cn(
+        "relative h-full overflow-hidden border-border/60 shadow-sm transition",
+        to && "cursor-pointer hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md",
+      )}
+    >
       <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary/60 via-primary/30 to-transparent" />
       <CardContent className="p-4 sm:p-5">
         <div className="flex items-start justify-between gap-3">
@@ -34,5 +46,26 @@ export function StatCard({
         </div>
       </CardContent>
     </Card>
+  );
+
+  if (!to) return body;
+
+  if (typeof to === "string") {
+    return (
+      <Link to={to as "/"} className="block h-full outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl">
+        {body}
+      </Link>
+    );
+  }
+
+  return (
+    <Link
+      to={to.to as "/"}
+      params={to.params as never}
+      search={to.search as never}
+      className="block h-full outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
+    >
+      {body}
+    </Link>
   );
 }

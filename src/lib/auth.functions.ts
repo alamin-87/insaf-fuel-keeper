@@ -10,20 +10,44 @@ export const getSessionFn = createServerFn({ method: "GET" }).handler(async (): 
 export const loginFn = createServerFn({ method: "POST" })
   .inputValidator((d: { username: string; password: string }) => d)
   .handler(async ({ data }): Promise<{ ok: true; user: AuthUser } | { ok: false; error: string }> => {
+    const username = data.username.trim().toLowerCase();
+    const password = data.password;
+
+    // Prefer app user directory (editable from Settings).
+    try {
+      const { findUserByCredentials } = await import("./users.server");
+      const found = await findUserByCredentials(username, password);
+      if (found) {
+        const user: AuthUser = {
+          username: found.username,
+          displayName: found.displayName,
+          role: found.role,
+        };
+        const session = await useAppSession();
+        await session.update({ user });
+        return { ok: true, user };
+      }
+    } catch {
+      // Fall through to env credentials if Mongo is unavailable.
+    }
+
+    // Env fallback for bootstrap / emergency access.
     const creds = getAuthCredentials();
     if (
-      data.username.trim().toLowerCase() !== creds.username.toLowerCase() ||
-      data.password !== creds.password
+      username === creds.username.toLowerCase() &&
+      password === creds.password
     ) {
-      return { ok: false, error: "Invalid username or password" };
+      const user: AuthUser = {
+        username: creds.username,
+        displayName: creds.displayName,
+        role: "Administrator",
+      };
+      const session = await useAppSession();
+      await session.update({ user });
+      return { ok: true, user };
     }
-    const user: AuthUser = {
-      username: creds.username,
-      displayName: creds.displayName,
-    };
-    const session = await useAppSession();
-    await session.update({ user });
-    return { ok: true, user };
+
+    return { ok: false, error: "Invalid username or password" };
   });
 
 export const logoutFn = createServerFn({ method: "POST" }).handler(async () => {

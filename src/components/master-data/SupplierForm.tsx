@@ -11,10 +11,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/common/PageHeader";
+import { useT } from "@/i18n";
 
 type FormValues = z.infer<typeof supplierSchema>;
 
 export function SupplierForm({ id }: { id?: string }) {
+  const t = useT();
   const mode = id ? "edit" : "create";
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -44,30 +46,30 @@ export function SupplierForm({ id }: { id?: string }) {
       mode === "edit" ? supplierService.update(id!, v as never) : supplierService.create(v as never),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["suppliers"] });
-      toast.success(mode === "edit" ? "Supplier updated" : "Supplier saved");
+      toast.success(t("common.save"));
       navigate({ to: id ? "/suppliers/$id" : "/suppliers", params: id ? { id } : undefined });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (id && isLoading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
-  if (id && !existing) return <div className="p-6 text-sm text-destructive">Supplier not found.</div>;
+  if (id && isLoading) return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
+  if (id && !existing) return <div className="p-6 text-sm text-destructive">{t("suppliers.notFound")}</div>;
 
   return (
     <div>
-      <PageHeader title={mode === "create" ? "New Supplier" : "Edit Supplier"} />
+      <PageHeader title={mode === "create" ? t("suppliers.new") : t("suppliers.edit")} />
       <Card><CardContent className="pt-6">
         <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="grid gap-4 md:grid-cols-2">
-          <Row label="Name" error={errors.name?.message}><Input {...register("name")} /></Row>
-          <Row label="Phone" error={errors.phone?.message}><Input {...register("phone")} /></Row>
-          <Row label="Email" error={errors.email?.message}><Input type="email" {...register("email")} /></Row>
-          <Row label="GSTIN"><Input {...register("gstin")} /></Row>
-          <Row label="Address" error={errors.address?.message} className="md:col-span-2"><Input {...register("address")} /></Row>
-          <Row label="Opening Payable"><Input type="number" step="0.01" {...register("openingBalance")} /></Row>
+          <Row label={t("common.name")} error={errors.name?.message}><Input {...register("name")} /></Row>
+          <Row label={t("common.phone")} error={errors.phone?.message}><Input {...register("phone")} /></Row>
+          <Row label={t("common.email")} error={errors.email?.message}><Input type="email" {...register("email")} /></Row>
+          <Row label={t("customers.gstin")}><Input {...register("gstin")} /></Row>
+          <Row label={t("common.address")} error={errors.address?.message} className="md:col-span-2"><Input {...register("address")} /></Row>
+          <Row label={t("suppliers.payable")}><Input type="number" step="0.01" {...register("openingBalance")} /></Row>
           <div className="md:col-span-2 flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => navigate({ to: id ? "/suppliers/$id" : "/suppliers", params: id ? { id } : undefined })}>Cancel</Button>
+            <Button type="button" variant="ghost" onClick={() => navigate({ to: id ? "/suppliers/$id" : "/suppliers", params: id ? { id } : undefined })}>{t("common.cancel")}</Button>
             <Button type="submit" disabled={isSubmitting || mutation.isPending}>
-              {mode === "edit" ? "Update Supplier" : "Save Supplier"}
+              {t("common.save")}
             </Button>
           </div>
         </form>

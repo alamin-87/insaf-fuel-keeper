@@ -21,8 +21,10 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/common/PageHeader";
+import { useT } from "@/i18n";
 
 export function ChallanForm({ salesOrderId: initialSoId }: { salesOrderId?: string }) {
+  const t = useT();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { data: customers = [] } = useQuery({ queryKey: ["customers"], queryFn: customerService.list });
@@ -62,7 +64,7 @@ export function ChallanForm({ salesOrderId: initialSoId }: { salesOrderId?: stri
       });
       if (!parsed.success) throw new Error(parsed.error.errors[0]?.message || "Invalid form");
       const c = customers.find((x) => x.id === customerId);
-      if (!c) throw new Error("Select customer");
+      if (!c) throw new Error(t("common.select"));
       return deliveryService.create({
         challanNo: genOrderNo("DC"),
         customerId,
@@ -77,7 +79,7 @@ export function ChallanForm({ salesOrderId: initialSoId }: { salesOrderId?: stri
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["deliveries"] });
-      toast.success("Challan created");
+      toast.success(t("deliveries.new"));
       navigate({ to: "/deliveries" });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -85,11 +87,11 @@ export function ChallanForm({ salesOrderId: initialSoId }: { salesOrderId?: stri
 
   return (
     <div>
-      <PageHeader title="New Delivery Challan" />
+      <PageHeader title={t("deliveries.new")} />
       <Card><CardContent className="pt-6 space-y-6">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-1.5">
-            <Label>Sales Order (optional)</Label>
+            <Label>{t("sales.orderNo")}</Label>
             <Select
               value={salesOrderId || "__none"}
               onValueChange={(v) => {
@@ -100,9 +102,9 @@ export function ChallanForm({ salesOrderId: initialSoId }: { salesOrderId?: stri
                 setSalesOrderId(v);
               }}
             >
-              <SelectTrigger><SelectValue placeholder="Link sales order" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("common.select")} /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="__none">No linked order</SelectItem>
+                <SelectItem value="__none">—</SelectItem>
                 {openOrders.map((s) => (
                   <SelectItem key={s.id} value={s.id}>{s.orderNo} · {s.customerName}</SelectItem>
                 ))}
@@ -110,40 +112,40 @@ export function ChallanForm({ salesOrderId: initialSoId }: { salesOrderId?: stri
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label>Customer</Label>
+            <Label>{t("common.customer")}</Label>
             <Select value={customerId} onValueChange={setCustomerId} disabled={!!salesOrderId}>
-              <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("common.select")} /></SelectTrigger>
               <SelectContent>
                 {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label>Driver Name</Label>
+            <Label>{t("deliveries.driver")}</Label>
             <Input value={driverName} onChange={(e) => setDriverName(e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label>Vehicle No</Label>
-            <Input value={vehicleNo} onChange={(e) => setVehicleNo(e.target.value)} placeholder="DHAKA-METRO-GA-12-3456" />
+            <Label>{t("deliveries.vehicle")}</Label>
+            <Input value={vehicleNo} onChange={(e) => setVehicleNo(e.target.value)} />
           </div>
         </div>
 
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-sm font-semibold">Items</h3>
+            <h3 className="text-sm font-semibold">{t("sales.item")}</h3>
             <Button size="sm" variant="outline" onClick={addItem} disabled={!!salesOrderId}>
-              <Plus className="mr-1 h-3 w-3" /> Add
+              <Plus className="mr-1 h-3 w-3" /> {t("common.addItem")}
             </Button>
           </div>
           <div className="overflow-hidden rounded-md border">
             <div className="overflow-x-auto">
             <Table>
               <TableHeader><TableRow>
-                <TableHead>Product</TableHead><TableHead className="w-24 text-right">Qty</TableHead><TableHead className="w-10" />
+                <TableHead>{t("common.product")}</TableHead><TableHead className="w-24 text-right">{t("common.quantity")}</TableHead><TableHead className="w-10" />
               </TableRow></TableHeader>
               <TableBody>
                 {items.length === 0 && (
-                  <TableRow><TableCell colSpan={3} className="py-8 text-center text-sm text-muted-foreground">No items.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={3} className="py-8 text-center text-sm text-muted-foreground">{t("common.noItems")}</TableCell></TableRow>
                 )}
                 {items.map((it, idx) => (
                   <TableRow key={idx}>
@@ -188,8 +190,8 @@ export function ChallanForm({ salesOrderId: initialSoId }: { salesOrderId?: stri
         </div>
 
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => navigate({ to: "/deliveries" })}>Cancel</Button>
-          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>Create Challan</Button>
+          <Button variant="ghost" onClick={() => navigate({ to: "/deliveries" })}>{t("common.cancel")}</Button>
+          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>{t("common.create")}</Button>
         </div>
       </CardContent></Card>
     </div>

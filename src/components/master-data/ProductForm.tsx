@@ -14,10 +14,12 @@ import { PageHeader } from "@/components/common/PageHeader";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { useT } from "@/i18n";
 
 type FormValues = z.infer<typeof productSchema>;
 
 export function ProductForm({ id }: { id?: string }) {
+  const t = useT();
   const mode = id ? "edit" : "create";
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -52,23 +54,23 @@ export function ProductForm({ id }: { id?: string }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
-      toast.success(mode === "edit" ? "Product updated" : "Product saved");
+      toast.success(t("common.save"));
       navigate({ to: id ? "/products/$id" : "/products", params: id ? { id } : undefined });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (id && isLoading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
-  if (id && !existing) return <div className="p-6 text-sm text-destructive">Product not found.</div>;
+  if (id && isLoading) return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
+  if (id && !existing) return <div className="p-6 text-sm text-destructive">{t("products.notFound")}</div>;
 
   return (
     <div>
-      <PageHeader title={mode === "create" ? "New Product" : "Edit Product"} />
+      <PageHeader title={mode === "create" ? t("products.new") : t("products.edit")} />
       <Card><CardContent className="pt-6">
         <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="grid gap-4 md:grid-cols-2">
-          <Row label="Code" error={errors.code?.message}><Input {...register("code")} /></Row>
-          <Row label="Name" error={errors.name?.message}><Input {...register("name")} /></Row>
-          <Row label="Category">
+          <Row label={t("products.code")} error={errors.code?.message}><Input {...register("code")} /></Row>
+          <Row label={t("common.name")} error={errors.name?.message}><Input {...register("name")} /></Row>
+          <Row label={t("common.category")}>
             <Select value={watch("category")} onValueChange={(v) => setValue("category", v as FormValues["category"])}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -78,7 +80,7 @@ export function ProductForm({ id }: { id?: string }) {
               </SelectContent>
             </Select>
           </Row>
-          <Row label="Unit of Measure">
+          <Row label={t("products.uom")}>
             <Select value={watch("uom")} onValueChange={(v) => setValue("uom", v as FormValues["uom"])}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -88,14 +90,14 @@ export function ProductForm({ id }: { id?: string }) {
               </SelectContent>
             </Select>
           </Row>
-          <Row label="Price"><Input type="number" step="0.01" {...register("price")} /></Row>
-          <Row label="Tax %"><Input type="number" step="0.01" {...register("taxRate")} /></Row>
-          <Row label="Stock"><Input type="number" {...register("stock")} /></Row>
-          <Row label="Reorder Level"><Input type="number" {...register("reorderLevel")} /></Row>
+          <Row label={t("common.price")}><Input type="number" step="0.01" {...register("price")} /></Row>
+          <Row label={t("products.taxPct")}><Input type="number" step="0.01" {...register("taxRate")} /></Row>
+          <Row label={t("products.stock")}><Input type="number" {...register("stock")} /></Row>
+          <Row label={t("products.reorder")}><Input type="number" {...register("reorderLevel")} /></Row>
           <div className="md:col-span-2 flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => navigate({ to: id ? "/products/$id" : "/products", params: id ? { id } : undefined })}>Cancel</Button>
+            <Button type="button" variant="ghost" onClick={() => navigate({ to: id ? "/products/$id" : "/products", params: id ? { id } : undefined })}>{t("common.cancel")}</Button>
             <Button type="submit" disabled={isSubmitting || mutation.isPending}>
-              {mode === "edit" ? "Update Product" : "Save Product"}
+              {t("common.save")}
             </Button>
           </div>
         </form>

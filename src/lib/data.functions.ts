@@ -4,12 +4,14 @@ import { allSeed } from "./seed-data";
 import { requireUser } from "./session.server";
 import type {
   Customer, Supplier, Product, SalesOrder, DashboardStats, StockAlert,
-  Expense, LedgerEntry,
+  Expense, LedgerEntry, Cylinder, PurchaseOrder,
 } from "@/types";
 
 type CollName =
   | "customers" | "suppliers" | "products" | "cylinders" | "movements"
-  | "sales" | "deliveries" | "expenses" | "ledger";
+  | "sales" | "deliveries" | "expenses" | "ledger"
+  | "purchases" | "stockMovements" | "vouchers" | "employees" | "payroll"
+  | "appUsers";
 
 // Strip Mongo's _id so returned docs are plain and serializable.
 const clean = <T,>(doc: any): T => {
@@ -50,7 +52,7 @@ async function collAll<T>(name: CollName): Promise<T[]> {
 async function collGet<T>(name: CollName, id: string): Promise<T | null> {
   const db = await getDb();
   await ensureSeeded();
-  const doc = await db.collection(name).findOne({ id });
+  const doc = await db.collection(name).findOne({ id: String(id) });
   return doc ? clean<T>(doc) : null;
 }
 
@@ -66,31 +68,44 @@ async function collCreate<T extends { id?: string }>(name: CollName, data: any):
 async function collUpdate<T>(name: CollName, id: string, patch: any): Promise<T> {
   const db = await getDb();
   await ensureSeeded();
+  if (!id) throw new Error("Missing record id");
+  if (!patch || typeof patch !== "object") throw new Error("Missing update payload");
   const { _id, id: _ignore, ...rest } = patch;
-  await db.collection(name).updateOne({ id }, { $set: rest });
-  const doc = await db.collection(name).findOne({ id });
+  const result = await db.collection(name).updateOne({ id: String(id) }, { $set: rest });
+  if (result.matchedCount === 0) {
+    throw new Error(`Record not found (${name}/${id})`);
+  }
+  const doc = await db.collection(name).findOne({ id: String(id) });
+  if (!doc) throw new Error("Update failed — record missing after write");
   return clean<T>(doc);
 }
 
 async function collRemove(name: CollName, id: string): Promise<void> {
   const db = await getDb();
   await ensureSeeded();
-  await db.collection(name).deleteOne({ id });
+  await db.collection(name).deleteOne({ id: String(id) });
 }
 
 // ---------- Generic CRUD server functions ----------
-type CrudInput = { op: "list" | "get" | "create" | "update" | "remove"; coll: CollName; id?: string; data?: any };
+type CrudInput = {
+  op: "list" | "get" | "create" | "update" | "remove";
+  coll: CollName;
+  id?: string;
+  /** Record body for create/update — avoid naming this `data` (conflicts with server-fn wrapper). */
+  payload?: any;
+};
 
 export const crudFn = createServerFn({ method: "POST" })
   .inputValidator((d: CrudInput) => d)
   .handler(async ({ data }): Promise<any> => {
     await requireUser();
+    const id = data.id != null ? String(data.id) : undefined;
     switch (data.op) {
       case "list": return await collAll(data.coll);
-      case "get": return await collGet(data.coll, data.id!);
-      case "create": return await collCreate(data.coll, data.data);
-      case "update": return await collUpdate(data.coll, data.id!, data.data);
-      case "remove": await collRemove(data.coll, data.id!); return { ok: true };
+      case "get": return await collGet(data.coll, id!);
+      case "create": return await collCreate(data.coll, data.payload);
+      case "update": return await collUpdate(data.coll, id!, data.payload);
+      case "remove": await collRemove(data.coll, id!); return { ok: true };
       default: return null;
     }
   });
@@ -118,11 +133,11 @@ export const dashboardFn = createServerFn({ method: "GET" }).handler(async (): P
   const customers = (await db.collection("customers").find({}).toArray()) as unknown as Customer[];
   const expenses = (await db.collection("expenses").find({}).toArray()) as unknown as Expense[];
   const ledger = (await db.collection("ledger").find({}).toArray()) as unknown as LedgerEntry[];
+  const cylinders = (await db.collection("cylinders").find({}).toArray()) as unknown as Cylinder[];
+  const purchases = (await db.collection("purchases").find({}).toArray()) as unknown as PurchaseOrder[];
 
   const todayStr = dhakaDay(new Date());
   let todaysOrders = sales.filter((s) => s.date && dhakaDay(new Date(s.date)) === todayStr);
-  // Fallback: if seed data predates today in Dhaka time, use the most recent
-  // Dhaka-local sales date so the dashboard is never empty.
   if (todaysOrders.length === 0) {
     const dhakaDates = sales
       .map((s) => (s.date ? dhakaDay(new Date(s.date)) : ""))
@@ -153,11 +168,21 @@ export const dashboardFn = createServerFn({ method: "GET" }).handler(async (): P
   const customerDue =
     sales.reduce((a, o) => a + Math.max(0, (o.total || 0) - (o.paid || 0)), 0) +
     customers.reduce((a, c) => a + Math.max(0, c.openingBalance || 0), 0);
-  const supplierPayable = suppliers.reduce((a, s) => a + Math.max(0, s.openingBalance || 0), 0);
+
+  const purchaseDue = purchases.reduce((a, p) => a + Math.max(0, (p.total || 0) - (p.paid || 0)), 0);
+  const supplierPayable =
+    suppliers.reduce((a, s) => a + Math.max(0, s.openingBalance || 0), 0) + purchaseDue;
+
+  const monthPrefix = todayStr.slice(0, 7);
+  const monthlySales = sales
+    .filter((s) => s.date && dhakaDay(new Date(s.date)).startsWith(monthPrefix) && s.status !== "cancelled")
+    .reduce((a, o) => a + (o.total || 0), 0);
 
   const stockAlerts: StockAlert[] = products
     .filter((p) => (p.stock ?? 0) <= (p.reorderLevel ?? 0))
     .map((p) => ({ productId: p.id, productName: p.name, stock: p.stock, reorderLevel: p.reorderLevel }));
+
+  const countStatus = (status: Cylinder["status"]) => cylinders.filter((c) => c.status === status).length;
 
   return {
     todaySales,
@@ -167,6 +192,13 @@ export const dashboardFn = createServerFn({ method: "GET" }).handler(async (): P
     supplierPayable,
     cashBalance: Math.round(balanceFor(ledger, "cash")),
     bankBalance: Math.round(balanceFor(ledger, "bank")),
+    availableStock: products.reduce((a, p) => a + (p.stock || 0), 0),
+    cylindersInWarehouse: countStatus("in_stock"),
+    cylindersWithCustomers: countStatus("at_customer"),
+    cylindersUnderRefill: countStatus("refilling"),
+    damagedCylinders: countStatus("damaged"),
+    lostCylinders: countStatus("lost"),
+    monthlySales,
     stockAlerts,
   };
 });
@@ -182,6 +214,7 @@ export const mongoHealthFn = createServerFn({ method: "GET" }).handler(async () 
     for (const name of [
       "customers", "suppliers", "products", "cylinders", "movements",
       "sales", "deliveries", "expenses", "ledger",
+      "purchases", "stockMovements", "vouchers", "employees", "payroll",
     ] as const) {
       counts[name] = await db.collection(name).countDocuments();
     }

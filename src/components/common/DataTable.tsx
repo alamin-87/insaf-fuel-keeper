@@ -6,6 +6,9 @@ import {
 import { Card } from "@/components/ui/card";
 import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n";
+import { DateRangeFilter } from "@/components/common/DateRangeFilter";
+import { EMPTY_DATE_RANGE, filterByDateRange, type DateRange } from "@/lib/date-range";
 
 export interface Column<T> {
   key: string;
@@ -18,25 +21,46 @@ export interface Column<T> {
 
 type SortDir = "asc" | "desc";
 
+type DateKey<T> = keyof T | ((row: T) => string | number | Date | null | undefined);
+
 export function DataTable<T extends { id: string }>({
-  rows, columns, searchKeys, onRowClick, empty = "No records found.",
+  rows, columns, searchKeys, onRowClick, empty, dateKey, dateRange, onDateRangeChange,
 }: {
   rows: T[];
   columns: Column<T>[];
   searchKeys?: (keyof T)[];
   onRowClick?: (row: T) => void;
   empty?: string;
+  /** Enable date filter toolbar. Pass field name or extractor. */
+  dateKey?: DateKey<T>;
+  /** Controlled date range (optional — uncontrolled if omitted). */
+  dateRange?: DateRange;
+  onDateRangeChange?: (next: DateRange) => void;
 }) {
+  const t = useT();
   const [q, setQ] = useState("");
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [internalRange, setInternalRange] = useState<DateRange>(EMPTY_DATE_RANGE);
+  const emptyLabel = empty ?? t("common.noRecords");
+
+  const range = dateRange ?? internalRange;
+  const setRange = onDateRangeChange ?? setInternalRange;
+
+  const getDate = (row: T) => {
+    if (!dateKey) return undefined;
+    if (typeof dateKey === "function") return dateKey(row);
+    return row[dateKey] as string | number | Date | null | undefined;
+  };
 
   const filtered = useMemo(() => {
+    const dated = dateKey ? filterByDateRange(rows, range, getDate) : rows;
+
     const base = q && searchKeys
-      ? rows.filter((r) =>
+      ? dated.filter((r) =>
           searchKeys.some((k) => String(r[k] ?? "").toLowerCase().includes(q.toLowerCase())),
         )
-      : rows;
+      : dated;
 
     if (!sortKey) return base;
     const col = columns.find((c) => c.key === sortKey && c.sortable);
@@ -59,7 +83,7 @@ export function DataTable<T extends { id: string }>({
       else cmp = String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: "base" });
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [rows, q, searchKeys, sortKey, sortDir, columns]);
+  }, [rows, q, searchKeys, sortKey, sortDir, columns, dateKey, range]);
 
   const toggleSort = (key: string) => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -69,19 +93,28 @@ export function DataTable<T extends { id: string }>({
     }
   };
 
+  const showToolbar = Boolean(searchKeys) || Boolean(dateKey);
+
   return (
     <Card className="overflow-hidden p-0">
-      {searchKeys && (
-        <div className="border-b p-3">
-          <div className="relative max-w-sm">
-            <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search…"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              className="pl-8"
-            />
-          </div>
+      {showToolbar && (
+        <div className="flex flex-col gap-3 border-b p-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          {searchKeys ? (
+            <div className="relative w-full max-w-sm">
+              <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder={t("common.search")}
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+          ) : (
+            <div />
+          )}
+          {dateKey && (
+            <DateRangeFilter value={range} onChange={setRange} compact />
+          )}
         </div>
       )}
       <div className="overflow-x-auto">
@@ -117,7 +150,7 @@ export function DataTable<T extends { id: string }>({
             {filtered.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={columns.length} className="py-12 text-center text-sm text-muted-foreground">
-                  {empty}
+                  {emptyLabel}
                 </TableCell>
               </TableRow>
             ) : (

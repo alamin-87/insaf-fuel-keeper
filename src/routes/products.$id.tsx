@@ -7,12 +7,14 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/utils/formatters";
+import { useT } from "@/i18n";
 
 export const Route = createFileRoute("/products/$id")({
   component: ProductDetail,
 });
 
 function ProductDetail() {
+  const t = useT();
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -26,14 +28,14 @@ function ProductDetail() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
-      toast.success("Product deleted");
+      toast.success(t("products.deleted"));
       navigate({ to: "/products" });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (isLoading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
-  if (isFetched && !p) return <div className="p-6 text-sm text-destructive">Product not found.</div>;
+  if (isLoading) return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
+  if (isFetched && !p) return <div className="p-6 text-sm text-destructive">{t("products.notFound")}</div>;
   if (!p) return null;
 
   return (
@@ -44,14 +46,14 @@ function ProductDetail() {
         actions={
           <div className="flex gap-2">
             <Button variant="outline" asChild>
-              <Link to="/products/$id/edit" params={{ id }}><Pencil className="mr-1 h-4 w-4" /> Edit</Link>
+              <Link to="/products/$id/edit" params={{ id }}><Pencil className="mr-1 h-4 w-4" /> {t("common.edit")}</Link>
             </Button>
             <Button
               variant="destructive"
               disabled={remove.isPending}
-              onClick={() => { if (confirm(`Delete ${p.name}?`)) remove.mutate(); }}
+              onClick={() => { if (confirm(`${t("common.delete")} ${p.name}?`)) remove.mutate(); }}
             >
-              <Trash2 className="mr-1 h-4 w-4" /> Delete
+              <Trash2 className="mr-1 h-4 w-4" /> {t("common.delete")}
             </Button>
           </div>
         }

@@ -3,9 +3,9 @@ import { z } from "zod";
 export const customerSchema = z.object({
   name: z.string().min(2, "Name required"),
   phone: z.string().min(6, "Phone required"),
-  email: z.string().email().optional().or(z.literal("")),
+  email: z.union([z.literal(""), z.string().email()]).optional(),
   address: z.string().min(2, "Address required"),
-  gstin: z.string().optional().or(z.literal("")),
+  gstin: z.union([z.literal(""), z.string()]).optional(),
   openingBalance: z.coerce.number(),
 });
 
@@ -26,7 +26,7 @@ export const cylinderSchema = z.object({
   serialNumber: z.string().min(1),
   productId: z.string().min(1),
   capacity: z.coerce.number().min(0),
-  status: z.enum(["in_stock", "at_customer", "in_transit", "refilling", "damaged"]),
+  status: z.enum(["in_stock", "at_customer", "in_transit", "refilling", "damaged", "lost"]),
   location: z.string().min(1),
   customerId: z.string().optional(),
 });
@@ -45,10 +45,33 @@ export const salesOrderSchema = z.object({
   items: z.array(lineItemSchema).min(1, "Add at least one item"),
 });
 
+export const purchaseOrderSchema = z.object({
+  supplierId: z.string().min(1, "Select a supplier"),
+  notes: z.string().optional(),
+  items: z.array(lineItemSchema).min(1, "Add at least one item"),
+});
+
 export const deliverySchema = z.object({
   customerId: z.string().min(1, "Select a customer"),
   salesOrderId: z.string().optional(),
   driverName: z.string().min(2, "Driver name required"),
   vehicleNo: z.string().min(2, "Vehicle number required"),
   items: z.array(lineItemSchema).min(1, "Add at least one item"),
+});
+
+export const employeeSchema = z.object({
+  name: z.string().min(2, "Name required"),
+  phone: z.string().min(6, "Phone required"),
+  designation: z.string().min(2, "Designation required"),
+  department: z.string().min(2, "Department required"),
+  joiningDate: z.string().min(1, "Joining date required"),
+  salary: z.coerce.number().min(0),
+});
+
+export const voucherSchema = z.object({
+  type: z.enum(["payment", "receipt", "journal"]),
+  account: z.enum(["cash", "bank", "cheque", "mobile"]),
+  amount: z.coerce.number().min(1),
+  partyName: z.string().optional(),
+  notes: z.string().optional(),
 });

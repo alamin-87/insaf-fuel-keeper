@@ -1,67 +1,86 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
-  LayoutDashboard, Users, Truck, Package, ShoppingCart, Cylinder, ClipboardList, Receipt,
+  LayoutDashboard, Users, Truck, Package, ShoppingCart, Cylinder, ClipboardList,
+  Receipt, Warehouse, BookOpen, UserCog, BarChart3, ShoppingBag, Settings,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader,
 } from "@/components/ui/sidebar";
-
-const groups = [
-  {
-    label: "Overview",
-    items: [
-      { title: "Dashboard", url: "/", icon: LayoutDashboard },
-      { title: "Expenses", url: "/expenses", icon: Receipt },
-    ],
-  },
-  {
-    label: "Master Data",
-    items: [
-      { title: "Customers", url: "/customers", icon: Users },
-      { title: "Suppliers", url: "/suppliers", icon: Truck },
-      { title: "Products", url: "/products", icon: Package },
-    ],
-  },
-  {
-    label: "Operations",
-    items: [
-      { title: "Sales Orders", url: "/sales", icon: ShoppingCart },
-      { title: "Cylinders", url: "/cylinders", icon: Cylinder },
-      { title: "Deliveries", url: "/deliveries", icon: ClipboardList },
-    ],
-  },
-];
+import { useT, type MessageKey } from "@/i18n";
 
 export function AppSidebar() {
+  const t = useT();
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const isActive = (url: string) => (url === "/" ? pathname === "/" : pathname.startsWith(url));
+
+  const groups: { labelKey: MessageKey; items: { titleKey: MessageKey; url: string; icon: typeof LayoutDashboard }[] }[] = [
+    {
+      labelKey: "nav.overview",
+      items: [
+        { titleKey: "nav.dashboard", url: "/", icon: LayoutDashboard },
+        { titleKey: "nav.reports", url: "/reports", icon: BarChart3 },
+      ],
+    },
+    {
+      labelKey: "nav.masterData",
+      items: [
+        { titleKey: "nav.customers", url: "/customers", icon: Users },
+        { titleKey: "nav.suppliers", url: "/suppliers", icon: Truck },
+        { titleKey: "nav.products", url: "/products", icon: Package },
+      ],
+    },
+    {
+      labelKey: "nav.operations",
+      items: [
+        { titleKey: "nav.sales", url: "/sales", icon: ShoppingCart },
+        { titleKey: "nav.purchases", url: "/purchases", icon: ShoppingBag },
+        { titleKey: "nav.inventory", url: "/inventory", icon: Warehouse },
+        { titleKey: "nav.cylinders", url: "/cylinders", icon: Cylinder },
+        { titleKey: "nav.deliveries", url: "/deliveries", icon: ClipboardList },
+      ],
+    },
+    {
+      labelKey: "nav.financeHr",
+      items: [
+        { titleKey: "nav.accounting", url: "/accounting", icon: BookOpen },
+        { titleKey: "nav.expenses", url: "/expenses", icon: Receipt },
+        { titleKey: "nav.hr", url: "/hr", icon: UserCog },
+      ],
+    },
+    {
+      labelKey: "nav.system",
+      items: [
+        { titleKey: "nav.settings", url: "/settings", icon: Settings },
+      ],
+    },
+  ];
 
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-2 px-2 py-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground font-bold">
-            I
+            ই
           </div>
           <div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
-            <span className="text-sm font-semibold">Insaf Gas Corp</span>
-            <span className="text-xs text-muted-foreground">ERP</span>
+            <span className="font-display text-sm font-semibold tracking-tight">{t("brand.name")}</span>
+            <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">{t("brand.erp")}</span>
           </div>
         </div>
       </SidebarHeader>
       <SidebarContent>
         {groups.map((g) => (
-          <SidebarGroup key={g.label}>
-            <SidebarGroupLabel>{g.label}</SidebarGroupLabel>
+          <SidebarGroup key={g.labelKey}>
+            <SidebarGroupLabel>{t(g.labelKey)}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {g.items.map((item) => (
-                  <SidebarMenuItem key={item.title}>
+                  <SidebarMenuItem key={item.titleKey}>
                     <SidebarMenuButton asChild isActive={isActive(item.url)}>
                       <Link to={item.url} className="flex items-center gap-2">
                         <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
+                        <span>{t(item.titleKey)}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

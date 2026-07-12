@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -21,16 +21,39 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { useT } from "@/i18n";
 
-export function SalesOrderForm({ mode = "order" }: { mode?: "order" | "quotation" }) {
+export function SalesOrderForm({
+  mode = "order",
+  id,
+}: {
+  mode?: "order" | "quotation";
+  id?: string;
+}) {
+  const t = useT();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const editing = Boolean(id);
   const { data: customers = [] } = useQuery({ queryKey: ["customers"], queryFn: customerService.list });
   const { data: products = [] } = useQuery({ queryKey: ["products"], queryFn: productService.list });
+  const { data: existing, isLoading } = useQuery({
+    queryKey: ["sales", id],
+    queryFn: () => salesService.get(id!),
+    enabled: editing,
+  });
 
   const [customerId, setCustomerId] = useState<string>("");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<LineItem[]>([]);
+  const [hydrated, setHydrated] = useState(!editing);
+
+  useEffect(() => {
+    if (!existing) return;
+    setCustomerId(existing.customerId);
+    setNotes(existing.notes ?? "");
+    setItems(existing.items);
+    setHydrated(true);
+  }, [existing]);
 
   const addItem = () => {
     const p = products[0];
@@ -49,7 +72,23 @@ export function SalesOrderForm({ mode = "order" }: { mode?: "order" | "quotation
       const parsed = salesOrderSchema.safeParse({ customerId, notes, items });
       if (!parsed.success) throw new Error(parsed.error.errors[0]?.message || "Invalid form");
       const customer = customers.find((c) => c.id === customerId);
-      if (!customer) throw new Error("Select a customer");
+      if (!customer) throw new Error(t("common.select"));
+
+      if (editing && existing) {
+        if (existing.status !== "draft" && existing.status !== "confirmed") {
+          throw new Error(t("sales.cannotEdit"));
+        }
+        return salesService.update(id!, {
+          customerId,
+          customerName: customer.name,
+          items,
+          subtotal: totals.subtotal,
+          tax: totals.tax,
+          total: totals.total,
+          notes,
+        });
+      }
+
       return salesService.create({
         orderNo: genOrderNo(mode === "quotation" ? "QT" : "SO"),
         customerId, customerName: customer.name,
@@ -58,52 +97,59 @@ export function SalesOrderForm({ mode = "order" }: { mode?: "order" | "quotation
         paid: 0, status: mode === "quotation" ? "draft" : "confirmed", notes,
       });
     },
-    onSuccess: () => {
+    onSuccess: (order) => {
       qc.invalidateQueries({ queryKey: ["sales"] });
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
-      toast.success(mode === "quotation" ? "Quotation saved" : "Sales order created");
-      navigate({ to: "/sales" });
+      toast.success(editing ? t("sales.updated") : mode === "quotation" ? t("sales.quotationSaved") : t("sales.created"));
+      navigate({ to: "/sales/$id", params: { id: order.id } });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
+  if (editing && isLoading) return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
+  if (editing && !existing) return <div className="p-6 text-sm text-destructive">{t("sales.notFound")}</div>;
+  if (editing && existing && existing.status !== "draft" && existing.status !== "confirmed") {
+    return <div className="p-6 text-sm text-destructive">{t("sales.cannotEdit")}</div>;
+  }
+  if (!hydrated) return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
+
   return (
     <div>
-      <PageHeader title={mode === "quotation" ? "New Quotation" : "New Sales Order"} />
+      <PageHeader title={editing ? t("sales.edit") : mode === "quotation" ? t("sales.newQuotation") : t("sales.newOrder")} />
       <Card><CardContent className="pt-6 space-y-6">
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-1.5">
-            <Label>Customer</Label>
+            <Label>{t("common.customer")}</Label>
             <Select value={customerId} onValueChange={setCustomerId}>
-              <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder={t("common.select")} /></SelectTrigger>
               <SelectContent>
                 {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label>Notes</Label>
-            <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes" />
+            <Label>{t("common.notes")}</Label>
+            <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t("common.optionalNotes")} />
           </div>
         </div>
 
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-sm font-semibold">Line Items</h3>
-            <Button size="sm" variant="outline" onClick={addItem}><Plus className="mr-1 h-3 w-3" /> Add Item</Button>
+            <h3 className="text-sm font-semibold">{t("sales.item")}</h3>
+            <Button size="sm" variant="outline" onClick={addItem}><Plus className="mr-1 h-3 w-3" /> {t("common.addItem")}</Button>
           </div>
           <div className="overflow-hidden rounded-md border">
             <div className="overflow-x-auto">
             <Table>
               <TableHeader><TableRow>
-                <TableHead>Product</TableHead><TableHead className="w-24 text-right">Qty</TableHead>
-                <TableHead className="w-32 text-right">Price</TableHead><TableHead className="w-24 text-right">Tax %</TableHead>
-                <TableHead className="w-32 text-right">Line Total</TableHead><TableHead className="w-10" />
+                <TableHead>{t("common.product")}</TableHead><TableHead className="w-24 text-right">{t("common.quantity")}</TableHead>
+                <TableHead className="w-32 text-right">{t("common.price")}</TableHead><TableHead className="w-24 text-right">{t("products.taxPct")}</TableHead>
+                <TableHead className="w-32 text-right">{t("common.lineTotal")}</TableHead><TableHead className="w-10" />
               </TableRow></TableHeader>
               <TableBody>
                 {items.length === 0 && (
-                  <TableRow><TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">No items yet.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">{t("common.noItems")}</TableCell></TableRow>
                 )}
                 {items.map((it, idx) => (
                   <TableRow key={idx}>
@@ -131,21 +177,20 @@ export function SalesOrderForm({ mode = "order" }: { mode?: "order" | "quotation
           </div>
         </div>
 
-
         <div className="flex justify-end">
           <div className="w-full max-w-xs space-y-1 text-sm">
-            <div className="flex justify-between"><span>Subtotal</span><span>{formatCurrency(totals.subtotal)}</span></div>
-            <div className="flex justify-between"><span>Tax</span><span>{formatCurrency(totals.tax)}</span></div>
+            <div className="flex justify-between"><span>{t("common.subtotal")}</span><span>{formatCurrency(totals.subtotal)}</span></div>
+            <div className="flex justify-between"><span>{t("common.tax")}</span><span>{formatCurrency(totals.tax)}</span></div>
             <div className="flex justify-between border-t pt-1 text-base font-semibold">
-              <span>Total</span><span>{formatCurrency(totals.total)}</span>
+              <span>{t("common.total")}</span><span>{formatCurrency(totals.total)}</span>
             </div>
           </div>
         </div>
 
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => navigate({ to: "/sales" })}>Cancel</Button>
+          <Button variant="ghost" onClick={() => navigate({ to: editing ? "/sales/$id" : "/sales", params: editing ? { id: id! } : undefined })}>{t("common.cancel")}</Button>
           <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
-            {mode === "quotation" ? "Save Quotation" : "Create Order"}
+            {editing ? t("common.save") : mode === "quotation" ? t("sales.quotation") : t("sales.new")}
           </Button>
         </div>
       </CardContent></Card>

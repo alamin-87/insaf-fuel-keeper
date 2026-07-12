@@ -10,8 +10,10 @@ import { formatDateTime } from "@/utils/formatters";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { useT } from "@/i18n";
 
 export function DeliveryChallan({ id }: { id: string }) {
+  const t = useT();
   const qc = useQueryClient();
   const { data: d, isLoading, isFetched } = useQuery({
     queryKey: ["deliveries", id],
@@ -25,39 +27,39 @@ export function DeliveryChallan({ id }: { id: string }) {
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["sales"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
-      toast.success("Delivery confirmed");
+      toast.success(t("deliveries.confirm"));
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (isLoading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
-  if (isFetched && !d) return <div className="p-6 text-sm text-destructive">Delivery not found.</div>;
+  if (isLoading) return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
+  if (isFetched && !d) return <div className="p-6 text-sm text-destructive">{t("deliveries.notFound")}</div>;
   if (!d) return null;
 
   return (
     <div>
       <PageHeader
-        title={`Challan ${d.challanNo}`}
-        description={`To ${d.customerName}`}
-        actions={<Badge>{d.status}</Badge>}
+        title={`${t("deliveries.challanNo")} ${d.challanNo}`}
+        description={`${t("common.customer")}: ${d.customerName}`}
+        actions={<Badge>{t(`status.${d.status}` as any)}</Badge>}
       />
       <Card><CardContent className="pt-6 space-y-4">
         <div className="grid gap-4 md:grid-cols-4 text-sm">
-          <Info label="Driver" value={d.driverName} />
-          <Info label="Vehicle" value={d.vehicleNo} />
+          <Info label={t("deliveries.driver")} value={d.driverName} />
+          <Info label={t("deliveries.vehicle")} value={d.vehicleNo} />
           <Info
-            label="Sales Order"
+            label={t("sales.orderNo")}
             value={d.salesOrderId ? (
               <Link className="font-medium text-primary underline-offset-2 hover:underline" to="/sales/$id" params={{ id: d.salesOrderId }}>
-                View linked SO
+                {d.salesOrderId}
               </Link>
             ) : "—"}
           />
-          <Info label="Confirmed At" value={d.confirmedAt ? formatDateTime(d.confirmedAt) : "—"} />
+          <Info label={t("common.date")} value={d.confirmedAt ? formatDateTime(d.confirmedAt) : "—"} />
         </div>
         <Table>
           <TableHeader><TableRow>
-            <TableHead>Item</TableHead><TableHead className="text-right">Qty</TableHead>
+            <TableHead>{t("sales.item")}</TableHead><TableHead className="text-right">{t("common.quantity")}</TableHead>
           </TableRow></TableHeader>
           <TableBody>
             {d.items.map((it, i) => (
@@ -70,10 +72,9 @@ export function DeliveryChallan({ id }: { id: string }) {
         </Table>
         <div className="flex justify-end">
           <Button onClick={() => confirm.mutate()} disabled={d.status !== "pending" || confirm.isPending}>
-            {d.status === "pending" ? "Confirm Delivery" : d.status === "delivered" ? "Delivered" : "Confirmed"}
+            {d.status === "pending" ? t("deliveries.confirm") : t(`status.${d.status}` as any)}
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">Signature capture available in Phase 2.</p>
       </CardContent></Card>
     </div>
   );

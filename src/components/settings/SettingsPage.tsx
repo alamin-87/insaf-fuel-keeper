@@ -1,0 +1,385 @@
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { Pencil, Trash2, X } from "lucide-react";
+import { PageHeader } from "@/components/common/PageHeader";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
+import { useT, type MessageKey } from "@/i18n";
+import { BG_THEMES, useThemeSettings } from "@/lib/theme";
+import {
+  APP_MODULES, APP_ROLES, loadPowerMatrix, savePowerMatrix,
+  type AppModule, type AppRole,
+} from "@/lib/settings-store";
+import {
+  listAppUsersFn, removeAppUserFn, upsertAppUserFn, type PublicAppUser,
+} from "@/lib/users.functions";
+import { cn } from "@/lib/utils";
+
+export function SettingsPage() {
+  const t = useT();
+  const theme = useThemeSettings();
+  const qc = useQueryClient();
+  const { data: users = [], isLoading: usersLoading } = useQuery({
+    queryKey: ["appUsers"],
+    queryFn: () => listAppUsersFn(),
+  });
+  const [matrix, setMatrix] = useState(loadPowerMatrix);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [username, setUsername] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState<AppRole>("Sales");
+  const [active, setActive] = useState(true);
+
+  useEffect(() => {
+    setMatrix(loadPowerMatrix());
+  }, []);
+
+  const persistMatrix = (next: typeof matrix) => {
+    setMatrix(next);
+    savePowerMatrix(next);
+  };
+
+  const resetForm = () => {
+    setEditingId(null);
+    setUsername("");
+    setDisplayName("");
+    setPassword("");
+    setRole("Sales");
+    setActive(true);
+  };
+
+  const startEdit = (u: PublicAppUser) => {
+    setEditingId(u.id);
+    setUsername(u.username);
+    setDisplayName(u.displayName);
+    setPassword("");
+    setRole(u.role);
+    setActive(u.active);
+  };
+
+  const saveUser = useMutation({
+    mutationFn: () =>
+      upsertAppUserFn({
+        data: {
+          id: editingId ?? undefined,
+          username,
+          displayName,
+          role,
+          password: password.trim() || undefined,
+          active,
+        },
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["appUsers"] });
+      toast.success(editingId ? t("settings.userUpdated") : t("settings.userAdded"));
+      resetForm();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const removeUser = useMutation({
+    mutationFn: (id: string) => removeAppUserFn({ data: { id } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["appUsers"] });
+      toast.success(t("settings.userRemoved"));
+      if (editingId) resetForm();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const toggleAccess = (r: AppRole, mod: AppModule) => {
+    const next = {
+      ...matrix,
+      [r]: { ...matrix[r], [mod]: !matrix[r][mod] },
+    };
+    persistMatrix(next);
+    toast.success(t("settings.roleUpdated"));
+  };
+
+  return (
+    <div className="space-y-4">
+      <PageHeader title={t("settings.title")} description={t("settings.desc")} />
+
+      <Tabs defaultValue="appearance">
+        <TabsList className="flex h-auto flex-wrap gap-1">
+          <TabsTrigger value="appearance">{t("settings.tab.appearance")}</TabsTrigger>
+          <TabsTrigger value="users">{t("settings.tab.users")}</TabsTrigger>
+          <TabsTrigger value="power">{t("settings.tab.power")}</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="appearance" className="space-y-4">
+          <Card>
+            <CardContent className="space-y-4 pt-6">
+              <div>
+                <h3 className="font-display text-base font-semibold">{t("settings.bgTitle")}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">{t("settings.bgHint")}</p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {BG_THEMES.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      theme.setBgTheme(item.id);
+                      toast.success(t("settings.saved"));
+                    }}
+                    className={cn(
+                      "overflow-hidden rounded-xl border text-left transition",
+                      theme.bgTheme === item.id ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-primary/40",
+                    )}
+                  >
+                    <div className={cn("h-16 bg-gradient-to-br", item.preview)} />
+                    <div className="flex items-center justify-between px-3 py-2">
+                      <span className="text-sm font-medium">{t(item.labelKey as MessageKey)}</span>
+                      {theme.bgTheme === item.id && <Badge>{t("common.active")}</Badge>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid gap-4 rounded-xl border bg-muted/30 p-4 md:grid-cols-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <Label className="text-sm font-semibold">{t("settings.motion")}</Label>
+                    <p className="mt-1 text-xs text-muted-foreground">{t("settings.motionHint")}</p>
+                  </div>
+                  <Switch
+                    checked={theme.motionEnabled}
+                    onCheckedChange={(v) => {
+                      theme.setMotionEnabled(v);
+                      toast.success(t("settings.saved"));
+                    }}
+                  />
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <Label className="text-sm font-semibold">{t("settings.transparent")}</Label>
+                    <p className="mt-1 text-xs text-muted-foreground">{t("settings.transparentHint")}</p>
+                  </div>
+                  <Switch
+                    checked={theme.transparentPanels}
+                    onCheckedChange={(v) => {
+                      theme.setTransparentPanels(v);
+                      toast.success(t("settings.saved"));
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    theme.resetTheme();
+                    toast.success(t("settings.saved"));
+                  }}
+                >
+                  {t("settings.reset")}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="users" className="space-y-4">
+          <Card>
+            <CardContent className="space-y-4 pt-6">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="font-display text-base font-semibold">
+                    {editingId ? t("settings.editUser") : t("settings.usersTitle")}
+                  </h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{t("settings.usersHint")}</p>
+                </div>
+                {editingId && (
+                  <Button type="button" variant="ghost" size="sm" onClick={resetForm}>
+                    <X className="mr-1 h-4 w-4" /> {t("common.cancel")}
+                  </Button>
+                )}
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                <div className="space-y-1.5">
+                  <Label>{t("settings.username")}</Label>
+                  <Input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="off" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>{t("settings.displayName")}</Label>
+                  <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>{t("settings.role")}</Label>
+                  <Select value={role} onValueChange={(v) => setRole(v as AppRole)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {APP_ROLES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>{t("settings.password")}{editingId ? ` (${t("settings.passwordKeep")})` : ""}</Label>
+                  <Input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={editingId ? "••••••••" : ""}
+                    autoComplete="new-password"
+                  />
+                </div>
+                <div className="flex items-end gap-3">
+                  <div className="flex items-center gap-2 pb-2">
+                    <Switch checked={active} onCheckedChange={setActive} id="user-active" />
+                    <Label htmlFor="user-active">{active ? t("common.active") : t("common.inactive")}</Label>
+                  </div>
+                </div>
+                <div className="flex items-end">
+                  <Button
+                    className="w-full"
+                    disabled={saveUser.isPending}
+                    onClick={() => {
+                      if (!username.trim() || !displayName.trim()) {
+                        toast.error(t("common.name"));
+                        return;
+                      }
+                      if (!editingId && !password.trim()) {
+                        toast.error(t("settings.passwordRequired"));
+                        return;
+                      }
+                      saveUser.mutate();
+                    }}
+                  >
+                    {editingId ? t("common.save") : t("settings.addUser")}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t("settings.username")}</TableHead>
+                      <TableHead>{t("settings.displayName")}</TableHead>
+                      <TableHead>{t("settings.role")}</TableHead>
+                      <TableHead>{t("common.status")}</TableHead>
+                      <TableHead className="text-right">{t("common.actions")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {usersLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
+                          {t("common.loading")}
+                        </TableCell>
+                      </TableRow>
+                    ) : users.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
+                          {t("common.noRecords")}
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      users.map((u) => (
+                        <TableRow key={u.id} className={editingId === u.id ? "bg-primary/5" : undefined}>
+                          <TableCell className="font-mono text-xs">{u.username}</TableCell>
+                          <TableCell className="font-medium">{u.displayName}</TableCell>
+                          <TableCell><Badge variant="secondary">{u.role}</Badge></TableCell>
+                          <TableCell>
+                            <Badge variant={u.active ? "default" : "outline"}>
+                              {u.active ? t("common.active") : t("common.inactive")}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex justify-end gap-1.5">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1.5 border-primary/40 bg-primary/5 text-primary"
+                                onClick={() => startEdit(u)}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                                <span className="hidden sm:inline">{t("common.edit")}</span>
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                className="h-8 px-2"
+                                disabled={u.username === "operator" || removeUser.isPending}
+                                onClick={() => {
+                                  if (!confirm(t("common.confirmDelete"))) return;
+                                  removeUser.mutate(u.id);
+                                }}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="power" className="space-y-4">
+          <Card>
+            <CardContent className="space-y-4 pt-6">
+              <div>
+                <h3 className="font-display text-base font-semibold">{t("settings.powerTitle")}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">{t("settings.powerHint")}</p>
+              </div>
+              <div className="overflow-x-auto rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="sticky left-0 z-10 bg-card min-w-36">{t("settings.module")}</TableHead>
+                      {APP_ROLES.map((r) => (
+                        <TableHead key={r} className="min-w-24 text-center text-[11px]">{r}</TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {APP_MODULES.map((mod) => (
+                      <TableRow key={mod.id}>
+                        <TableCell className="sticky left-0 z-10 bg-card font-medium">{mod.label}</TableCell>
+                        {APP_ROLES.map((r) => (
+                          <TableCell key={r} className="text-center">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 accent-primary"
+                              checked={matrix[r][mod.id]}
+                              disabled={r === "Administrator"}
+                              onChange={() => toggleAccess(r, mod.id)}
+                              aria-label={`${r} ${mod.label}`}
+                            />
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

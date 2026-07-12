@@ -11,10 +11,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/common/PageHeader";
+import { useT } from "@/i18n";
 
 type FormValues = z.infer<typeof customerSchema>;
 
 export function CustomerForm({ id }: { id?: string }) {
+  const t = useT();
   const mode = id ? "edit" : "create";
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -48,31 +50,31 @@ export function CustomerForm({ id }: { id?: string }) {
         : customerService.create(values as never),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["customers"] });
-      toast.success(mode === "edit" ? "Customer updated" : "Customer saved");
+      toast.success(t("common.save"));
       navigate({ to: id ? "/customers/$id" : "/customers", params: id ? { id } : undefined });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (id && isLoading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
-  if (id && !existing) return <div className="p-6 text-sm text-destructive">Customer not found.</div>;
+  if (id && isLoading) return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
+  if (id && !existing) return <div className="p-6 text-sm text-destructive">{t("customers.notFound")}</div>;
 
   return (
     <div>
-      <PageHeader title={mode === "create" ? "New Customer" : "Edit Customer"} />
+      <PageHeader title={mode === "create" ? t("customers.new") : t("customers.edit")} />
       <Card>
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="grid gap-4 md:grid-cols-2">
-            <Field label="Name" error={errors.name?.message}><Input {...register("name")} /></Field>
-            <Field label="Phone" error={errors.phone?.message}><Input {...register("phone")} /></Field>
-            <Field label="Email" error={errors.email?.message}><Input type="email" {...register("email")} /></Field>
-            <Field label="GSTIN"><Input {...register("gstin")} /></Field>
-            <Field label="Address" error={errors.address?.message} className="md:col-span-2"><Input {...register("address")} /></Field>
-            <Field label="Opening Balance"><Input type="number" step="0.01" {...register("openingBalance")} /></Field>
+            <Field label={t("common.name")} error={errors.name?.message}><Input {...register("name")} /></Field>
+            <Field label={t("common.phone")} error={errors.phone?.message}><Input {...register("phone")} /></Field>
+            <Field label={t("common.email")} error={errors.email?.message}><Input type="email" {...register("email")} /></Field>
+            <Field label={t("customers.gstin")}><Input {...register("gstin")} /></Field>
+            <Field label={t("common.address")} error={errors.address?.message} className="md:col-span-2"><Input {...register("address")} /></Field>
+            <Field label={t("customers.openingBal")}><Input type="number" step="0.01" {...register("openingBalance")} /></Field>
             <div className="md:col-span-2 flex justify-end gap-2">
-              <Button type="button" variant="ghost" onClick={() => navigate({ to: id ? "/customers/$id" : "/customers", params: id ? { id } : undefined })}>Cancel</Button>
+              <Button type="button" variant="ghost" onClick={() => navigate({ to: id ? "/customers/$id" : "/customers", params: id ? { id } : undefined })}>{t("common.cancel")}</Button>
               <Button type="submit" disabled={isSubmitting || mutation.isPending}>
-                {mode === "edit" ? "Update Customer" : "Save Customer"}
+                {t("common.save")}
               </Button>
             </div>
           </form>

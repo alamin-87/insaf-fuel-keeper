@@ -1,11 +1,12 @@
 import type {
   Customer, Supplier, Product, Cylinder, CylinderMovement, SalesOrder, Delivery,
-  Expense, LedgerEntry,
+  Expense, LedgerEntry, PurchaseOrder, StockMovement, Voucher, Employee, PayrollRun,
 } from "@/types";
 
 const iso = (d: Date) => d.toISOString();
 const today = new Date();
 const daysAgo = (n: number) => iso(new Date(today.getTime() - n * 86400000));
+const monthKey = (d = today) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 
 export const seedCustomers: Customer[] = [
   { id: "c1", name: "Padma Steel Mills Ltd", phone: "+880 1711 111111", email: "orders@padmasteel.bd", address: "BSCIC Industrial Area, Narayanganj", gstin: "BIN-102345678-0101", openingBalance: 148000, createdAt: daysAgo(120) },
@@ -23,12 +24,12 @@ export const seedSuppliers: Supplier[] = [
 ];
 
 export const seedProducts: Product[] = [
-  { id: "p1", code: "LPG-12", name: "LPG Domestic 12kg", category: "LPG", uom: "cyl", price: 1450, taxRate: 5, stock: 65, reorderLevel: 25, createdAt: daysAgo(120) },
-  { id: "p2", code: "LPG-35", name: "LPG Commercial 35kg", category: "LPG", uom: "cyl", price: 4200, taxRate: 5, stock: 12, reorderLevel: 15, createdAt: daysAgo(120) },
-  { id: "p3", code: "LPG-45", name: "LPG Commercial 45kg", category: "LPG", uom: "cyl", price: 5350, taxRate: 5, stock: 28, reorderLevel: 12, createdAt: daysAgo(120) },
-  { id: "p4", code: "OXY-D", name: "Medical Oxygen D-Type", category: "Medical", uom: "cyl", price: 850, taxRate: 12, stock: 34, reorderLevel: 15, createdAt: daysAgo(120) },
-  { id: "p5", code: "N2-B", name: "Nitrogen Industrial", category: "Industrial", uom: "cyl", price: 1150, taxRate: 15, stock: 6, reorderLevel: 10, createdAt: daysAgo(120) },
-  { id: "p6", code: "CO2-B", name: "Carbon Dioxide", category: "Industrial", uom: "cyl", price: 980, taxRate: 15, stock: 22, reorderLevel: 10, createdAt: daysAgo(120) },
+  { id: "p1", code: "LPG-12", name: "LPG Domestic 12kg", category: "LPG", uom: "cyl", price: 1450, cost: 1200, taxRate: 5, stock: 65, reorderLevel: 25, createdAt: daysAgo(120) },
+  { id: "p2", code: "LPG-35", name: "LPG Commercial 35kg", category: "LPG", uom: "cyl", price: 4200, cost: 3600, taxRate: 5, stock: 12, reorderLevel: 15, createdAt: daysAgo(120) },
+  { id: "p3", code: "LPG-45", name: "LPG Commercial 45kg", category: "LPG", uom: "cyl", price: 5350, cost: 4600, taxRate: 5, stock: 28, reorderLevel: 12, createdAt: daysAgo(120) },
+  { id: "p4", code: "OXY-D", name: "Medical Oxygen D-Type", category: "Medical", uom: "cyl", price: 850, cost: 620, taxRate: 12, stock: 34, reorderLevel: 15, createdAt: daysAgo(120) },
+  { id: "p5", code: "N2-B", name: "Nitrogen Industrial", category: "Industrial", uom: "cyl", price: 1150, cost: 880, taxRate: 15, stock: 6, reorderLevel: 10, createdAt: daysAgo(120) },
+  { id: "p6", code: "CO2-B", name: "Carbon Dioxide", category: "Industrial", uom: "cyl", price: 980, cost: 750, taxRate: 15, stock: 22, reorderLevel: 10, createdAt: daysAgo(120) },
 ];
 
 export const seedCylinders: Cylinder[] = [
@@ -106,6 +107,63 @@ export const seedLedger: LedgerEntry[] = [
   { id: "l5", date: daysAgo(0), account: "bank", direction: "out", amount: 8500, category: "expense", refType: "expense", refId: "e2", notes: "Warehouse electricity" },
   { id: "l6", date: daysAgo(1), account: "cash", direction: "out", amount: 3200, category: "expense", refType: "expense", refId: "e3", notes: "Cylinder valve kit" },
   { id: "l7", date: daysAgo(2), account: "cash", direction: "out", amount: 5000, category: "expense", refType: "expense", refId: "e4", notes: "Driver advance" },
+  { id: "l8", date: daysAgo(1), account: "bank", direction: "out", amount: 50000, category: "purchase", refType: "purchase", refId: "po1", notes: "PO-2026-0001 part payment" },
+];
+
+export const seedPurchases: PurchaseOrder[] = [
+  {
+    id: "po1", orderNo: "PO-2026-0001", supplierId: "s1", supplierName: "Bashundhara LP Gas Ltd",
+    date: daysAgo(2), items: [{ productId: "p1", productName: "LPG Domestic 12kg", quantity: 40, price: 1200, taxRate: 5 }],
+    subtotal: 48000, tax: 2400, total: 50400, paid: 50000, status: "received",
+    grnNo: "GRN-2026-0001", receivedAt: daysAgo(1), notes: "Domestic cylinder refill batch",
+  },
+  {
+    id: "po2", orderNo: "PO-2026-0002", supplierId: "s3", supplierName: "Linde Bangladesh Ltd",
+    date: daysAgo(0), items: [{ productId: "p4", productName: "Medical Oxygen D-Type", quantity: 20, price: 620, taxRate: 12 }],
+    subtotal: 12400, tax: 1488, total: 13888, paid: 0, status: "ordered",
+  },
+];
+
+export const seedStockMovements: StockMovement[] = [
+  { id: "sm1", date: daysAgo(1), productId: "p1", productName: "LPG Domestic 12kg", type: "in", quantity: 40, balanceAfter: 65, refType: "purchase", refId: "po1", notes: "GRN-2026-0001", by: "Warehouse" },
+  { id: "sm2", date: daysAgo(0), productId: "p2", productName: "LPG Commercial 35kg", type: "out", quantity: 8, balanceAfter: 12, refType: "sales", refId: "so1", notes: "SO-2026-0001", by: "Sales" },
+  { id: "sm3", date: daysAgo(0), productId: "p4", productName: "Medical Oxygen D-Type", type: "out", quantity: 12, balanceAfter: 34, refType: "sales", refId: "so2", notes: "SO-2026-0002", by: "Sales" },
+];
+
+export const seedVouchers: Voucher[] = [
+  { id: "v1", voucherNo: "RV-2026-0001", type: "receipt", date: daysAgo(0), account: "cash", amount: 35280, partyName: "Padma Steel Mills Ltd", notes: "SO collection", createdAt: daysAgo(0) },
+  { id: "v2", voucherNo: "PV-2026-0001", type: "payment", date: daysAgo(1), account: "bank", amount: 50000, partyName: "Bashundhara LP Gas Ltd", notes: "Supplier payment", createdAt: daysAgo(1) },
+];
+
+export const seedEmployees: Employee[] = [
+  { id: "emp1", employeeNo: "EMP-001", name: "Karim Uddin", phone: "+880 1710 101010", designation: "Driver", department: "Delivery", joiningDate: daysAgo(400), salary: 22000, status: "active", createdAt: daysAgo(400) },
+  { id: "emp2", employeeNo: "EMP-002", name: "Jahangir Alam", phone: "+880 1710 202020", designation: "Driver", department: "Delivery", joiningDate: daysAgo(350), salary: 22000, status: "active", createdAt: daysAgo(350) },
+  { id: "emp3", employeeNo: "EMP-003", name: "Nasrin Akter", phone: "+880 1710 303030", designation: "Accounts Officer", department: "Accounts", joiningDate: daysAgo(200), salary: 35000, status: "active", createdAt: daysAgo(200) },
+  { id: "emp4", employeeNo: "EMP-004", name: "Rafiqul Islam", phone: "+880 1710 404040", designation: "Warehouse Supervisor", department: "Warehouse", joiningDate: daysAgo(300), salary: 28000, status: "active", createdAt: daysAgo(300) },
+];
+
+export const seedPayroll: PayrollRun[] = [
+  {
+    id: "pay1", employeeId: "emp1", employeeName: "Karim Uddin", month: monthKey(),
+    basic: 22000, bonus: 0, allowance: 2000, deduction: 500, net: 23500, status: "paid",
+    paidAt: daysAgo(5), paymentMethod: "bank", createdAt: daysAgo(5),
+  },
+  {
+    id: "pay2", employeeId: "emp3", employeeName: "Nasrin Akter", month: monthKey(),
+    basic: 35000, bonus: 2000, allowance: 1500, deduction: 0, net: 38500, status: "draft",
+    createdAt: daysAgo(1),
+  },
+];
+
+export const seedAppUsers = [
+  { id: "u1", username: "operator", password: "insaf123", displayName: "Operator", role: "Administrator", active: true, createdAt: daysAgo(200) },
+  { id: "u2", username: "manager", password: "insaf123", displayName: "Plant Manager", role: "Manager", active: true, createdAt: daysAgo(200) },
+  { id: "u3", username: "sales1", password: "insaf123", displayName: "Sales Desk", role: "Sales", active: true, createdAt: daysAgo(200) },
+  { id: "u4", username: "warehouse", password: "insaf123", displayName: "Warehouse Lead", role: "Warehouse", active: true, createdAt: daysAgo(200) },
+  { id: "u5", username: "accounts", password: "insaf123", displayName: "Accounts Officer", role: "Accounts", active: true, createdAt: daysAgo(200) },
+  { id: "u6", username: "hr1", password: "insaf123", displayName: "HR Officer", role: "HR", active: true, createdAt: daysAgo(200) },
+  { id: "u7", username: "delivery1", password: "insaf123", displayName: "Delivery Lead", role: "Delivery", active: true, createdAt: daysAgo(200) },
+  { id: "u8", username: "auditor", password: "insaf123", displayName: "Internal Auditor", role: "Auditor", active: true, createdAt: daysAgo(200) },
 ];
 
 export const allSeed = {
@@ -118,4 +176,10 @@ export const allSeed = {
   deliveries: seedDeliveries,
   expenses: seedExpenses,
   ledger: seedLedger,
+  purchases: seedPurchases,
+  stockMovements: seedStockMovements,
+  vouchers: seedVouchers,
+  employees: seedEmployees,
+  payroll: seedPayroll,
+  appUsers: seedAppUsers,
 };
