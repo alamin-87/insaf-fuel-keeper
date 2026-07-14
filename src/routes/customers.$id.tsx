@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Pencil, Trash2 } from "lucide-react";
 import { customerService } from "@/services/customer.service";
 import { PageHeader } from "@/components/common/PageHeader";
+import { DetailOrOutlet } from "@/components/common/DetailOrOutlet";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, formatDate } from "@/utils/formatters";
@@ -14,6 +15,14 @@ export const Route = createFileRoute("/customers/$id")({
 });
 
 function CustomerDetail() {
+  return (
+    <DetailOrOutlet>
+      <CustomerDetailBody />
+    </DetailOrOutlet>
+  );
+}
+
+function CustomerDetailBody() {
   const t = useT();
   const { id } = Route.useParams();
   const navigate = useNavigate();
@@ -42,6 +51,8 @@ function CustomerDetail() {
       <PageHeader
         title={c.name}
         description={c.address}
+        backTo="/customers"
+        backLabel={t("customers.title")}
         actions={
           <div className="flex gap-2">
             <Button variant="outline" asChild>

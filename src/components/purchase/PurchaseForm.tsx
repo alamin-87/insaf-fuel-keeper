@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -23,16 +23,31 @@ import {
 } from "@/components/ui/table";
 import { useT } from "@/i18n";
 
-export function PurchaseForm() {
+export function PurchaseForm({ id }: { id?: string }) {
   const t = useT();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const editing = Boolean(id);
   const { data: suppliers = [] } = useQuery({ queryKey: ["suppliers"], queryFn: supplierService.list });
   const { data: products = [] } = useQuery({ queryKey: ["products"], queryFn: productService.list });
+  const { data: existing, isLoading } = useQuery({
+    queryKey: ["purchases", id],
+    queryFn: () => purchaseService.get(id!),
+    enabled: editing,
+  });
 
   const [supplierId, setSupplierId] = useState("");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<LineItem[]>([]);
+  const [hydrated, setHydrated] = useState(!editing);
+
+  useEffect(() => {
+    if (!existing) return;
+    setSupplierId(existing.supplierId);
+    setNotes(existing.notes ?? "");
+    setItems(existing.items);
+    setHydrated(true);
+  }, [existing]);
 
   const addItem = () => {
     const p = products[0];
@@ -55,6 +70,22 @@ export function PurchaseForm() {
       if (!parsed.success) throw new Error(parsed.error.errors[0]?.message || "Invalid form");
       const supplier = suppliers.find((s) => s.id === supplierId);
       if (!supplier) throw new Error(t("common.select"));
+
+      if (editing && existing) {
+        if (existing.status !== "draft" && existing.status !== "ordered") {
+          throw new Error(t("purchases.cannotEdit"));
+        }
+        return purchaseService.update(id!, {
+          supplierId,
+          supplierName: supplier.name,
+          items,
+          subtotal: totals.subtotal,
+          tax: totals.tax,
+          total: totals.total,
+          notes,
+        });
+      }
+
       return purchaseService.create({
         orderNo: genOrderNo("PO"),
         supplierId, supplierName: supplier.name,
@@ -65,15 +96,24 @@ export function PurchaseForm() {
     },
     onSuccess: (po) => {
       qc.invalidateQueries({ queryKey: ["purchases"] });
-      toast.success(t("purchases.created"));
+      qc.invalidateQueries({ queryKey: ["purchases", po.id] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      toast.success(editing ? t("purchases.updated") : t("purchases.created"));
       navigate({ to: "/purchases/$id", params: { id: po.id } });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
+  if (editing && isLoading) return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
+  if (editing && !existing) return <div className="p-6 text-sm text-destructive">{t("purchases.notFound")}</div>;
+  if (editing && existing && existing.status !== "draft" && existing.status !== "ordered") {
+    return <div className="p-6 text-sm text-destructive">{t("purchases.cannotEdit")}</div>;
+  }
+  if (!hydrated) return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
+
   return (
     <div>
-      <PageHeader title={t("purchases.newTitle")} />
+      <PageHeader title={editing ? t("purchases.editTitle") : t("purchases.newTitle")} backTo={editing ? { to: "/purchases/$id", params: { id: id! } } : "/purchases"} />
       <Card><CardContent className="pt-6 space-y-6">
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-1.5">
@@ -143,7 +183,9 @@ export function PurchaseForm() {
 
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => navigate({ to: "/purchases" })}>{t("common.cancel")}</Button>
-          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>{t("purchases.create")}</Button>
+          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+            {editing ? t("common.save") : t("purchases.create")}
+          </Button>
         </div>
       </CardContent></Card>
     </div>

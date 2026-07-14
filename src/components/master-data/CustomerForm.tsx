@@ -46,11 +46,22 @@ export function CustomerForm({ id }: { id?: string }) {
   const mutation = useMutation({
     mutationFn: (values: FormValues) =>
       mode === "edit"
-        ? customerService.update(id!, values as never)
-        : customerService.create(values as never),
+        ? customerService.update(id!, {
+            ...values,
+            email: values.email || undefined,
+            gstin: values.gstin || undefined,
+            openingBalance: Number(values.openingBalance) || 0,
+          })
+        : customerService.create({
+            ...values,
+            email: values.email || undefined,
+            gstin: values.gstin || undefined,
+            openingBalance: Number(values.openingBalance) || 0,
+          } as never),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["customers"] });
-      toast.success(t("common.save"));
+      if (id) qc.invalidateQueries({ queryKey: ["customers", id] });
+      toast.success(mode === "edit" ? t("customers.updated") : t("customers.created"));
       navigate({ to: id ? "/customers/$id" : "/customers", params: id ? { id } : undefined });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -61,7 +72,7 @@ export function CustomerForm({ id }: { id?: string }) {
 
   return (
     <div>
-      <PageHeader title={mode === "create" ? t("customers.new") : t("customers.edit")} />
+      <PageHeader title={mode === "create" ? t("customers.new") : t("customers.edit")} backTo={id ? { to: "/customers/$id", params: { id } } : "/customers"} />
       <Card>
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="grid gap-4 md:grid-cols-2">
@@ -70,7 +81,9 @@ export function CustomerForm({ id }: { id?: string }) {
             <Field label={t("common.email")} error={errors.email?.message}><Input type="email" {...register("email")} /></Field>
             <Field label={t("customers.gstin")}><Input {...register("gstin")} /></Field>
             <Field label={t("common.address")} error={errors.address?.message} className="md:col-span-2"><Input {...register("address")} /></Field>
-            <Field label={t("customers.openingBal")}><Input type="number" step="0.01" {...register("openingBalance")} /></Field>
+            <Field label={t("customers.openingBal")} error={errors.openingBalance?.message}>
+              <Input type="number" step="0.01" {...register("openingBalance", { valueAsNumber: true })} />
+            </Field>
             <div className="md:col-span-2 flex justify-end gap-2">
               <Button type="button" variant="ghost" onClick={() => navigate({ to: id ? "/customers/$id" : "/customers", params: id ? { id } : undefined })}>{t("common.cancel")}</Button>
               <Button type="submit" disabled={isSubmitting || mutation.isPending}>

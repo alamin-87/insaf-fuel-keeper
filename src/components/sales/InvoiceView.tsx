@@ -13,6 +13,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/common/PageHeader";
+import { BrandLogo } from "@/components/common/BrandLogo";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -76,6 +77,8 @@ export function InvoiceView({ id }: { id: string }) {
       <PageHeader
         title={`${order.status === "draft" ? t("sales.quotationLabel") : t("sales.invoice")} ${order.orderNo}`}
         description={t("sales.issuedTo", { customer: order.customerName, date: formatDate(order.date) })}
+        backTo="/sales"
+        backLabel={t("sales.title")}
         actions={
           <div className="flex flex-wrap gap-2">
             {(order.status === "draft" || order.status === "confirmed") && (
@@ -93,9 +96,12 @@ export function InvoiceView({ id }: { id: string }) {
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2"><CardContent className="pt-6 space-y-4">
           <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-xl font-bold">{t("brand.name")}</h2>
-              <p className="text-xs text-muted-foreground">{t("brand.tagline")}</p>
+            <div className="flex items-start gap-3">
+              <BrandLogo size="lg" />
+              <div>
+                <h2 className="text-xl font-bold">{t("brand.name")}</h2>
+                <p className="text-xs text-muted-foreground">{t("brand.tagline")}</p>
+              </div>
             </div>
             <Badge>{t(`status.${order.status}` as any)}</Badge>
           </div>

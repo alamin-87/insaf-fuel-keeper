@@ -7,11 +7,14 @@ import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader,
 } from "@/components/ui/sidebar";
+import { BrandLogo } from "@/components/common/BrandLogo";
+import { useModuleAccess } from "@/hooks/useModuleAccess";
 import { useT, type MessageKey } from "@/i18n";
 
 export function AppSidebar() {
   const t = useT();
   const pathname = useRouterState({ select: (r) => r.location.pathname });
+  const { canAccessUrl, isLoading } = useModuleAccess();
   const isActive = (url: string) => (url === "/" ? pathname === "/" : pathname.startsWith(url));
 
   const groups: { labelKey: MessageKey; items: { titleKey: MessageKey; url: string; icon: typeof LayoutDashboard }[] }[] = [
@@ -56,21 +59,26 @@ export function AppSidebar() {
     },
   ];
 
+  const visibleGroups = groups
+    .map((g) => ({
+      ...g,
+      items: isLoading ? g.items : g.items.filter((item) => canAccessUrl(item.url)),
+    }))
+    .filter((g) => g.items.length > 0);
+
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-2 px-2 py-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground font-bold">
-            ই
-          </div>
+          <BrandLogo size="md" />
           <div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
             <span className="font-display text-sm font-semibold tracking-tight">{t("brand.name")}</span>
             <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">{t("brand.erp")}</span>
           </div>
         </div>
       </SidebarHeader>
-      <SidebarContent>
-        {groups.map((g) => (
+      <SidebarContent data-lenis-prevent>
+        {visibleGroups.map((g) => (
           <SidebarGroup key={g.labelKey}>
             <SidebarGroupLabel>{t(g.labelKey)}</SidebarGroupLabel>
             <SidebarGroupContent>

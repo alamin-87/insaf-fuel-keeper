@@ -10,6 +10,9 @@ export type AppRole =
 
 export type AppModule =
   | "dashboard"
+  | "customers"
+  | "suppliers"
+  | "products"
   | "sales"
   | "purchases"
   | "inventory"
@@ -35,6 +38,9 @@ export const APP_ROLES: AppRole[] = [
 
 export const APP_MODULES: { id: AppModule; label: string }[] = [
   { id: "dashboard", label: "Dashboard" },
+  { id: "customers", label: "Customers" },
+  { id: "suppliers", label: "Suppliers" },
+  { id: "products", label: "Products" },
   { id: "sales", label: "Sales" },
   { id: "purchases", label: "Purchases" },
   { id: "inventory", label: "Inventory" },
@@ -67,15 +73,15 @@ export function defaultMatrix(): Record<AppRole, Record<AppModule, boolean>> {
     Manager: blankAccess(true),
     Sales: {
       ...blankAccess(false),
-      dashboard: true, sales: true, deliveries: true, reports: true,
+      dashboard: true, customers: true, products: true, sales: true, deliveries: true, reports: true,
     },
     Warehouse: {
       ...blankAccess(false),
-      dashboard: true, inventory: true, cylinders: true, deliveries: true, purchases: true,
+      dashboard: true, suppliers: true, products: true, inventory: true, cylinders: true, deliveries: true, purchases: true,
     },
     Accounts: {
       ...blankAccess(false),
-      dashboard: true, accounting: true, expenses: true, reports: true, sales: true, purchases: true,
+      dashboard: true, customers: true, suppliers: true, accounting: true, expenses: true, reports: true, sales: true, purchases: true,
     },
     HR: {
       ...blankAccess(false),
@@ -83,11 +89,11 @@ export function defaultMatrix(): Record<AppRole, Record<AppModule, boolean>> {
     },
     Delivery: {
       ...blankAccess(false),
-      dashboard: true, deliveries: true, cylinders: true,
+      dashboard: true, customers: true, deliveries: true, cylinders: true,
     },
     Auditor: {
       ...blankAccess(false),
-      dashboard: true, reports: true, accounting: true, sales: true, purchases: true,
+      dashboard: true, customers: true, suppliers: true, products: true, reports: true, accounting: true, sales: true, purchases: true,
     },
   };
 }
@@ -133,3 +139,5 @@ export function loadPowerMatrix(): Record<AppRole, Record<AppModule, boolean>> {
 export function savePowerMatrix(matrix: Record<AppRole, Record<AppModule, boolean>>) {
   localStorage.setItem(MATRIX_KEY, JSON.stringify(matrix));
 }
+
+export type PowerMatrix = Record<AppRole, Record<AppModule, boolean>>;

@@ -65,7 +65,7 @@ export function ProductForm({ id }: { id?: string }) {
 
   return (
     <div>
-      <PageHeader title={mode === "create" ? t("products.new") : t("products.edit")} />
+      <PageHeader title={mode === "create" ? t("products.new") : t("products.edit")} backTo={id ? { to: "/products/$id", params: { id } } : "/products"} />
       <Card><CardContent className="pt-6">
         <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="grid gap-4 md:grid-cols-2">
           <Row label={t("products.code")} error={errors.code?.message}><Input {...register("code")} /></Row>

@@ -3,6 +3,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Bell, Languages, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { BrandLogo } from "@/components/common/BrandLogo";
 import { logoutFn } from "@/lib/auth.functions";
 import { useI18n } from "@/i18n";
 
@@ -26,11 +27,14 @@ export function Navbar() {
   return (
     <header className="app-navbar sticky top-0 z-20 flex h-14 items-center gap-2 border-b px-3 backdrop-blur-xl sm:px-4">
       <SidebarTrigger />
-      <div className="ml-1 flex min-w-0 flex-col leading-tight">
-        <span className="font-display truncate text-sm font-semibold tracking-tight">{t("brand.name")}</span>
-        <span className="hidden text-[11px] font-medium tracking-[0.08em] text-muted-foreground sm:block">
-          {t("brand.tagline")}
-        </span>
+      <div className="ml-1 flex min-w-0 items-center gap-2">
+        <BrandLogo size="sm" className="hidden sm:block" />
+        <div className="flex min-w-0 flex-col leading-tight">
+          <span className="font-display truncate text-sm font-semibold tracking-tight">{t("brand.name")}</span>
+          <span className="hidden text-[11px] font-medium tracking-[0.08em] text-muted-foreground sm:block">
+            {t("brand.tagline")}
+          </span>
+        </div>
       </div>
       <div className="ml-auto flex items-center gap-1">
         <Button

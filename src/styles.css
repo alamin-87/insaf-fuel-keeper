@@ -1,6 +1,7 @@
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
+@import "lenis/dist/lenis.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -192,6 +193,26 @@
   code, kbd, pre, .font-mono {
     font-family: var(--font-mono);
   }
+}
+
+html {
+  scroll-behavior: auto;
+}
+
+html.lenis, html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+body {
+  overscroll-behavior-y: none;
 }
 
 /* Slim futuristic scrollbar */
@@ -640,5 +661,9 @@ a[href*="lovable.dev/projects"][target="_blank"],
   }
   .login-gate-panel {
     transition-duration: 0.01ms !important;
+  }
+  [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
   }
 }

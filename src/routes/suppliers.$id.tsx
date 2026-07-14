@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Pencil, Trash2 } from "lucide-react";
 import { supplierService } from "@/services/supplier.service";
 import { PageHeader } from "@/components/common/PageHeader";
+import { DetailOrOutlet } from "@/components/common/DetailOrOutlet";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/utils/formatters";
@@ -14,6 +15,14 @@ export const Route = createFileRoute("/suppliers/$id")({
 });
 
 function SupplierDetail() {
+  return (
+    <DetailOrOutlet>
+      <SupplierDetailBody />
+    </DetailOrOutlet>
+  );
+}
+
+function SupplierDetailBody() {
   const t = useT();
   const { id } = Route.useParams();
   const navigate = useNavigate();
@@ -42,6 +51,8 @@ function SupplierDetail() {
       <PageHeader
         title={s.name}
         description={s.address}
+        backTo="/suppliers"
+        backLabel={t("suppliers.title")}
         actions={
           <div className="flex gap-2">
             <Button variant="outline" asChild>

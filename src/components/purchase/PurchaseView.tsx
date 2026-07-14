@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { purchaseService } from "@/services/purchase.service";
 import { formatCurrency, formatDate } from "@/utils/formatters";
@@ -66,7 +67,18 @@ export function PurchaseView({ id }: { id: string }) {
       <PageHeader
         title={`${t("purchases.title")} ${po.orderNo}`}
         description={`${po.supplierName} · ${formatDate(po.date)}`}
-        actions={<Badge>{t(`status.${po.status}` as any)}</Badge>}
+        backTo="/purchases"
+        backLabel={t("purchases.title")}
+        actions={
+          <div className="flex items-center gap-2">
+            {(po.status === "draft" || po.status === "ordered") && (
+              <Button variant="outline" asChild>
+                <Link to="/purchases/$id/edit" params={{ id: po.id }}>{t("common.edit")}</Link>
+              </Button>
+            )}
+            <Badge>{t(`status.${po.status}` as any)}</Badge>
+          </div>
+        }
       />
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2"><CardContent className="pt-6 space-y-4">

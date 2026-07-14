@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/common/PageHeader";
+import { BrandLogo } from "@/components/common/BrandLogo";
 import { formatDateTime } from "@/utils/formatters";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -41,9 +42,30 @@ export function DeliveryChallan({ id }: { id: string }) {
       <PageHeader
         title={`${t("deliveries.challanNo")} ${d.challanNo}`}
         description={`${t("common.customer")}: ${d.customerName}`}
-        actions={<Badge>{t(`status.${d.status}` as any)}</Badge>}
+        backTo="/deliveries"
+        backLabel={t("deliveries.title")}
+        actions={
+          <div className="flex items-center gap-2">
+            {d.status === "pending" && (
+              <Button variant="outline" asChild>
+                <Link to="/deliveries/$id/edit" params={{ id: d.id }}>{t("common.edit")}</Link>
+              </Button>
+            )}
+            {(d.status === "pending" || d.status === "in_transit") && (
+              <Button disabled={confirm.isPending} onClick={() => confirm.mutate()}>{t("deliveries.confirm")}</Button>
+            )}
+            <Badge>{t(`status.${d.status}` as any)}</Badge>
+          </div>
+        }
       />
       <Card><CardContent className="pt-6 space-y-4">
+        <div className="flex items-center gap-3 border-b pb-4">
+          <BrandLogo size="md" />
+          <div>
+            <p className="font-display text-sm font-semibold">{t("brand.name")}</p>
+            <p className="text-[11px] text-muted-foreground">{t("brand.tagline")}</p>
+          </div>
+        </div>
         <div className="grid gap-4 md:grid-cols-4 text-sm">
           <Info label={t("deliveries.driver")} value={d.driverName} />
           <Info label={t("deliveries.vehicle")} value={d.vehicleNo} />

@@ -136,6 +136,15 @@ export function HrPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const removePay = useMutation({
+    mutationFn: (id: string) => hrService.removePayroll(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["payroll"] });
+      toast.success(t("hr.payslipDeleted"));
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -263,7 +272,20 @@ export function HrPage() {
                 header: t("common.actions"),
                 className: actionsColumnClass,
                 render: (r) => r.status === "draft" ? (
-                  <Button size="sm" disabled={payRun.isPending} onClick={(e) => { e.stopPropagation(); payRun.mutate(r.id); }}>{t("hr.pay")}</Button>
+                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                    <Button size="sm" disabled={payRun.isPending} onClick={() => payRun.mutate(r.id)}>{t("hr.pay")}</Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-destructive"
+                      disabled={removePay.isPending}
+                      onClick={() => {
+                        if (confirm(t("hr.payslipDeleteConfirm"))) removePay.mutate(r.id);
+                      }}
+                    >
+                      {t("common.delete")}
+                    </Button>
+                  </div>
                 ) : <span className="text-xs text-muted-foreground">{r.paidAt ? formatDate(r.paidAt) : "—"}</span>,
               },
             ]}

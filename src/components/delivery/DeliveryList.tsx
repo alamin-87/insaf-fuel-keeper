@@ -57,7 +57,9 @@ export function DeliveryList() {
             render: (r) => (
               <RowActions
                 onView={() => navigate({ to: "/deliveries/$id", params: { id: r.id } })}
-                onEdit={() => navigate({ to: "/deliveries/$id", params: { id: r.id } })}
+                onEdit={r.status === "pending"
+                  ? () => navigate({ to: "/deliveries/$id/edit", params: { id: r.id } })
+                  : undefined}
                 onDelete={r.status === "pending" ? () => {
                   if (confirm(t("deliveries.deleteConfirm"))) remove.mutate(r.id);
                 } : undefined}

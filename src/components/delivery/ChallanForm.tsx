@@ -23,13 +23,25 @@ import {
 import { PageHeader } from "@/components/common/PageHeader";
 import { useT } from "@/i18n";
 
-export function ChallanForm({ salesOrderId: initialSoId }: { salesOrderId?: string }) {
+export function ChallanForm({
+  salesOrderId: initialSoId,
+  id,
+}: {
+  salesOrderId?: string;
+  id?: string;
+}) {
   const t = useT();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const editing = Boolean(id);
   const { data: customers = [] } = useQuery({ queryKey: ["customers"], queryFn: customerService.list });
   const { data: products = [] } = useQuery({ queryKey: ["products"], queryFn: productService.list });
   const { data: sales = [] } = useQuery({ queryKey: ["sales"], queryFn: salesService.list });
+  const { data: existing, isLoading } = useQuery({
+    queryKey: ["deliveries", id],
+    queryFn: () => deliveryService.get(id!),
+    enabled: editing,
+  });
 
   const openOrders = sales.filter((s) => s.status === "confirmed" || s.status === "invoiced");
 
@@ -38,14 +50,25 @@ export function ChallanForm({ salesOrderId: initialSoId }: { salesOrderId?: stri
   const [driverName, setDriverName] = useState("");
   const [vehicleNo, setVehicleNo] = useState("");
   const [items, setItems] = useState<LineItem[]>([]);
+  const [hydrated, setHydrated] = useState(!editing);
 
   useEffect(() => {
-    if (!salesOrderId) return;
+    if (!existing) return;
+    setSalesOrderId(existing.salesOrderId || "");
+    setCustomerId(existing.customerId);
+    setDriverName(existing.driverName);
+    setVehicleNo(existing.vehicleNo);
+    setItems(existing.items.map((it) => ({ ...it })));
+    setHydrated(true);
+  }, [existing]);
+
+  useEffect(() => {
+    if (editing || !salesOrderId) return;
     const so = sales.find((s) => s.id === salesOrderId);
     if (!so) return;
     setCustomerId(so.customerId);
     setItems(so.items.map((it) => ({ ...it })));
-  }, [salesOrderId, sales]);
+  }, [salesOrderId, sales, editing]);
 
   const addItem = () => {
     const p = products[0];
@@ -65,6 +88,19 @@ export function ChallanForm({ salesOrderId: initialSoId }: { salesOrderId?: stri
       if (!parsed.success) throw new Error(parsed.error.errors[0]?.message || "Invalid form");
       const c = customers.find((x) => x.id === customerId);
       if (!c) throw new Error(t("common.select"));
+
+      if (editing && existing) {
+        if (existing.status !== "pending") throw new Error(t("deliveries.cannotEdit"));
+        return deliveryService.update(id!, {
+          customerId,
+          customerName: c.name,
+          salesOrderId: salesOrderId || undefined,
+          driverName,
+          vehicleNo,
+          items,
+        });
+      }
+
       return deliveryService.create({
         challanNo: genOrderNo("DC"),
         customerId,
@@ -77,17 +113,27 @@ export function ChallanForm({ salesOrderId: initialSoId }: { salesOrderId?: stri
         date: new Date().toISOString(),
       });
     },
-    onSuccess: () => {
+    onSuccess: (d) => {
       qc.invalidateQueries({ queryKey: ["deliveries"] });
-      toast.success(t("deliveries.new"));
-      navigate({ to: "/deliveries" });
+      qc.invalidateQueries({ queryKey: ["deliveries", d.id] });
+      toast.success(editing ? t("deliveries.updated") : t("deliveries.created"));
+      navigate({ to: "/deliveries/$id", params: { id: d.id } });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
+  if (editing && isLoading) return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
+  if (editing && !existing) return <div className="p-6 text-sm text-destructive">{t("deliveries.notFound")}</div>;
+  if (editing && existing && existing.status !== "pending") {
+    return <div className="p-6 text-sm text-destructive">{t("deliveries.cannotEdit")}</div>;
+  }
+  if (!hydrated) return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
+
+  const lockItems = !!salesOrderId;
+
   return (
     <div>
-      <PageHeader title={t("deliveries.new")} />
+      <PageHeader title={editing ? t("deliveries.editTitle") : t("deliveries.new")} backTo={editing ? { to: "/deliveries/$id", params: { id: id! } } : "/deliveries"} />
       <Card><CardContent className="pt-6 space-y-6">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-1.5">
@@ -113,7 +159,7 @@ export function ChallanForm({ salesOrderId: initialSoId }: { salesOrderId?: stri
           </div>
           <div className="space-y-1.5">
             <Label>{t("common.customer")}</Label>
-            <Select value={customerId} onValueChange={setCustomerId} disabled={!!salesOrderId}>
+            <Select value={customerId} onValueChange={setCustomerId} disabled={lockItems}>
               <SelectTrigger><SelectValue placeholder={t("common.select")} /></SelectTrigger>
               <SelectContent>
                 {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
@@ -133,7 +179,7 @@ export function ChallanForm({ salesOrderId: initialSoId }: { salesOrderId?: stri
         <div>
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-sm font-semibold">{t("sales.item")}</h3>
-            <Button size="sm" variant="outline" onClick={addItem} disabled={!!salesOrderId}>
+            <Button size="sm" variant="outline" onClick={addItem} disabled={lockItems}>
               <Plus className="mr-1 h-3 w-3" /> {t("common.addItem")}
             </Button>
           </div>
@@ -152,7 +198,7 @@ export function ChallanForm({ salesOrderId: initialSoId }: { salesOrderId?: stri
                     <TableCell>
                       <Select
                         value={it.productId}
-                        disabled={!!salesOrderId}
+                        disabled={lockItems}
                         onValueChange={(v) => {
                           const p = products.find((x) => x.id === v);
                           if (p) setItems(items.map((x, i) => i === idx ? { ...x, productId: p.id, productName: p.name, price: p.price, taxRate: p.taxRate } : x));
@@ -169,13 +215,13 @@ export function ChallanForm({ salesOrderId: initialSoId }: { salesOrderId?: stri
                         type="number"
                         min={1}
                         value={it.quantity}
-                        disabled={!!salesOrderId}
+                        disabled={lockItems}
                         onChange={(e) => setItems(items.map((x, i) => i === idx ? { ...x, quantity: Number(e.target.value) } : x))}
                         className="text-right"
                       />
                     </TableCell>
                     <TableCell>
-                      {!salesOrderId && (
+                      {!lockItems && (
                         <Button size="icon" variant="ghost" onClick={() => setItems(items.filter((_, i) => i !== idx))}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -191,7 +237,9 @@ export function ChallanForm({ salesOrderId: initialSoId }: { salesOrderId?: stri
 
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={() => navigate({ to: "/deliveries" })}>{t("common.cancel")}</Button>
-          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>{t("common.create")}</Button>
+          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+            {editing ? t("common.save") : t("common.create")}
+          </Button>
         </div>
       </CardContent></Card>
     </div>

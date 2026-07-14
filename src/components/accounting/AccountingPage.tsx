@@ -7,6 +7,7 @@ import { accountingService } from "@/services/accounting.service";
 import { voucherSchema } from "@/utils/validators";
 import { PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/common/DataTable";
+import { RowActions, actionsColumnClass } from "@/components/common/RowActions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +44,17 @@ export function AccountingPage() {
       toast.success(t("accounting.posted"));
       reset({ type: "payment", account: "cash", amount: 0, partyName: "", notes: "" });
       setOpen(false);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const removeVoucher = useMutation({
+    mutationFn: (id: string) => accountingService.removeVoucher(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["vouchers"] });
+      qc.invalidateQueries({ queryKey: ["ledger"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      toast.success(t("accounting.voided"));
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -124,6 +136,19 @@ export function AccountingPage() {
               { key: "account", header: t("common.account"), sortable: true, sortValue: (r) => r.account, render: (r) => r.account },
               { key: "party", header: t("common.party"), render: (r) => r.partyName ?? "—" },
               { key: "amount", header: t("common.amount"), sortable: true, sortValue: (r) => r.amount, render: (r) => formatCurrency(r.amount), className: "text-right" },
+              {
+                key: "actions",
+                header: t("common.actions"),
+                className: actionsColumnClass,
+                render: (r) => (
+                  <RowActions
+                    onDelete={() => {
+                      if (confirm(t("accounting.voidConfirm"))) removeVoucher.mutate(r.id);
+                    }}
+                    deleteDisabled={removeVoucher.isPending}
+                  />
+                ),
+              },
             ]}
           />
         </TabsContent>

@@ -1,7 +1,9 @@
+import { useRef } from "react";
 import { Link } from "@tanstack/react-router";
 import { Card, CardContent } from "@/components/ui/card";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { gsap, prefersReducedMotion } from "@/lib/gsap";
 
 type StatLink =
   | string
@@ -17,6 +19,7 @@ export function StatCard({
   tone?: "default" | "positive" | "warning" | "danger" | "info";
   to?: StatLink;
 }) {
+  const cardRef = useRef<HTMLDivElement>(null);
   const toneMap = {
     default: "bg-primary/10 text-primary",
     positive: "bg-success/15 text-success",
@@ -25,11 +28,23 @@ export function StatCard({
     info: "bg-info/15 text-info",
   } as const;
 
+  const onEnter = () => {
+    if (!to || prefersReducedMotion() || !cardRef.current) return;
+    gsap.to(cardRef.current, { y: -4, duration: 0.28, ease: "power2.out", overwrite: "auto" });
+  };
+  const onLeave = () => {
+    if (!to || prefersReducedMotion() || !cardRef.current) return;
+    gsap.to(cardRef.current, { y: 0, duration: 0.35, ease: "power3.out", overwrite: "auto" });
+  };
+
   const body = (
     <Card
+      ref={cardRef}
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
       className={cn(
-        "relative h-full overflow-hidden border-border/60 shadow-sm transition",
-        to && "cursor-pointer hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md",
+        "relative h-full overflow-hidden border-border/60 shadow-sm will-change-transform",
+        to && "cursor-pointer hover:border-primary/40 hover:shadow-md",
       )}
     >
       <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary/60 via-primary/30 to-transparent" />

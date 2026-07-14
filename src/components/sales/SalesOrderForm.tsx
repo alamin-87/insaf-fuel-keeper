@@ -116,7 +116,7 @@ export function SalesOrderForm({
 
   return (
     <div>
-      <PageHeader title={editing ? t("sales.edit") : mode === "quotation" ? t("sales.newQuotation") : t("sales.newOrder")} />
+      <PageHeader title={editing ? t("sales.edit") : mode === "quotation" ? t("sales.newQuotation") : t("sales.newOrder")} backTo={editing ? { to: "/sales/$id", params: { id: id! } } : "/sales"} />
       <Card><CardContent className="pt-6 space-y-6">
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-1.5">

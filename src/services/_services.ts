@@ -127,8 +127,34 @@ export const salesService = {
     }
     return order;
   },
-  update: (id: string, data: Partial<SalesOrder>) => call<SalesOrder>("update", "sales", id, data),
-  remove: (id: string) => call<{ ok: true }>("remove", "sales", id),
+  update: async (id: string, data: Partial<SalesOrder>) => {
+    const existing = await call<SalesOrder | null>("get", "sales", id);
+    if (!existing) throw new Error("Order not found");
+    const wasStocked = existing.status === "confirmed" || existing.status === "invoiced" || existing.status === "paid";
+    if (wasStocked && data.items) {
+      await adjustStock(existing.items, 1, {
+        refType: "sales", refId: id, notes: `Edit reverse ${existing.orderNo}`, by: "Sales",
+      });
+      await adjustStock(data.items, -1, {
+        refType: "sales", refId: id, notes: `Edit apply ${existing.orderNo}`, by: "Sales",
+      });
+    }
+    return call<SalesOrder>("update", "sales", id, data);
+  },
+  remove: async (id: string) => {
+    const existing = await call<SalesOrder | null>("get", "sales", id);
+    if (!existing) throw new Error("Order not found");
+    if (existing.status === "confirmed" || existing.status === "invoiced" || existing.status === "paid") {
+      await adjustStock(existing.items, 1, {
+        refType: "sales", refId: id, notes: `Delete ${existing.orderNo}`, by: "Sales",
+      });
+    }
+    const ledger = await call<LedgerEntry[]>("list", "ledger");
+    for (const entry of ledger.filter((e) => e.refType === "sales" && e.refId === id)) {
+      await call("remove", "ledger", entry.id);
+    }
+    return call<{ ok: true }>("remove", "sales", id);
+  },
   setStatus: async (id: string, status: SalesStatus) => {
     const order = await call<SalesOrder | null>("get", "sales", id);
     if (!order) throw new Error("Order not found");
@@ -186,8 +212,18 @@ export const deliveryService = {
   list: () => call<Delivery[]>("list", "deliveries"),
   get: (id: string) => call<Delivery | null>("get", "deliveries", id),
   create: (data: Omit<Delivery, "id">) => call<Delivery>("create", "deliveries", undefined, data),
-  update: (id: string, data: Partial<Delivery>) => call<Delivery>("update", "deliveries", id, data),
-  remove: (id: string) => call<{ ok: true }>("remove", "deliveries", id),
+  update: async (id: string, data: Partial<Delivery>) => {
+    const existing = await call<Delivery | null>("get", "deliveries", id);
+    if (!existing) throw new Error("Delivery not found");
+    if (existing.status !== "pending") throw new Error("Only pending deliveries can be edited");
+    return call<Delivery>("update", "deliveries", id, data);
+  },
+  remove: async (id: string) => {
+    const existing = await call<Delivery | null>("get", "deliveries", id);
+    if (!existing) throw new Error("Delivery not found");
+    if (existing.status !== "pending") throw new Error("Only pending deliveries can be deleted");
+    return call<{ ok: true }>("remove", "deliveries", id);
+  },
   confirm: async (id: string) => {
     const delivery = await call<Delivery | null>("get", "deliveries", id);
     if (!delivery) throw new Error("Delivery not found");
@@ -274,8 +310,27 @@ export const purchaseService = {
   create: async (data: Omit<PurchaseOrder, "id">) => {
     return call<PurchaseOrder>("create", "purchases", undefined, data);
   },
-  update: (id: string, data: Partial<PurchaseOrder>) => call<PurchaseOrder>("update", "purchases", id, data),
-  remove: (id: string) => call<{ ok: true }>("remove", "purchases", id),
+  update: async (id: string, data: Partial<PurchaseOrder>) => {
+    const existing = await call<PurchaseOrder | null>("get", "purchases", id);
+    if (!existing) throw new Error("Purchase order not found");
+    if (existing.status !== "draft" && existing.status !== "ordered") {
+      throw new Error("Only draft or ordered POs can be edited");
+    }
+    if (existing.paid > 0) throw new Error("Cannot edit a PO with payments");
+    return call<PurchaseOrder>("update", "purchases", id, data);
+  },
+  remove: async (id: string) => {
+    const existing = await call<PurchaseOrder | null>("get", "purchases", id);
+    if (!existing) throw new Error("Purchase order not found");
+    if (existing.status !== "draft" && existing.status !== "cancelled") {
+      throw new Error("Only draft or cancelled POs can be deleted");
+    }
+    const ledger = await call<LedgerEntry[]>("list", "ledger");
+    for (const entry of ledger.filter((e) => e.refType === "purchase" && e.refId === id)) {
+      await call("remove", "ledger", entry.id);
+    }
+    return call<{ ok: true }>("remove", "purchases", id);
+  },
   setStatus: async (id: string, status: PurchaseStatus) => {
     const po = await call<PurchaseOrder | null>("get", "purchases", id);
     if (!po) throw new Error("Purchase order not found");
@@ -400,6 +455,15 @@ export const accountingService = {
     }
     return voucher;
   },
+  removeVoucher: async (id: string) => {
+    const voucher = await call<Voucher | null>("get", "vouchers", id);
+    if (!voucher) throw new Error("Voucher not found");
+    const ledger = await call<LedgerEntry[]>("list", "ledger");
+    for (const entry of ledger.filter((e) => e.refType === "voucher" && e.refId === id)) {
+      await call("remove", "ledger", entry.id);
+    }
+    return call<{ ok: true }>("remove", "vouchers", id);
+  },
 };
 
 export const hrService = {
@@ -422,6 +486,25 @@ export const hrService = {
       status: "draft",
       createdAt: new Date().toISOString(),
     });
+  },
+  updatePayroll: async (id: string, data: Partial<Pick<PayrollRun, "bonus" | "allowance" | "deduction" | "basic" | "month">>) => {
+    const run = await call<PayrollRun | null>("get", "payroll", id);
+    if (!run) throw new Error("Payroll not found");
+    if (run.status !== "draft") throw new Error("Only draft payslips can be edited");
+    const basic = data.basic ?? run.basic;
+    const bonus = data.bonus ?? run.bonus;
+    const allowance = data.allowance ?? run.allowance;
+    const deduction = data.deduction ?? run.deduction;
+    return call<PayrollRun>("update", "payroll", id, {
+      ...data,
+      net: basic + bonus + allowance - deduction,
+    });
+  },
+  removePayroll: async (id: string) => {
+    const run = await call<PayrollRun | null>("get", "payroll", id);
+    if (!run) throw new Error("Payroll not found");
+    if (run.status !== "draft") throw new Error("Only draft payslips can be deleted");
+    return call<{ ok: true }>("remove", "payroll", id);
   },
   payPayroll: async (id: string, method: PaymentMethod = "bank") => {
     const run = await call<PayrollRun | null>("get", "payroll", id);

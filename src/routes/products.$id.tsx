@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Pencil, Trash2 } from "lucide-react";
 import { productService } from "@/services/product.service";
 import { PageHeader } from "@/components/common/PageHeader";
+import { DetailOrOutlet } from "@/components/common/DetailOrOutlet";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/utils/formatters";
@@ -14,6 +15,14 @@ export const Route = createFileRoute("/products/$id")({
 });
 
 function ProductDetail() {
+  return (
+    <DetailOrOutlet>
+      <ProductDetailBody />
+    </DetailOrOutlet>
+  );
+}
+
+function ProductDetailBody() {
   const t = useT();
   const { id } = Route.useParams();
   const navigate = useNavigate();
@@ -43,6 +52,8 @@ function ProductDetail() {
       <PageHeader
         title={p.name}
         description={`${p.category} · ${p.code}`}
+        backTo="/products"
+        backLabel={t("products.title")}
         actions={
           <div className="flex gap-2">
             <Button variant="outline" asChild>

@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { I18nProvider, useT } from "@/i18n";
 import { ThemeProvider } from "@/lib/theme";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { SmoothScrollProvider } from "@/components/common/SmoothScroll";
 
 /** Fallback client if route context is unavailable during a hard navigation. */
 const fallbackQueryClient = new QueryClient({
@@ -119,12 +120,12 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "Insaf Gas Corp ERP" },
       { name: "twitter:description", content: "Enterprise resource planning for Insaf Gas Corp — sales, cylinders, deliveries and master data." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/b5532679-0732-497b-bcb7-c52b3737b8bd/id-preview-f9751d6a--0437e65c-0746-4831-a1f7-57f4f32ad9b5.lovable.app-1783891601779.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/b5532679-0732-497b-bcb7-c52b3737b8bd/id-preview-f9751d6a--0437e65c-0746-4831-a1f7-57f4f32ad9b5.lovable.app-1783891601779.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/favicon.png?v=4", type: "image/png" },
+      { rel: "icon", href: "/favicon.ico?v=4", sizes: "any" },
+      { rel: "apple-touch-icon", href: "/favicon.png?v=4" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
@@ -167,8 +168,10 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {isLogin ? <Outlet /> : <Layout><Outlet /></Layout>}
-      {mounted && <Toaster richColors position="top-right" />}
+      <SmoothScrollProvider>
+        {isLogin ? <Outlet /> : <Layout><Outlet /></Layout>}
+        {mounted && <Toaster richColors position="top-right" />}
+      </SmoothScrollProvider>
     </QueryClientProvider>
   );
 }

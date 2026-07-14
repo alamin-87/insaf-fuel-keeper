@@ -68,7 +68,7 @@ export function CylinderForm({ id }: { id?: string }) {
 
   return (
     <div>
-      <PageHeader title={editing ? t("cylinders.edit") : t("cylinders.new")} />
+      <PageHeader title={editing ? t("cylinders.edit") : t("cylinders.new")} backTo={editing ? { to: "/cylinders/$id", params: { id: id! } } : "/cylinders"} />
       <Card><CardContent className="pt-6">
         <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="grid gap-4 md:grid-cols-2">
           <Row label={t("cylinders.serial")} error={errors.serialNumber?.message}><Input {...register("serialNumber")} /></Row>

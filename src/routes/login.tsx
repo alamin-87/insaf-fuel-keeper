@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { createFileRoute, redirect, useNavigate, useRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { loginFn, getSessionFn } from "@/lib/auth.functions";
 import { LoginGateOverlay } from "@/components/auth/LoginGateOverlay";
+import { BrandLogo } from "@/components/common/BrandLogo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { useT, useI18n } from "@/i18n";
 import type { AppRole } from "@/lib/settings-store";
 import { cn } from "@/lib/utils";
+import { gsap, prefersReducedMotion } from "@/lib/gsap";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Login · Insaf Gas Corp" }] }),
@@ -67,6 +69,50 @@ function LoginPage() {
   const [gateActive, setGateActive] = useState(false);
   const [gateUser, setGateUser] = useState<{ name: string; role?: string }>({ name: "" });
   const [pendingNav, setPendingNav] = useState<string | null>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const root = pageRef.current;
+    if (!root) return;
+
+    if (prefersReducedMotion()) {
+      gsap.set("[data-login-enter], [data-login-card]", { opacity: 1, clearProps: "transform" });
+      return;
+    }
+
+    const ctx = gsap.context(() => {
+      gsap.fromTo(
+        "[data-login-enter]",
+        { opacity: 0, y: 22 },
+        { opacity: 1, y: 0, duration: 0.6, stagger: 0.1, ease: "power3.out", clearProps: "transform" },
+      );
+      gsap.fromTo(
+        "[data-login-card]",
+        { opacity: 0, y: 28, scale: 0.96 },
+        {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          duration: 0.5,
+          stagger: 0.045,
+          delay: 0.18,
+          ease: "power3.out",
+          clearProps: "transform",
+        },
+      );
+      gsap.to("[data-login-orb]", {
+        y: "+=18",
+        x: "+=10",
+        duration: 5,
+        repeat: -1,
+        yoyo: true,
+        ease: "sine.inOut",
+        stagger: 1.2,
+      });
+    }, root);
+
+    return () => ctx.revert();
+  }, []);
 
   const finishGate = useCallback(() => {
     if (pendingNav) {
@@ -104,17 +150,15 @@ function LoginPage() {
   };
 
   return (
-    <div className="login-page login-ambient relative text-slate-50">
+    <div ref={pageRef} className="login-page login-ambient relative text-slate-50">
       <div className="login-grid-lines pointer-events-none absolute inset-0" />
-      <div className="login-orb pointer-events-none absolute -left-20 top-1/4 h-64 w-64 rounded-full bg-emerald-500/10 blur-3xl" />
-      <div className="login-orb pointer-events-none absolute -right-16 bottom-1/4 h-48 w-48 rounded-full bg-cyan-500/10 blur-3xl" style={{ animationDelay: "-3s" }} />
+      <div data-login-orb className="pointer-events-none absolute -left-20 top-1/4 h-64 w-64 rounded-full bg-emerald-500/10 blur-3xl" />
+      <div data-login-orb className="pointer-events-none absolute -right-16 bottom-1/4 h-48 w-48 rounded-full bg-cyan-500/10 blur-3xl" />
 
       <div className="relative mx-auto flex h-full max-w-[1400px] flex-col px-3 py-3 sm:px-5 sm:py-4">
-        <header className="login-enter flex shrink-0 items-center justify-between gap-2">
+        <header data-login-enter className="flex shrink-0 items-center justify-between gap-2 opacity-0">
           <div className="flex min-w-0 items-center gap-2.5">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500 text-base font-bold text-slate-950 shadow-lg shadow-emerald-500/30 sm:h-10 sm:w-10">
-              ই
-            </div>
+            <BrandLogo size="lg" className="rounded-lg shadow-lg shadow-sky-900/40" />
             <div className="min-w-0 truncate">
               <p className="truncate font-display text-sm font-semibold sm:text-base">{t("brand.name")}</p>
               <p className="truncate text-[10px] text-slate-400 sm:text-xs">{t("brand.tagline")}</p>
@@ -132,8 +176,8 @@ function LoginPage() {
           </Button>
         </header>
 
-        <main className="login-enter login-enter-delay-1 mt-3 grid min-h-0 flex-1 gap-3 lg:grid-cols-[1.2fr_0.75fr] lg:gap-4">
-          <section className="flex min-h-0 flex-col gap-2 overflow-hidden">
+        <main className="mt-3 grid min-h-0 flex-1 gap-3 lg:grid-cols-[1.2fr_0.75fr] lg:gap-4">
+          <section data-login-enter className="flex min-h-0 flex-col gap-2 overflow-hidden opacity-0">
             <div className="shrink-0">
               <div className="flex items-center gap-2">
                 <Badge className="h-5 bg-emerald-500/15 px-2 text-[10px] text-emerald-300 hover:bg-emerald-500/15">
@@ -148,7 +192,7 @@ function LoginPage() {
             </div>
 
             <div className="grid min-h-0 flex-1 grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-2.5 lg:grid-cols-4">
-              {QUICK_ACCESS.map((u, i) => {
+              {QUICK_ACCESS.map((u) => {
                 const meta = ROLE_META[u.role] ?? ROLE_META.Auditor;
                 const Icon = meta.icon;
                 const busy = pending && quickUser === u.username;
@@ -156,11 +200,11 @@ function LoginPage() {
                   <button
                     key={u.username}
                     type="button"
+                    data-login-card
                     disabled={pending || gateActive}
                     onClick={() => doLogin(u.username, QUICK_PASSWORD, u)}
-                    style={{ animationDelay: `${0.05 + i * 0.04}s` }}
                     className={cn(
-                      "login-role-btn login-card-enter group flex flex-col rounded-xl border bg-gradient-to-br p-2.5 text-left sm:p-3",
+                      "login-role-btn group flex flex-col rounded-xl border bg-gradient-to-br p-2.5 text-left opacity-0 sm:p-3",
                       "shadow-lg shadow-black/20",
                       meta.tone,
                       meta.glow,
@@ -187,7 +231,7 @@ function LoginPage() {
             <p className="shrink-0 text-center text-[9px] text-slate-600 sm:text-[10px]">{t("login.quickPassHint")}</p>
           </section>
 
-          <aside className="login-enter login-enter-delay-2 flex min-h-0 flex-col justify-center">
+          <aside data-login-enter className="flex min-h-0 flex-col justify-center opacity-0">
             <div className="rounded-2xl border border-slate-800/80 bg-slate-900/70 p-4 shadow-2xl shadow-black/40 backdrop-blur-xl sm:p-5">
               <div className="mb-3">
                 <h2 className="font-display text-base font-semibold sm:text-lg">{t("login.title")}</h2>

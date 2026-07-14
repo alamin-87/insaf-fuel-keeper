@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Pencil, Trash2, X } from "lucide-react";
+import { Pencil, RotateCcw, Save, Trash2, X } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,13 +19,21 @@ import {
 import { useT, type MessageKey } from "@/i18n";
 import { BG_THEMES, useThemeSettings } from "@/lib/theme";
 import {
-  APP_MODULES, APP_ROLES, loadPowerMatrix, savePowerMatrix,
+  APP_MODULES, APP_ROLES, defaultMatrix,
   type AppModule, type AppRole,
 } from "@/lib/settings-store";
 import {
+  getPowerMatrixFn, resetPowerMatrixFn, savePowerMatrixFn, type PowerMatrix,
+} from "@/lib/settings.functions";
+import {
   listAppUsersFn, removeAppUserFn, upsertAppUserFn, type PublicAppUser,
 } from "@/lib/users.functions";
+import { savePowerMatrix as cachePowerMatrix } from "@/lib/settings-store";
 import { cn } from "@/lib/utils";
+
+function matricesEqual(a: PowerMatrix, b: PowerMatrix) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
 
 export function SettingsPage() {
   const t = useT();
@@ -35,7 +43,11 @@ export function SettingsPage() {
     queryKey: ["appUsers"],
     queryFn: () => listAppUsersFn(),
   });
-  const [matrix, setMatrix] = useState(loadPowerMatrix);
+  const { data: serverMatrix, isLoading: matrixLoading } = useQuery({
+    queryKey: ["powerMatrix"],
+    queryFn: () => getPowerMatrixFn(),
+  });
+  const [matrix, setMatrix] = useState<PowerMatrix>(defaultMatrix);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -44,13 +56,38 @@ export function SettingsPage() {
   const [active, setActive] = useState(true);
 
   useEffect(() => {
-    setMatrix(loadPowerMatrix());
-  }, []);
+    if (serverMatrix) {
+      setMatrix(serverMatrix);
+      cachePowerMatrix(serverMatrix);
+    }
+  }, [serverMatrix]);
 
-  const persistMatrix = (next: typeof matrix) => {
-    setMatrix(next);
-    savePowerMatrix(next);
-  };
+  const dirty = useMemo(
+    () => (serverMatrix ? !matricesEqual(matrix, serverMatrix) : false),
+    [matrix, serverMatrix],
+  );
+
+  const saveMatrix = useMutation({
+    mutationFn: () => savePowerMatrixFn({ data: { matrix } }),
+    onSuccess: (saved) => {
+      setMatrix(saved);
+      cachePowerMatrix(saved);
+      qc.setQueryData(["powerMatrix"], saved);
+      toast.success(t("settings.roleUpdated"));
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const resetMatrix = useMutation({
+    mutationFn: () => resetPowerMatrixFn(),
+    onSuccess: (saved) => {
+      setMatrix(saved);
+      cachePowerMatrix(saved);
+      qc.setQueryData(["powerMatrix"], saved);
+      toast.success(t("settings.matrixReset"));
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const resetForm = () => {
     setEditingId(null);
@@ -101,12 +138,11 @@ export function SettingsPage() {
   });
 
   const toggleAccess = (r: AppRole, mod: AppModule) => {
-    const next = {
-      ...matrix,
-      [r]: { ...matrix[r], [mod]: !matrix[r][mod] },
-    };
-    persistMatrix(next);
-    toast.success(t("settings.roleUpdated"));
+    if (r === "Administrator") return;
+    setMatrix((prev) => ({
+      ...prev,
+      [r]: { ...prev[r], [mod]: !prev[r][mod] },
+    }));
   };
 
   return (
@@ -341,41 +377,75 @@ export function SettingsPage() {
         <TabsContent value="power" className="space-y-4">
           <Card>
             <CardContent className="space-y-4 pt-6">
-              <div>
-                <h3 className="font-display text-base font-semibold">{t("settings.powerTitle")}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{t("settings.powerHint")}</p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h3 className="font-display text-base font-semibold">{t("settings.powerTitle")}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{t("settings.powerHint")}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={resetMatrix.isPending || matrixLoading}
+                    onClick={() => {
+                      if (!confirm(t("settings.matrixResetConfirm"))) return;
+                      resetMatrix.mutate();
+                    }}
+                  >
+                    <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                    {t("settings.reset")}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={!dirty || saveMatrix.isPending || matrixLoading}
+                    onClick={() => saveMatrix.mutate()}
+                  >
+                    <Save className="mr-1.5 h-3.5 w-3.5" />
+                    {t("settings.saveMatrix")}
+                  </Button>
+                </div>
               </div>
-              <div className="overflow-x-auto rounded-lg border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="sticky left-0 z-10 bg-card min-w-36">{t("settings.module")}</TableHead>
-                      {APP_ROLES.map((r) => (
-                        <TableHead key={r} className="min-w-24 text-center text-[11px]">{r}</TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {APP_MODULES.map((mod) => (
-                      <TableRow key={mod.id}>
-                        <TableCell className="sticky left-0 z-10 bg-card font-medium">{mod.label}</TableCell>
+
+              {matrixLoading ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">{t("common.loading")}</p>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="sticky left-0 z-10 bg-card min-w-36">{t("settings.module")}</TableHead>
                         {APP_ROLES.map((r) => (
-                          <TableCell key={r} className="text-center">
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4 accent-primary"
-                              checked={matrix[r][mod.id]}
-                              disabled={r === "Administrator"}
-                              onChange={() => toggleAccess(r, mod.id)}
-                              aria-label={`${r} ${mod.label}`}
-                            />
-                          </TableCell>
+                          <TableHead key={r} className="min-w-24 text-center text-[11px]">{r}</TableHead>
                         ))}
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {APP_MODULES.map((mod) => (
+                        <TableRow key={mod.id}>
+                          <TableCell className="sticky left-0 z-10 bg-card font-medium">{mod.label}</TableCell>
+                          {APP_ROLES.map((r) => (
+                            <TableCell key={r} className="text-center">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 accent-primary"
+                                checked={Boolean(matrix[r]?.[mod.id])}
+                                disabled={r === "Administrator"}
+                                onChange={() => toggleAccess(r, mod.id)}
+                                aria-label={`${r} ${mod.label}`}
+                              />
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+              {dirty && (
+                <p className="text-xs text-amber-700 dark:text-amber-400">{t("settings.matrixDirty")}</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

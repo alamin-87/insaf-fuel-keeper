@@ -66,6 +66,8 @@ export function CylinderTracking({ id }: { id: string }) {
       <PageHeader
         title={t("cylinders.tracking", { serial: cylinder.serialNumber })}
         description={t("cylinders.capacityAt", { capacity: String(cylinder.capacity), location: cylinder.location })}
+        backTo="/cylinders"
+        backLabel={t("cylinders.title")}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" asChild>

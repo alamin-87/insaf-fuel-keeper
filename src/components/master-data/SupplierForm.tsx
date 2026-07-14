@@ -42,11 +42,21 @@ export function SupplierForm({ id }: { id?: string }) {
   });
 
   const mutation = useMutation({
-    mutationFn: (v: FormValues) =>
-      mode === "edit" ? supplierService.update(id!, v as never) : supplierService.create(v as never),
+    mutationFn: (v: FormValues) => {
+      const payload = {
+        ...v,
+        email: v.email || undefined,
+        gstin: v.gstin || undefined,
+        openingBalance: Number(v.openingBalance) || 0,
+      };
+      return mode === "edit"
+        ? supplierService.update(id!, payload)
+        : supplierService.create(payload as never);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["suppliers"] });
-      toast.success(t("common.save"));
+      if (id) qc.invalidateQueries({ queryKey: ["suppliers", id] });
+      toast.success(mode === "edit" ? t("suppliers.updated") : t("suppliers.created"));
       navigate({ to: id ? "/suppliers/$id" : "/suppliers", params: id ? { id } : undefined });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -57,7 +67,7 @@ export function SupplierForm({ id }: { id?: string }) {
 
   return (
     <div>
-      <PageHeader title={mode === "create" ? t("suppliers.new") : t("suppliers.edit")} />
+      <PageHeader title={mode === "create" ? t("suppliers.new") : t("suppliers.edit")} backTo={id ? { to: "/suppliers/$id", params: { id } } : "/suppliers"} />
       <Card><CardContent className="pt-6">
         <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="grid gap-4 md:grid-cols-2">
           <Row label={t("common.name")} error={errors.name?.message}><Input {...register("name")} /></Row>
@@ -65,7 +75,9 @@ export function SupplierForm({ id }: { id?: string }) {
           <Row label={t("common.email")} error={errors.email?.message}><Input type="email" {...register("email")} /></Row>
           <Row label={t("customers.gstin")}><Input {...register("gstin")} /></Row>
           <Row label={t("common.address")} error={errors.address?.message} className="md:col-span-2"><Input {...register("address")} /></Row>
-          <Row label={t("suppliers.payable")}><Input type="number" step="0.01" {...register("openingBalance")} /></Row>
+          <Row label={t("suppliers.payable")} error={errors.openingBalance?.message}>
+            <Input type="number" step="0.01" {...register("openingBalance", { valueAsNumber: true })} />
+          </Row>
           <div className="md:col-span-2 flex justify-end gap-2">
             <Button type="button" variant="ghost" onClick={() => navigate({ to: id ? "/suppliers/$id" : "/suppliers", params: id ? { id } : undefined })}>{t("common.cancel")}</Button>
             <Button type="submit" disabled={isSubmitting || mutation.isPending}>
