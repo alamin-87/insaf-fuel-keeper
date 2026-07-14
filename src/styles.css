@@ -527,11 +527,29 @@ a[href*="lovable.dev/projects"][target="_blank"],
   pointer-events: none !important;
 }
 
-/* ── Login homepage (no-scroll + gate) ── */
+/* ── Login homepage: always document-scrollable (no clipped viewport) ── */
 .login-page {
-  height: 100dvh;
-  max-height: 100dvh;
-  overflow: hidden;
+  position: relative;
+  width: 100%;
+  min-height: 100dvh;
+  min-height: 100svh;
+  overflow: visible;
+}
+
+html:has(body.login-route) {
+  height: auto !important;
+  max-height: none !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+body.login-route {
+  height: auto !important;
+  max-height: none !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: auto;
 }
 
 .login-ambient {

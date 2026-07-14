@@ -24,9 +24,25 @@ export function Dashboard() {
     setToday(new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" }));
   }, []);
 
-  const { data, isLoading } = useQuery({ queryKey: ["dashboard"], queryFn: salesService.dashboard, refetchInterval: 30000 });
-  const { data: sales = [] } = useQuery({ queryKey: ["sales"], queryFn: salesService.list });
-  const { data: expenses = [] } = useQuery({ queryKey: ["expenses"], queryFn: expenseService.list });
+  const { data, isLoading } = useQuery({
+    queryKey: ["dashboard"],
+    queryFn: salesService.dashboard,
+    refetchInterval: 30000,
+    refetchOnMount: "always",
+    staleTime: 0,
+  });
+  const { data: sales = [] } = useQuery({
+    queryKey: ["sales"],
+    queryFn: salesService.list,
+    refetchOnMount: "always",
+    staleTime: 0,
+  });
+  const { data: expenses = [] } = useQuery({
+    queryKey: ["expenses"],
+    queryFn: expenseService.list,
+    refetchOnMount: "always",
+    staleTime: 0,
+  });
 
   const s = data ?? {
     todaySales: 0, todayCollection: 0, todayExpense: 0,
@@ -48,12 +64,12 @@ export function Dashboard() {
   const periodSales = filteredSales.reduce((a, o) => a + o.total, 0);
   const periodCollection = filteredSales.reduce((a, o) => a + o.paid, 0);
   const periodExpense = filteredExpenses.reduce((a, o) => a + o.amount, 0);
-
+
   const greetingName = user?.displayName || "Operator";
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      <div data-reveal className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary-glow p-5 text-primary-foreground shadow-elegant opacity-0 sm:p-7">
+      <div data-reveal className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary-glow p-5 text-primary-foreground shadow-elegant sm:p-7">
         <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-brand/25 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-20 -left-10 h-56 w-56 rounded-full bg-primary-glow/40 blur-3xl" />
         <div className="relative grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
@@ -64,21 +80,14 @@ export function Dashboard() {
             </h1>
             <p className="mt-1 line-clamp-2 text-xs text-primary-foreground/80 sm:text-sm">{today}</p>
           </div>
-          <div className="flex shrink-0 flex-col items-end gap-1.5">
-            <div className="hidden items-center gap-2 rounded-full bg-primary-foreground/10 px-3 py-1 text-[11px] backdrop-blur sm:flex">
-              <CylinderIcon className="h-3 w-3" />
-              {t("dash.live")}
-            </div>
-          </div>
-        </div>
+        </div> 
       </div>
-
-      <div data-reveal className="rounded-xl border bg-card/60 p-3 opacity-0 backdrop-blur-sm">
+      <div data-reveal className="rounded-xl border bg-card/60 p-3 backdrop-blur-sm">
         <DateRangeFilter value={range} onChange={setRange} />
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <div data-reveal className="opacity-0">
+        <div data-reveal>
         <StatCard
           title={periodActive ? t("dash.periodSales") : t("dash.todaySales")}
           value={formatCurrency(periodActive ? periodSales : s.todaySales)}
@@ -88,7 +97,7 @@ export function Dashboard() {
           to="/sales"
         />
         </div>
-        <div data-reveal className="opacity-0">
+        <div data-reveal>
         <StatCard
           title={periodActive ? t("dash.periodCollection") : t("dash.collection")}
           value={formatCurrency(periodActive ? periodCollection : s.todayCollection)}
@@ -97,7 +106,7 @@ export function Dashboard() {
           to="/sales"
         />
         </div>
-        <div data-reveal className="opacity-0">
+        <div data-reveal>
         <StatCard
           title={periodActive ? t("dash.periodExpense") : t("dash.expense")}
           value={formatCurrency(periodActive ? periodExpense : s.todayExpense)}
@@ -107,19 +116,19 @@ export function Dashboard() {
           to="/expenses"
         />
         </div>
-        <div data-reveal className="opacity-0">
+        <div data-reveal>
         <StatCard title={t("dash.customerDue")} value={formatCurrency(s.customerDue)} icon={Users} tone="danger" hint={t("dash.hintReceivables")} to="/customers" />
         </div>
-        <div data-reveal className="opacity-0">
+        <div data-reveal>
         <StatCard title={t("dash.supplierPayable")} value={formatCurrency(s.supplierPayable)} icon={Truck} tone="warning" hint={t("dash.hintPayable")} to="/purchases" />
         </div>
-        <div data-reveal className="opacity-0">
+        <div data-reveal>
         <StatCard title={t("dash.cashBalance")} value={formatCurrency(s.cashBalance)} icon={Wallet} tone="info" hint={t("dash.hintCash")} to="/accounting" />
         </div>
-        <div data-reveal className="opacity-0">
+        <div data-reveal>
         <StatCard title={t("dash.bankBalance")} value={formatCurrency(s.bankBalance)} icon={Building2} tone="info" hint={t("dash.hintBank")} to="/accounting" />
         </div>
-        <div data-reveal className="opacity-0">
+        <div data-reveal>
         <StatCard
           title={t("dash.monthlySales")}
           value={formatCurrency(periodActive ? periodSales : s.monthlySales)}
@@ -128,21 +137,21 @@ export function Dashboard() {
           to="/reports"
         />
         </div>
-        <div data-reveal className="opacity-0">
+        <div data-reveal>
         <StatCard title={t("dash.availableStock")} value={String(s.availableStock)} icon={Package} hint={t("dash.hintUnits")} to="/inventory" />
         </div>
-        <div data-reveal className="opacity-0">
+        <div data-reveal>
         <StatCard title={t("dash.cylWarehouse")} value={String(s.cylindersInWarehouse)} icon={CylinderIcon} tone="info" to="/cylinders" />
         </div>
-        <div data-reveal className="opacity-0">
+        <div data-reveal>
         <StatCard title={t("dash.cylCustomers")} value={String(s.cylindersWithCustomers)} icon={Users} to="/cylinders" />
         </div>
-        <div data-reveal className="opacity-0">
+        <div data-reveal>
         <StatCard title={t("dash.cylRefillDamage")} value={`${s.cylindersUnderRefill} / ${s.damagedCylinders + s.lostCylinders}`} icon={AlertTriangle} tone="warning" to="/cylinders" />
         </div>
       </div>
 
-      <div data-reveal className="grid gap-4 opacity-0 lg:grid-cols-3">
+      <div data-reveal className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-1"><StockAlerts /></div>
         <KanbanView sales={filteredSales} />
       </div>

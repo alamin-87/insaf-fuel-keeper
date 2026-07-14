@@ -103,7 +103,7 @@ export const en = {
   "login.signedOut": "Signed out",
   "login.quickAccess": "Role access",
   "login.homeTitle": "Choose your workspace access",
-  "login.homeHint": "Tap a role card to auto sign-in. Or use username and password on the right.",
+  "login.homeHint": "Tap a role card to auto sign-in, or enter username and password above.",
   "login.tapToEnter": "Tap to enter →",
   "login.quickPassHint": "Demo password for all quick-access accounts: insaf123",
   "login.gateAuth": "Authenticating secure access…",

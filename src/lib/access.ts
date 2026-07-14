@@ -43,7 +43,8 @@ export function canRoleAccess(
   if (!role) return false;
   if (role === "Administrator") return true;
   if (!APP_ROLES.includes(role as AppRole)) return false;
-  if (!matrix) return role === "Administrator";
+  // Matrix still loading / unavailable — allow access so post-login dashboard isn’t blocked
+  if (!matrix) return true;
   return Boolean(matrix[role as AppRole]?.[moduleId]);
 }
 

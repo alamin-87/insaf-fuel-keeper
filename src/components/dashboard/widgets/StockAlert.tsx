@@ -8,7 +8,12 @@ import { useT } from "@/i18n";
 
 export function StockAlerts() {
   const t = useT();
-  const { data = [] } = useQuery({ queryKey: ["stock-alerts"], queryFn: productService.stockAlerts });
+  const { data = [] } = useQuery({
+    queryKey: ["stock-alerts"],
+    queryFn: productService.stockAlerts,
+    refetchOnMount: "always",
+    staleTime: 0,
+  });
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">

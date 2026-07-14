@@ -33,9 +33,10 @@ export function useSmoothScroll() {
 export function SmoothScrollProvider({ children }: { children: ReactNode }) {
   const lenisRef = useRef<Lenis | null>(null);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isLogin = pathname === "/login";
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || isLogin) return;
     if (prefersReducedMotion()) {
       document.documentElement.classList.add("scroll-smooth");
       return () => document.documentElement.classList.remove("scroll-smooth");
@@ -68,7 +69,7 @@ export function SmoothScrollProvider({ children }: { children: ReactNode }) {
       lenisRef.current = null;
       document.documentElement.classList.remove("lenis", "lenis-smooth");
     };
-  }, []);
+  }, [isLogin]);
 
   const scrollTo = useCallback((
     target: number | string | HTMLElement = 0,
@@ -95,11 +96,12 @@ export function SmoothScrollProvider({ children }: { children: ReactNode }) {
   const stop = useCallback(() => lenisRef.current?.stop(), []);
   const start = useCallback(() => lenisRef.current?.start(), []);
 
-  // Soft reset to top on navigation
+  // Soft reset to top on navigation (skip login — it manages its own scroll)
   useEffect(() => {
+    if (isLogin) return;
     scrollTo(0, { immediate: prefersReducedMotion() });
     requestAnimationFrame(() => ScrollTrigger.refresh());
-  }, [pathname, scrollTo]);
+  }, [pathname, scrollTo, isLogin]);
 
   const api = useMemo(
     () => ({ scrollTo, stop, start }),
