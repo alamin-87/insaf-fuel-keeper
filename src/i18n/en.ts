@@ -372,6 +372,7 @@ export const en = {
   "reports.bank": "Bank Book",
   "reports.gl": "General Ledger",
   "reports.pnl": "Profit & Loss",
+  "reports.balanceSheet": "Balance Sheet",
   "reports.expense": "Expense Report",
   "reports.delivery": "Vehicle-wise Delivery",
   "reports.product": "Product-wise Sales",

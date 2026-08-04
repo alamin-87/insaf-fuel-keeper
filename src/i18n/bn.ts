@@ -387,6 +387,7 @@ export const bn = {
   "reports.bank": "ব্যাংক বই",
   "reports.gl": "জেনারেল লেজার",
   "reports.pnl": "লাভ-ক্ষতি",
+  "reports.balanceSheet": "ব্যালেন্স শিট",
   "reports.expense": "খরচ রিপোর্ট",
   "reports.delivery": "যানবাহনভিত্তিক ডেলিভারি",
   "reports.product": "পণ্যভিত্তিক বিক্রি",

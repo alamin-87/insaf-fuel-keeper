@@ -7,6 +7,8 @@ import { cylinderService } from "@/services/cylinder.service";
 import { expenseService } from "@/services/expense.service";
 import { accountingService } from "@/services/accounting.service";
 import { deliveryService } from "@/services/delivery.service";
+import { customerService } from "@/services/customer.service";
+import { supplierService } from "@/services/supplier.service";
 import { PageHeader } from "@/components/common/PageHeader";
 import { DataTable } from "@/components/common/DataTable";
 import { DateRangeFilter } from "@/components/common/DateRangeFilter";
@@ -21,7 +23,7 @@ const reports = [
   { id: "stock", key: "reports.stock" }, { id: "cylinder", key: "reports.cylinder" },
   { id: "ar", key: "reports.ar" }, { id: "ap", key: "reports.ap" },
   { id: "cash", key: "reports.cash" }, { id: "bank", key: "reports.bank" },
-  { id: "gl", key: "reports.gl" }, { id: "pnl", key: "reports.pnl" },
+  { id: "gl", key: "reports.gl" }, { id: "pnl", key: "reports.pnl" }, { id: "balanceSheet", key: "reports.balanceSheet" },
   { id: "expense", key: "reports.expense" }, { id: "delivery", key: "reports.delivery" },
   { id: "product", key: "reports.product" },
 ] as const;
@@ -39,6 +41,9 @@ export function ReportsPage() {
   const { data: expensesRaw = [] } = useQuery({ queryKey: ["expenses"], queryFn: expenseService.list });
   const { data: ledgerRaw = [] } = useQuery({ queryKey: ["ledger"], queryFn: accountingService.listLedger });
   const { data: deliveriesRaw = [] } = useQuery({ queryKey: ["deliveries"], queryFn: deliveryService.list });
+  const { data: customers = [] } = useQuery({ queryKey: ["customers"], queryFn: customerService.list });
+  const { data: suppliers = [] } = useQuery({ queryKey: ["suppliers"], queryFn: supplierService.list });
+  const { data: assets = [] } = useQuery({ queryKey: ["assets"], queryFn: accountingService.listAssets });
 
   const sales = useMemo(() => filterByDateRange(salesRaw, range, (r) => r.date), [salesRaw, range]);
   const purchases = useMemo(() => filterByDateRange(purchasesRaw, range, (r) => r.date), [purchasesRaw, range]);
@@ -144,6 +149,37 @@ export function ReportsPage() {
 
     return { revenue, cogs, grossProfit, expenseList, totalExpenses, netProfit };
   }, [sales, products, expenses]);
+
+  const balanceSheet = useMemo(() => {
+    let cash = 0, bank = 0;
+    for (const e of ledger) {
+      if (e.account === "cash") cash += (e.direction === "in" ? e.amount : -e.amount);
+      if (e.account === "bank") bank += (e.direction === "in" ? e.amount : -e.amount);
+    }
+    const inventoryValue = products.reduce((sum, p) => sum + (p.stock || 0) * (p.cost || 0), 0);
+    
+    let ar = customers.reduce((sum, c) => sum + (c.openingBalance || 0), 0);
+    ar += sales.reduce((sum, s) => s.status !== "cancelled" ? sum + Math.max(0, s.total - s.paid) : sum, 0);
+
+    const currentAssets = cash + bank + inventoryValue + ar;
+    const fixedAssets = assets.reduce((sum, a) => sum + (a.currentValue || 0), 0);
+    const totalAssets = currentAssets + fixedAssets;
+
+    let ap = suppliers.reduce((sum, s) => sum + (s.openingBalance || 0), 0);
+    ap += purchases.reduce((sum, p) => p.status !== "cancelled" ? sum + Math.max(0, p.total - p.paid) : sum, 0);
+
+    const totalLiabilities = ap;
+    const retainedEarnings = pnlData.netProfit;
+    const contributedCapital = totalAssets - totalLiabilities - retainedEarnings;
+    const totalEquity = contributedCapital + retainedEarnings;
+    const totalLiabilitiesAndEquity = totalLiabilities + totalEquity;
+
+    return {
+      cash, bank, inventoryValue, ar, currentAssets, fixedAssets, totalAssets,
+      ap, totalLiabilities, retainedEarnings, contributedCapital, totalEquity,
+      totalLiabilitiesAndEquity
+    };
+  }, [ledger, products, customers, sales, assets, suppliers, purchases, pnlData]);
 
   return (
     <div className="space-y-4">
@@ -400,6 +436,88 @@ export function ReportsPage() {
                     <td className={`py-5 text-right font-bold text-lg ${pnlData.netProfit < 0 ? 'text-destructive' : 'text-emerald-600 dark:text-emerald-400'}`}>
                       {formatCurrency(pnlData.netProfit)}
                     </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div className="mt-8 flex justify-end no-print">
+                 <Button onClick={() => window.print()}>{t("common.print")}</Button>
+              </div>
+            </div>
+          )}
+          {active === "balanceSheet" && (
+            <div className="mx-auto max-w-3xl border border-muted p-8 rounded bg-card/40">
+              <div className="text-center mb-8">
+                <h2 className="text-2xl font-bold uppercase tracking-wider">{t("reports.balanceSheet")}</h2>
+                <p className="text-muted-foreground">{range.from ? formatDate(range.from.toISOString()) : ""} - {range.to ? formatDate(range.to.toISOString()) : "Today"}</p>
+              </div>
+              <table className="w-full text-sm">
+                <tbody>
+                  {/* ASSETS */}
+                  <tr><td colSpan={2} className="font-bold uppercase pb-2 pt-4 border-b border-muted text-primary">Assets</td></tr>
+                  <tr><td colSpan={2} className="py-2 pl-2 font-medium">Current Assets</td></tr>
+                  <tr>
+                    <td className="py-1.5 pl-6 text-muted-foreground">Cash in Hand</td>
+                    <td className="py-1.5 text-right">{formatCurrency(balanceSheet.cash)}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-1.5 pl-6 text-muted-foreground">Cash at Bank</td>
+                    <td className="py-1.5 text-right">{formatCurrency(balanceSheet.bank)}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-1.5 pl-6 text-muted-foreground">Accounts Receivable</td>
+                    <td className="py-1.5 text-right">{formatCurrency(balanceSheet.ar)}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-1.5 pl-6 text-muted-foreground">Inventory (Closing Stock)</td>
+                    <td className="py-1.5 text-right">{formatCurrency(balanceSheet.inventoryValue)}</td>
+                  </tr>
+                  <tr className="border-t border-muted/30">
+                    <td className="py-2 pl-4 font-semibold text-muted-foreground">Total Current Assets</td>
+                    <td className="py-2 text-right font-semibold text-muted-foreground">{formatCurrency(balanceSheet.currentAssets)}</td>
+                  </tr>
+                  
+                  <tr><td colSpan={2} className="py-2 pl-2 font-medium pt-4">Non-Current Assets</td></tr>
+                  <tr>
+                    <td className="py-1.5 pl-6 text-muted-foreground">Property, Plant & Equipment (Fixed Assets)</td>
+                    <td className="py-1.5 text-right">{formatCurrency(balanceSheet.fixedAssets)}</td>
+                  </tr>
+
+                  <tr className="border-t-2 border-b-2 border-primary/30 bg-muted/10">
+                    <td className="py-4 font-bold uppercase">Total Assets</td>
+                    <td className="py-4 text-right font-bold text-[15px]">{formatCurrency(balanceSheet.totalAssets)}</td>
+                  </tr>
+
+                  {/* LIABILITIES */}
+                  <tr><td colSpan={2} className="font-bold uppercase pb-2 pt-8 border-b border-muted text-primary">Liabilities</td></tr>
+                  <tr><td colSpan={2} className="py-2 pl-2 font-medium">Current Liabilities</td></tr>
+                  <tr>
+                    <td className="py-1.5 pl-6 text-muted-foreground">Accounts Payable</td>
+                    <td className="py-1.5 text-right">{formatCurrency(balanceSheet.ap)}</td>
+                  </tr>
+                  <tr className="border-t border-muted/50">
+                    <td className="py-3 font-bold uppercase">Total Liabilities</td>
+                    <td className="py-3 text-right font-bold">{formatCurrency(balanceSheet.totalLiabilities)}</td>
+                  </tr>
+
+                  {/* EQUITY */}
+                  <tr><td colSpan={2} className="font-bold uppercase pb-2 pt-8 border-b border-muted text-primary">Owners Equity</td></tr>
+                  <tr>
+                    <td className="py-1.5 pl-6 text-muted-foreground">Contributed Capital / Adjustment</td>
+                    <td className="py-1.5 text-right">{formatCurrency(balanceSheet.contributedCapital)}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-1.5 pl-6 text-muted-foreground">Retained Earnings (Net Profit)</td>
+                    <td className="py-1.5 text-right">{formatCurrency(balanceSheet.retainedEarnings)}</td>
+                  </tr>
+                  <tr className="border-t border-muted/50">
+                    <td className="py-3 font-bold uppercase">Total Owners Equity</td>
+                    <td className="py-3 text-right font-bold">{formatCurrency(balanceSheet.totalEquity)}</td>
+                  </tr>
+
+                  {/* TOTAL LIABILITIES & EQUITY */}
+                  <tr className="border-t-4 border-b-[6px] border-double border-primary/40 bg-muted/20">
+                    <td className="py-5 font-bold uppercase text-base">Total Liabilities & Equities</td>
+                    <td className="py-5 text-right font-bold text-[15px]">{formatCurrency(balanceSheet.totalLiabilitiesAndEquity)}</td>
                   </tr>
                 </tbody>
               </table>
