@@ -21,7 +21,7 @@ const reports = [
   { id: "stock", key: "reports.stock" }, { id: "cylinder", key: "reports.cylinder" },
   { id: "ar", key: "reports.ar" }, { id: "ap", key: "reports.ap" },
   { id: "cash", key: "reports.cash" }, { id: "bank", key: "reports.bank" },
-  { id: "gl", key: "reports.gl" },
+  { id: "gl", key: "reports.gl" }, { id: "pnl", key: "reports.pnl" },
   { id: "expense", key: "reports.expense" }, { id: "delivery", key: "reports.delivery" },
   { id: "product", key: "reports.product" },
 ] as const;
@@ -113,6 +113,37 @@ export function ReportsPage() {
     }
     return [...map.values()];
   }, [ledger]);
+
+  const pnlData = useMemo(() => {
+    const validSales = sales.filter((s) => s.status !== "cancelled" && s.status !== "draft");
+    const revenue = validSales.reduce((sum, s) => sum + s.subtotal, 0);
+
+    let cogs = 0;
+    const productMap = new Map(products.map(p => [p.id, p]));
+    for (const s of validSales) {
+      for (const item of s.items) {
+        const p = productMap.get(item.productId);
+        const cost = p?.cost || 0;
+        cogs += item.quantity * cost;
+      }
+    }
+
+    const grossProfit = revenue - cogs;
+
+    const expCategories = new Map<string, number>();
+    for (const exp of expenses) {
+      const cat = exp.category || "General";
+      expCategories.set(cat, (expCategories.get(cat) || 0) + exp.amount);
+    }
+    const expenseList = Array.from(expCategories.entries())
+      .map(([name, amount]) => ({ name, amount }))
+      .sort((a, b) => b.amount - a.amount);
+    const totalExpenses = expenseList.reduce((sum, e) => sum + e.amount, 0);
+
+    const netProfit = grossProfit - totalExpenses;
+
+    return { revenue, cogs, grossProfit, expenseList, totalExpenses, netProfit };
+  }, [sales, products, expenses]);
 
   return (
     <div className="space-y-4">
@@ -308,6 +339,74 @@ export function ReportsPage() {
                 </div>
               )}
             />
+          )}
+          {active === "pnl" && (
+            <div className="mx-auto max-w-3xl border border-muted p-8 rounded bg-card/40">
+              <div className="text-center mb-8">
+                <h2 className="text-2xl font-bold uppercase tracking-wider">{t("reports.pnl")}</h2>
+                <p className="text-muted-foreground">{range.from ? formatDate(range.from.toISOString()) : ""} - {range.to ? formatDate(range.to.toISOString()) : "Today"}</p>
+              </div>
+              <table className="w-full text-sm">
+                <tbody>
+                  {/* REVENUE */}
+                  <tr><td colSpan={2} className="font-bold uppercase pb-2 pt-4 border-b border-muted text-primary">Revenue</td></tr>
+                  <tr>
+                    <td className="py-3 pl-4 text-muted-foreground">Sales Revenue</td>
+                    <td className="py-3 text-right">{formatCurrency(pnlData.revenue)}</td>
+                  </tr>
+                  <tr className="border-t border-muted/50">
+                    <td className="py-3 font-bold uppercase">Total Revenue</td>
+                    <td className="py-3 text-right font-bold">{formatCurrency(pnlData.revenue)}</td>
+                  </tr>
+
+                  {/* COST OF SALES */}
+                  <tr><td colSpan={2} className="font-bold uppercase pb-2 pt-8 border-b border-muted text-primary">Cost of Sales</td></tr>
+                  <tr>
+                    <td className="py-3 pl-4 text-muted-foreground">Cost of Goods Sold</td>
+                    <td className="py-3 text-right">{formatCurrency(pnlData.cogs)}</td>
+                  </tr>
+                  <tr className="border-t border-muted/50">
+                    <td className="py-3 font-bold uppercase">Total Cost of Sales</td>
+                    <td className="py-3 text-right font-bold">{formatCurrency(pnlData.cogs)}</td>
+                  </tr>
+
+                  {/* GROSS PROFIT */}
+                  <tr className="border-t-2 border-b-2 border-primary/30 bg-muted/10">
+                    <td className="py-4 font-bold uppercase">Gross Profit</td>
+                    <td className="py-4 text-right font-bold text-[15px]">{formatCurrency(pnlData.grossProfit)}</td>
+                  </tr>
+
+                  {/* EXPENSES */}
+                  <tr><td colSpan={2} className="font-bold uppercase pb-2 pt-8 border-b border-muted text-primary">Expenses</td></tr>
+                  {pnlData.expenseList.length === 0 ? (
+                    <tr>
+                      <td className="py-3 pl-4 italic text-muted-foreground">No expenses recorded</td>
+                      <td className="py-3 text-right">—</td>
+                    </tr>
+                  ) : pnlData.expenseList.map((exp, i) => (
+                    <tr key={i} className="border-b border-muted/20 last:border-0">
+                      <td className="py-2.5 pl-4 text-muted-foreground">{exp.name}</td>
+                      <td className="py-2.5 text-right">{formatCurrency(exp.amount)}</td>
+                    </tr>
+                  ))}
+                  <tr className="border-t border-muted/50">
+                    <td className="py-3 font-bold uppercase">Total Expenses</td>
+                    <td className="py-3 text-right font-bold">{formatCurrency(pnlData.totalExpenses)}</td>
+                  </tr>
+
+                  {/* NET PROFIT */}
+                  <tr className="border-t-4 border-b-[6px] border-double border-primary/40 bg-muted/20">
+                    <td className="py-5 font-bold uppercase text-base">Net Profit (Loss) Before Tax</td>
+                    <td className={`py-5 text-right font-bold text-lg ${pnlData.netProfit < 0 ? 'text-destructive' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                      {formatCurrency(pnlData.netProfit)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div className="mt-8 flex justify-end no-print">
+                 <Button onClick={() => window.print()}>{t("common.print")}</Button>
+              </div>
+            </div>
           )}
           {active === "expense" && (
             <DataTable

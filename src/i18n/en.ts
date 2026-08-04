@@ -371,6 +371,7 @@ export const en = {
   "reports.cash": "Cash Book",
   "reports.bank": "Bank Book",
   "reports.gl": "General Ledger",
+  "reports.pnl": "Profit & Loss",
   "reports.expense": "Expense Report",
   "reports.delivery": "Vehicle-wise Delivery",
   "reports.product": "Product-wise Sales",
