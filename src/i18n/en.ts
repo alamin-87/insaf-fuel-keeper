@@ -370,6 +370,7 @@ export const en = {
   "reports.ap": "Accounts Payable",
   "reports.cash": "Cash Book",
   "reports.bank": "Bank Book",
+  "reports.gl": "General Ledger",
   "reports.expense": "Expense Report",
   "reports.delivery": "Vehicle-wise Delivery",
   "reports.product": "Product-wise Sales",

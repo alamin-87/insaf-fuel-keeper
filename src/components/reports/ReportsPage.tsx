@@ -21,6 +21,7 @@ const reports = [
   { id: "stock", key: "reports.stock" }, { id: "cylinder", key: "reports.cylinder" },
   { id: "ar", key: "reports.ar" }, { id: "ap", key: "reports.ap" },
   { id: "cash", key: "reports.cash" }, { id: "bank", key: "reports.bank" },
+  { id: "gl", key: "reports.gl" },
   { id: "expense", key: "reports.expense" }, { id: "delivery", key: "reports.delivery" },
   { id: "product", key: "reports.product" },
 ] as const;
@@ -85,6 +86,33 @@ export function ReportsPage() {
     }
     return [...map.values()];
   }, [purchases]);
+
+  const glRows = useMemo(() => {
+    const map = new Map<string, { id: string; accountName: string; totalDebit: number; totalCredit: number; balance: number; entries: any[] }>();
+    for (const e of ledger) {
+      // Treat "in" as Debit, "out" as Credit
+      const isDebit = e.direction === "in";
+      const debit = isDebit ? e.amount : 0;
+      const credit = !isDebit ? e.amount : 0;
+
+      const cur = map.get(e.account) ?? { id: e.account, accountName: e.account, totalDebit: 0, totalCredit: 0, balance: 0, entries: [] };
+      cur.totalDebit += debit;
+      cur.totalCredit += credit;
+      cur.balance += (debit - credit);
+      cur.entries.push({ ...e, debit, credit });
+      map.set(e.account, cur);
+    }
+    // Sort entries by date and compute running balance
+    for (const acc of map.values()) {
+      acc.entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      let run = 0;
+      for (const ent of acc.entries) {
+        run += ent.debit - ent.credit;
+        ent.runningBalance = run;
+      }
+    }
+    return [...map.values()];
+  }, [ledger]);
 
   return (
     <div className="space-y-4">
@@ -239,6 +267,46 @@ export function ReportsPage() {
                 { key: "dir", header: t("accounting.dir"), render: (r) => r.direction },
                 { key: "amt", header: t("common.amount"), render: (r) => formatCurrency(r.amount), className: "text-right" },
               ]}
+            />
+          )}
+          {active === "gl" && (
+            <DataTable
+              rows={glRows}
+              searchKeys={["accountName"]}
+              columns={[
+                { key: "acc", header: t("common.account"), render: (r) => <span className="font-medium capitalize">{r.accountName}</span> },
+                { key: "dr", header: "Total Debit", render: (r) => formatCurrency(r.totalDebit), className: "text-right" },
+                { key: "cr", header: "Total Credit", render: (r) => formatCurrency(r.totalCredit), className: "text-right" },
+                { key: "bal", header: "Balance", render: (r) => <span className="font-medium">{formatCurrency(r.balance)}</span>, className: "text-right" },
+              ]}
+              renderSubComponent={(r) => (
+                <div className="bg-muted/30 p-4 pl-12 rounded-b-md overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-muted-foreground text-left">
+                        <th className="pb-2 font-medium">{t("common.date")}</th>
+                        <th className="pb-2 font-medium">Doc/Ref</th>
+                        <th className="pb-2 font-medium">{t("common.notes")}</th>
+                        <th className="pb-2 font-medium text-right">Debit</th>
+                        <th className="pb-2 font-medium text-right">Credit</th>
+                        <th className="pb-2 font-medium text-right">Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {r.entries.map((ent) => (
+                        <tr key={ent.id} className="border-b last:border-0">
+                          <td className="py-2 whitespace-nowrap">{formatDate(ent.date)}</td>
+                          <td className="py-2">{ent.refId ? `${ent.refType}: ${ent.refId.substring(0, 8)}` : "—"}</td>
+                          <td className="py-2">{ent.notes || ent.category}</td>
+                          <td className="py-2 text-right">{ent.debit ? formatCurrency(ent.debit) : "—"}</td>
+                          <td className="py-2 text-right">{ent.credit ? formatCurrency(ent.credit) : "—"}</td>
+                          <td className="py-2 text-right font-medium">{formatCurrency(ent.runningBalance)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             />
           )}
           {active === "expense" && (
