@@ -72,19 +72,29 @@ export function PurchaseForm({ id }: { id?: string }) {
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const finalItems = items.map((it) => {
+      const finalItems: any[] = [];
+      for (const it of items) {
         let cylinderIds: string[] = [];
         if (it.cylinderSerials) {
           const serials = it.cylinderSerials.split(",").map(s => s.trim()).filter(Boolean);
-          cylinderIds = serials.map(s => {
-            const found = cylinders.find(c => c.serialNumber === s);
-            if (!found) throw new Error(`Cylinder not found: ${s}`);
-            if (found.productId !== it.productId) throw new Error(`Cylinder ${s} does not match product ${it.productName}`);
-            return found.id;
-          });
+          for (const s of serials) {
+            let found = cylinders.find(c => c.serialNumber === s);
+            if (!found) {
+              found = await cylinderService.create({
+                serialNumber: s,
+                productId: it.productId,
+                capacity: 0,
+                status: "in_transit",
+                location: "Supplier",
+              });
+            } else {
+              if (found.productId !== it.productId) throw new Error(`Cylinder ${s} does not match product ${it.productName}`);
+            }
+            cylinderIds.push(found.id);
+          }
         }
-        return { ...it, cylinderIds };
-      });
+        finalItems.push({ ...it, cylinderIds });
+      }
 
       const parsed = purchaseOrderSchema.safeParse({ supplierId, notes, items: finalItems });
       if (!parsed.success) throw new Error(parsed.error.errors[0]?.message || "Invalid form");

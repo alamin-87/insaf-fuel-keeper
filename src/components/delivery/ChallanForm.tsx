@@ -84,20 +84,29 @@ export function ChallanForm({
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const finalItems = items.map((it) => {
+      const finalItems: any[] = [];
+      for (const it of items) {
         let cylinderIds: string[] = [];
         if (it.cylinderSerials) {
           const serials = it.cylinderSerials.split(",").map(s => s.trim()).filter(Boolean);
-          cylinderIds = serials.map(s => {
-            const found = cylinders.find(c => c.serialNumber === s);
-            if (!found) throw new Error(`Cylinder not found: ${s}`);
-            if (found.productId !== it.productId) throw new Error(`Cylinder ${s} does not match product ${it.productName}`);
-            if (found.status !== "in_stock") throw new Error(`Cylinder ${s} is not in stock (current status: ${found.status})`);
-            return found.id;
-          });
+          for (const s of serials) {
+            let found = cylinders.find(c => c.serialNumber === s);
+            if (!found) {
+              found = await cylinderService.create({
+                serialNumber: s,
+                productId: it.productId,
+                capacity: 0,
+                status: "in_stock",
+                location: "Warehouse",
+              });
+            } else {
+              if (found.productId !== it.productId) throw new Error(`Cylinder ${s} does not match product ${it.productName}`);
+            }
+            cylinderIds.push(found.id);
+          }
         }
-        return { ...it, cylinderIds };
-      });
+        finalItems.push({ ...it, cylinderIds });
+      }
 
       const parsed = deliverySchema.safeParse({
         customerId,
