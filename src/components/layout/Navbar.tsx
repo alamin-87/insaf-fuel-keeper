@@ -4,6 +4,7 @@ import { Bell, Languages, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { BrandLogo } from "@/components/common/BrandLogo";
+import { NotificationsDropdown } from "./NotificationsDropdown";
 import { logoutFn } from "@/lib/auth.functions";
 import { useI18n } from "@/i18n";
 
@@ -47,7 +48,7 @@ export function Navbar() {
           <Languages className="h-3.5 w-3.5" />
           <span>{locale === "bn" ? "EN" : "বাং"}</span>
         </Button>
-        <Button variant="ghost" size="icon" className="h-9 w-9"><Bell className="h-4 w-4" /></Button>
+        <NotificationsDropdown />
         <div className="hidden items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground sm:flex">
           <User className="h-3.5 w-3.5" />
           <span className="font-medium text-foreground">{user?.displayName ?? "Operator"}</span>

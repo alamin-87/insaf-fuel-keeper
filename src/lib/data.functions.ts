@@ -209,6 +209,27 @@ export const dashboardFn = createServerFn({ method: "GET" }).handler(async (): P
   };
 });
 
+// ---------- Notifications aggregation ----------
+export const notificationsFn = createServerFn({ method: "GET" }).handler(async () => {
+  await requireUser();
+  const db = await getDb();
+  await ensureSeeded();
+
+  const products = await db.collection("products").find({}).toArray() as unknown as Product[];
+  const lowStock = products.filter(p => (p.stock || 0) <= (p.reorderLevel || 0));
+
+  const pendingDeliveries = await db.collection("deliveries").find({ status: "pending" }).toArray() as unknown as Delivery[];
+  const pendingPurchases = await db.collection("purchases").find({ status: "ordered" }).toArray() as unknown as PurchaseOrder[];
+  const pendingSales = await db.collection("sales").find({ status: "confirmed" }).toArray() as unknown as SalesOrder[];
+
+  return {
+    lowStock: lowStock.map(p => ({ id: p.id, name: p.name, stock: p.stock, reorderLevel: p.reorderLevel })),
+    pendingDeliveries: pendingDeliveries.map(d => ({ id: d.id, challanNo: d.challanNo, customerName: d.customerName })),
+    pendingPurchases: pendingPurchases.map(p => ({ id: p.id, orderNo: p.orderNo, supplierName: p.supplierName })),
+    pendingSales: pendingSales.map(s => ({ id: s.id, orderNo: s.orderNo, customerName: s.customerName }))
+  };
+});
+
 // ---------- Health check ----------
 export const mongoHealthFn = createServerFn({ method: "GET" }).handler(async () => {
   try {

@@ -4,7 +4,7 @@ import type {
   Expense, LedgerEntry, PaymentMethod, PurchaseOrder, PurchaseStatus,
   StockMovement, Voucher, VoucherType, Employee, PayrollRun, Account,
 } from "@/types";
-import { crudFn, dashboardFn } from "@/lib/data.functions";
+import { crudFn, dashboardFn, notificationsFn } from "@/lib/data.functions";
 import { genOrderNo } from "@/utils/helpers";
 
 const call = async <T,>(op: any, coll: any, id?: string, payload?: any): Promise<T> => {
@@ -206,6 +206,12 @@ export const salesService = {
   dashboard: async (): Promise<DashboardStats & { stockAlerts: StockAlert[] }> => {
     return await dashboardFn();
   },
+};
+
+export const notificationsService = {
+  getNotifications: async () => {
+    return await notificationsFn();
+  }
 };
 
 export const deliveryService = {
