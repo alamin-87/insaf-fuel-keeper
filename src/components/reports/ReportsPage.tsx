@@ -24,6 +24,7 @@ const reports = [
   { id: "ar", key: "reports.ar" }, { id: "ap", key: "reports.ap" },
   { id: "cash", key: "reports.cash" }, { id: "bank", key: "reports.bank" },
   { id: "gl", key: "reports.gl" }, { id: "pnl", key: "reports.pnl" }, { id: "balanceSheet", key: "reports.balanceSheet" }, { id: "cashFlow", key: "reports.cashFlow" },
+  { id: "trialBalance", key: "reports.trialBalance" },
   { id: "expense", key: "reports.expense" }, { id: "delivery", key: "reports.delivery" },
   { id: "product", key: "reports.product" },
 ] as const;
@@ -217,6 +218,42 @@ export function ReportsPage() {
       netCashFlow
     };
   }, [ledger]);
+
+  const trialBalance = useMemo(() => {
+    const rows: { name: string; debit: number; credit: number }[] = [];
+    
+    const addRow = (name: string, isDebitNormal: boolean, amount: number) => {
+      if (amount === 0) return;
+      if (amount > 0) {
+        if (isDebitNormal) rows.push({ name, debit: amount, credit: 0 });
+        else rows.push({ name, debit: 0, credit: amount });
+      } else {
+        if (isDebitNormal) rows.push({ name, debit: 0, credit: Math.abs(amount) });
+        else rows.push({ name, debit: Math.abs(amount), credit: 0 });
+      }
+    };
+
+    addRow("Cash in Hand", true, balanceSheet.cash);
+    addRow("Cash at Bank", true, balanceSheet.bank);
+    addRow("Accounts Receivable", true, balanceSheet.ar);
+    addRow("Inventory (Closing Stock)", true, balanceSheet.inventoryValue);
+    addRow("Property, Plant & Equipment", true, balanceSheet.fixedAssets);
+    
+    addRow("Accounts Payable", false, balanceSheet.ap);
+    addRow("Contributed Capital / Adjustment", false, balanceSheet.contributedCapital);
+    
+    addRow("Sales Revenue", false, pnlData.revenue);
+    addRow("Cost of Goods Sold", true, pnlData.cogs);
+    
+    for (const exp of pnlData.expenseList) {
+      addRow(`Expense: ${exp.name}`, true, exp.amount);
+    }
+
+    const totalDebit = rows.reduce((sum, r) => sum + r.debit, 0);
+    const totalCredit = rows.reduce((sum, r) => sum + r.credit, 0);
+
+    return { rows, totalDebit, totalCredit };
+  }, [balanceSheet, pnlData]);
 
   return (
     <div className="space-y-4">
@@ -610,6 +647,40 @@ export function ReportsPage() {
                     <td className={`py-5 text-right font-bold text-lg ${cashFlow.netCashFlow < 0 ? 'text-destructive' : 'text-primary'}`}>
                       {cashFlow.netCashFlow < 0 ? `(${formatCurrency(Math.abs(cashFlow.netCashFlow))})` : formatCurrency(cashFlow.netCashFlow)}
                     </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div className="mt-8 flex justify-end no-print">
+                 <Button onClick={() => window.print()}>{t("common.print")}</Button>
+              </div>
+            </div>
+          )}
+          {active === "trialBalance" && (
+            <div className="mx-auto max-w-3xl border border-muted p-8 rounded bg-card/40">
+              <div className="text-center mb-8">
+                <h2 className="text-2xl font-bold uppercase tracking-wider">{t("reports.trialBalance")}</h2>
+                <p className="text-muted-foreground">{range.from ? formatDate(range.from.toISOString()) : ""} - {range.to ? formatDate(range.to.toISOString()) : "Today"}</p>
+              </div>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-muted">
+                    <th className="py-2 text-left font-bold uppercase">Account Name</th>
+                    <th className="py-2 text-right font-bold uppercase w-32">Debit</th>
+                    <th className="py-2 text-right font-bold uppercase w-32">Credit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trialBalance.rows.map((row, i) => (
+                    <tr key={i} className="border-b border-muted/20 last:border-0">
+                      <td className="py-2.5">{row.name}</td>
+                      <td className="py-2.5 text-right">{row.debit > 0 ? formatCurrency(row.debit) : ""}</td>
+                      <td className="py-2.5 text-right">{row.credit > 0 ? formatCurrency(row.credit) : ""}</td>
+                    </tr>
+                  ))}
+                  <tr className="border-t-2 border-b-4 border-double border-primary/40 bg-muted/20">
+                    <td className="py-5 font-bold uppercase text-base">Totals</td>
+                    <td className="py-5 text-right font-bold text-base">{formatCurrency(trialBalance.totalDebit)}</td>
+                    <td className="py-5 text-right font-bold text-base">{formatCurrency(trialBalance.totalCredit)}</td>
                   </tr>
                 </tbody>
               </table>

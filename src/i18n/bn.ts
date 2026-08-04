@@ -389,6 +389,7 @@ export const bn = {
   "reports.pnl": "লাভ-ক্ষতি",
   "reports.balanceSheet": "ব্যালেন্স শিট",
   "reports.cashFlow": "ক্যাশ ফ্লো স্টেটমেন্ট",
+  "reports.trialBalance": "রেওয়ামিল (Trial Balance)",
   "reports.expense": "খরচ রিপোর্ট",
   "reports.delivery": "যানবাহনভিত্তিক ডেলিভারি",
   "reports.product": "পণ্যভিত্তিক বিক্রি",

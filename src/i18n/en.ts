@@ -374,6 +374,7 @@ export const en = {
   "reports.pnl": "Profit & Loss",
   "reports.balanceSheet": "Balance Sheet",
   "reports.cashFlow": "Cash Flow Statement",
+  "reports.trialBalance": "Trial Balance",
   "reports.expense": "Expense Report",
   "reports.delivery": "Vehicle-wise Delivery",
   "reports.product": "Product-wise Sales",
