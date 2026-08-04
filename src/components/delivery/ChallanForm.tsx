@@ -7,6 +7,7 @@ import { customerService } from "@/services/customer.service";
 import { productService } from "@/services/product.service";
 import { salesService } from "@/services/sales.service";
 import { deliveryService } from "@/services/delivery.service";
+import { cylinderService } from "@/services/cylinder.service";
 import { deliverySchema } from "@/utils/validators";
 import { genOrderNo } from "@/utils/helpers";
 import type { LineItem } from "@/types";
@@ -37,6 +38,7 @@ export function ChallanForm({
   const { data: customers = [] } = useQuery({ queryKey: ["customers"], queryFn: customerService.list });
   const { data: products = [] } = useQuery({ queryKey: ["products"], queryFn: productService.list });
   const { data: sales = [] } = useQuery({ queryKey: ["sales"], queryFn: salesService.list });
+  const { data: cylinders = [] } = useQuery({ queryKey: ["cylinders"], queryFn: cylinderService.list });
   const { data: existing, isLoading } = useQuery({
     queryKey: ["deliveries", id],
     queryFn: () => deliveryService.get(id!),
@@ -49,7 +51,7 @@ export function ChallanForm({
   const [customerId, setCustomerId] = useState("");
   const [driverName, setDriverName] = useState("");
   const [vehicleNo, setVehicleNo] = useState("");
-  const [items, setItems] = useState<LineItem[]>([]);
+  const [items, setItems] = useState<(LineItem & { cylinderSerials?: string })[]>([]);
   const [hydrated, setHydrated] = useState(!editing);
 
   useEffect(() => {
@@ -58,7 +60,11 @@ export function ChallanForm({
     setCustomerId(existing.customerId);
     setDriverName(existing.driverName);
     setVehicleNo(existing.vehicleNo);
-    setItems(existing.items.map((it) => ({ ...it })));
+    setItems(existing.items.map((it) => {
+      const cids = it.cylinderIds || [];
+      const serials = cylinders.filter(c => cids.includes(c.id)).map(c => c.serialNumber).join(", ");
+      return { ...it, cylinderSerials: serials };
+    }));
     setHydrated(true);
   }, [existing]);
 
@@ -67,7 +73,7 @@ export function ChallanForm({
     const so = sales.find((s) => s.id === salesOrderId);
     if (!so) return;
     setCustomerId(so.customerId);
-    setItems(so.items.map((it) => ({ ...it })));
+    setItems(so.items.map((it) => ({ ...it, cylinderSerials: "" })));
   }, [salesOrderId, sales, editing]);
 
   const addItem = () => {
@@ -78,12 +84,27 @@ export function ChallanForm({
 
   const mutation = useMutation({
     mutationFn: async () => {
+      const finalItems = items.map((it) => {
+        let cylinderIds: string[] = [];
+        if (it.cylinderSerials) {
+          const serials = it.cylinderSerials.split(",").map(s => s.trim()).filter(Boolean);
+          cylinderIds = serials.map(s => {
+            const found = cylinders.find(c => c.serialNumber === s);
+            if (!found) throw new Error(`Cylinder not found: ${s}`);
+            if (found.productId !== it.productId) throw new Error(`Cylinder ${s} does not match product ${it.productName}`);
+            if (found.status !== "in_stock") throw new Error(`Cylinder ${s} is not in stock (current status: ${found.status})`);
+            return found.id;
+          });
+        }
+        return { ...it, cylinderIds };
+      });
+
       const parsed = deliverySchema.safeParse({
         customerId,
         salesOrderId: salesOrderId || undefined,
         driverName,
         vehicleNo,
-        items,
+        items: finalItems,
       });
       if (!parsed.success) throw new Error(parsed.error.errors[0]?.message || "Invalid form");
       const c = customers.find((x) => x.id === customerId);
@@ -97,7 +118,7 @@ export function ChallanForm({
           salesOrderId: salesOrderId || undefined,
           driverName,
           vehicleNo,
-          items,
+          items: finalItems,
         });
       }
 
@@ -108,7 +129,7 @@ export function ChallanForm({
         salesOrderId: salesOrderId || undefined,
         driverName,
         vehicleNo,
-        items,
+        items: finalItems,
         status: "pending",
         date: new Date().toISOString(),
       });
@@ -187,7 +208,10 @@ export function ChallanForm({
             <div className="overflow-x-auto">
             <Table>
               <TableHeader><TableRow>
-                <TableHead>{t("common.product")}</TableHead><TableHead className="w-24 text-right">{t("common.quantity")}</TableHead><TableHead className="w-10" />
+                <TableHead>{t("common.product")}</TableHead>
+                <TableHead>Cylinder Serials (comma separated)</TableHead>
+                <TableHead className="w-24 text-right">{t("common.quantity")}</TableHead>
+                <TableHead className="w-10" />
               </TableRow></TableHeader>
               <TableBody>
                 {items.length === 0 && (
@@ -209,6 +233,13 @@ export function ChallanForm({
                           {products.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        placeholder="e.g. INS-001, INS-002"
+                        value={it.cylinderSerials || ""}
+                        onChange={(e) => setItems(items.map((x, i) => i === idx ? { ...x, cylinderSerials: e.target.value } : x))}
+                      />
                     </TableCell>
                     <TableCell>
                       <Input

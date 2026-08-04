@@ -1,6 +1,7 @@
 import type {
   Customer, Supplier, Product, Cylinder, CylinderMovement, SalesOrder, Delivery,
   Expense, LedgerEntry, PurchaseOrder, StockMovement, Voucher, Employee, PayrollRun,
+  Account, ChartOfAccount, BusinessAsset
 } from "@/types";
 
 const iso = (d: Date) => d.toISOString();
@@ -166,6 +167,28 @@ export const seedAppUsers = [
   { id: "u8", username: "auditor", password: "insaf123", displayName: "Internal Auditor", role: "Auditor", active: true, createdAt: daysAgo(200) },
 ];
 
+export const seedAccounts: Account[] = [
+  { id: "acc1", name: "bKash Merchant", type: "mobile", accountNo: "01711000000", createdAt: daysAgo(200) },
+  { id: "acc2", name: "Dutch Bangla Bank", type: "bank", accountNo: "123.456.789", bankName: "DBBL", createdAt: daysAgo(200) },
+  { id: "acc3", name: "Islami Bank", type: "bank", accountNo: "987654321", bankName: "IBBL", createdAt: daysAgo(200) },
+];
+
+export const seedChartOfAccounts: ChartOfAccount[] = [
+  { id: "coa1", name: "Sales Revenue", type: "Income", code: "INC-01", createdAt: daysAgo(200) },
+  { id: "coa2", name: "Delivery Charges", type: "Income", code: "INC-02", createdAt: daysAgo(200) },
+  { id: "coa3", name: "Salary Expense", type: "Expense", code: "EXP-01", createdAt: daysAgo(200) },
+  { id: "coa4", name: "Office Rent", type: "Expense", code: "EXP-02", createdAt: daysAgo(200) },
+  { id: "coa5", name: "Transport Fuel", type: "Expense", code: "EXP-03", createdAt: daysAgo(200) },
+  { id: "coa6", name: "Warehouse Equipment", type: "Asset", code: "AST-01", createdAt: daysAgo(200) },
+  { id: "coa7", name: "Bank Loan", type: "Liability", code: "LIA-01", createdAt: daysAgo(200) },
+];
+
+export const seedAssets: BusinessAsset[] = [
+  { id: "ast1", name: "Delivery Truck (Tata Ace)", category: "Vehicles", purchaseDate: daysAgo(400), purchaseCost: 1250000, currentValue: 1050000, notes: "Used for cylinder delivery", createdAt: daysAgo(400) },
+  { id: "ast2", name: "Forklift (Toyota)", category: "Machinery", purchaseDate: daysAgo(300), purchaseCost: 850000, currentValue: 780000, notes: "Used in warehouse", createdAt: daysAgo(300) },
+  { id: "ast3", name: "Office Computers", category: "Electronics", purchaseDate: daysAgo(200), purchaseCost: 120000, currentValue: 90000, createdAt: daysAgo(200) },
+];
+
 export const allSeed = {
   customers: seedCustomers,
   suppliers: seedSuppliers,
@@ -182,4 +205,7 @@ export const allSeed = {
   employees: seedEmployees,
   payroll: seedPayroll,
   appUsers: seedAppUsers,
+  accounts: seedAccounts,
+  chartOfAccounts: seedChartOfAccounts,
+  assets: seedAssets,
 };

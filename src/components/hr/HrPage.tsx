@@ -21,6 +21,8 @@ import { formatCurrency, formatDate } from "@/utils/formatters";
 import type { Employee, PayrollRun } from "@/types";
 import { z } from "zod";
 import { useT } from "@/i18n";
+import { Printer } from "lucide-react";
+import { PayslipPrint } from "./PayslipPrint";
 
 type EmpForm = z.infer<typeof employeeSchema>;
 
@@ -36,6 +38,25 @@ export function HrPage() {
   const [bonus, setBonus] = useState("0");
   const [allowance, setAllowance] = useState("0");
   const [deduction, setDeduction] = useState("0");
+  const [editingPayId, setEditingPayId] = useState<string | null>(null);
+  const [printRun, setPrintRun] = useState<PayrollRun | null>(null);
+  const [printOpen, setPrintOpen] = useState(false);
+
+  const startEditPay = (run: PayrollRun) => {
+    setEditingPayId(run.id);
+    setPayEmpId(run.employeeId);
+    setBonus(run.bonus.toString());
+    setAllowance(run.allowance.toString());
+    setDeduction(run.deduction.toString());
+  };
+
+  const cancelEditPay = () => {
+    setEditingPayId(null);
+    setPayEmpId("");
+    setBonus("0");
+    setAllowance("0");
+    setDeduction("0");
+  };
 
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<EmpForm>({
     resolver: zodResolver(employeeSchema),
@@ -101,26 +122,34 @@ export function HrPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const createPay = useMutation({
+  const savePay = useMutation({
     mutationFn: async () => {
       const emp = employees.find((e) => e.id === payEmpId);
       if (!emp) throw new Error(t("common.select"));
-      const month = new Date().toISOString().slice(0, 7);
-      return hrService.createPayroll({
-        employeeId: emp.id,
-        employeeName: emp.name,
-        month,
+      
+      const payload = {
         basic: emp.salary,
         bonus: Number(bonus) || 0,
         allowance: Number(allowance) || 0,
         deduction: Number(deduction) || 0,
-      });
+      };
+
+      if (editingPayId) {
+        return hrService.updatePayroll(editingPayId, payload);
+      } else {
+        const month = new Date().toISOString().slice(0, 7);
+        return hrService.createPayroll({
+          ...payload,
+          employeeId: emp.id,
+          employeeName: emp.name,
+          month,
+        });
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["payroll"] });
-      toast.success(t("hr.payslipCreated"));
-      setPayEmpId("");
-      setBonus("0"); setAllowance("0"); setDeduction("0");
+      toast.success(editingPayId ? "Payslip updated" : t("hr.payslipCreated"));
+      cancelEditPay();
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -248,8 +277,13 @@ export function HrPage() {
               <div className="space-y-1.5"><Label>{t("hr.bonus")}</Label><Input type="number" value={bonus} onChange={(e) => setBonus(e.target.value)} /></div>
               <div className="space-y-1.5"><Label>{t("hr.allowance")}</Label><Input type="number" value={allowance} onChange={(e) => setAllowance(e.target.value)} /></div>
               <div className="space-y-1.5"><Label>{t("hr.deduction")}</Label><Input type="number" value={deduction} onChange={(e) => setDeduction(e.target.value)} /></div>
-              <div className="md:col-span-5 flex justify-end">
-                <Button disabled={!payEmpId || createPay.isPending} onClick={() => createPay.mutate()}>{t("hr.createPayslip")}</Button>
+              <div className="md:col-span-5 flex justify-end gap-2">
+                {editingPayId && (
+                  <Button variant="ghost" onClick={cancelEditPay}>{t("common.cancel")}</Button>
+                )}
+                <Button disabled={!payEmpId || savePay.isPending} onClick={() => savePay.mutate()}>
+                  {editingPayId ? t("common.save") : t("hr.createPayslip")}
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -271,27 +305,39 @@ export function HrPage() {
                 key: "actions",
                 header: t("common.actions"),
                 className: actionsColumnClass,
-                render: (r) => r.status === "draft" ? (
+                render: (r) => (
                   <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                    <Button size="sm" disabled={payRun.isPending} onClick={() => payRun.mutate(r.id)}>{t("hr.pay")}</Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-destructive"
-                      disabled={removePay.isPending}
-                      onClick={() => {
-                        if (confirm(t("hr.payslipDeleteConfirm"))) removePay.mutate(r.id);
-                      }}
-                    >
-                      {t("common.delete")}
+                    {r.status === "draft" ? (
+                      <>
+                        <Button size="sm" disabled={payRun.isPending} onClick={() => payRun.mutate(r.id)}>{t("hr.pay")}</Button>
+                        <Button size="sm" variant="ghost" onClick={() => startEditPay(r)}>
+                          {t("common.edit")}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive"
+                          disabled={removePay.isPending}
+                          onClick={() => {
+                            if (confirm(t("hr.payslipDeleteConfirm"))) removePay.mutate(r.id);
+                          }}
+                        >
+                          {t("common.delete")}
+                        </Button>
+                      </>
+                    ) : <span className="text-xs text-muted-foreground px-2">{r.paidAt ? formatDate(r.paidAt) : "—"}</span>}
+                    <Button size="sm" variant="outline" onClick={() => { setPrintRun(r); setPrintOpen(true); }} className="ml-2">
+                      <Printer className="h-4 w-4" />
                     </Button>
                   </div>
-                ) : <span className="text-xs text-muted-foreground">{r.paidAt ? formatDate(r.paidAt) : "—"}</span>,
+                ),
               },
             ]}
           />
         </TabsContent>
       </Tabs>
+
+      <PayslipPrint run={printRun} open={printOpen} onOpenChange={setPrintOpen} />
     </div>
   );
 }

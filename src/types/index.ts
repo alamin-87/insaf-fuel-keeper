@@ -80,6 +80,7 @@ export interface LineItem {
   quantity: number;
   price: number;
   taxRate: number;
+  cylinderIds?: string[];
 }
 
 export type SalesStatus = "draft" | "confirmed" | "invoiced" | "paid" | "cancelled";
@@ -148,7 +149,37 @@ export interface StockMovement {
   by: string;
 }
 
-export type PaymentMethod = "cash" | "bank" | "cheque" | "mobile";
+export type PaymentMethod = "cash" | "bank" | "cheque" | "mobile" | (string & {});
+
+export interface Account {
+  id: ID;
+  name: string;
+  type: "bank" | "mobile" | "cash";
+  accountNo?: string;
+  bankName?: string;
+  createdAt: string;
+}
+
+export type CoaType = "Asset" | "Liability" | "Equity" | "Income" | "Expense";
+
+export interface ChartOfAccount {
+  id: ID;
+  name: string;
+  type: CoaType;
+  code?: string;
+  createdAt: string;
+}
+
+export interface BusinessAsset {
+  id: ID;
+  name: string;
+  category: string;
+  purchaseDate: string;
+  purchaseCost: number;
+  currentValue: number;
+  notes?: string;
+  createdAt: string;
+}
 
 export interface Expense {
   id: ID;
@@ -191,6 +222,8 @@ export interface Voucher {
   date: string;
   account: PaymentMethod;
   amount: number;
+  partyType?: "customer" | "supplier";
+  partyId?: string;
   partyName?: string;
   notes?: string;
   createdAt: string;

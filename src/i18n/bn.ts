@@ -321,6 +321,7 @@ export const bn = {
   "accounting.vouchers": "ভাউচার",
   "accounting.cashBook": "ক্যাশ বই",
   "accounting.bankBook": "ব্যাংক বই",
+  "accounting.accounts": "অ্যাকাউন্টস",
   "accounting.voucherNo": "ভাউচার #",
   "accounting.paymentVoucher": "পেমেন্ট ভাউচার",
   "accounting.receiptVoucher": "রিসিপ্ট ভাউচার",

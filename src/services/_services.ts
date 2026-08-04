@@ -2,7 +2,7 @@ import type {
   Customer, Supplier, Product, Cylinder, CylinderMovement, CylinderStatus,
   SalesOrder, SalesStatus, Delivery, StockAlert, DashboardStats, LineItem,
   Expense, LedgerEntry, PaymentMethod, PurchaseOrder, PurchaseStatus,
-  StockMovement, Voucher, VoucherType, Employee, PayrollRun,
+  StockMovement, Voucher, VoucherType, Employee, PayrollRun, Account,
 } from "@/types";
 import { crudFn, dashboardFn } from "@/lib/data.functions";
 import { genOrderNo } from "@/utils/helpers";
@@ -242,6 +242,21 @@ export const deliveryService = {
       }
     }
 
+    // Automate cylinder tracking
+    for (const item of delivery.items) {
+      if (item.cylinderIds && item.cylinderIds.length > 0) {
+        for (const cid of item.cylinderIds) {
+          await cylinderService.addMovement({
+            cylinderId: cid,
+            type: "issued",
+            customerId: delivery.customerId,
+            notes: `Auto-issued from Delivery ${delivery.challanNo}`,
+            by: "Delivery",
+          });
+        }
+      }
+    }
+
     return call<Delivery>("update", "deliveries", id, {
       status: "delivered",
       confirmedAt: new Date().toISOString(),
@@ -350,6 +365,20 @@ export const purchaseService = {
     }
     const grnNo = genOrderNo("GRN");
     await adjustStock(po.items, 1, { refType: "purchase", refId: id, notes: grnNo, by: "Warehouse" });
+    
+    // Automate cylinder tracking for receipts
+    for (const item of po.items) {
+      if (item.cylinderIds && item.cylinderIds.length > 0) {
+        for (const cid of item.cylinderIds) {
+          await cylinderService.addMovement({
+            cylinderId: cid,
+            type: "received",
+            notes: `Auto-received from PO ${po.orderNo} (GRN ${grnNo})`,
+            by: "Purchase",
+          });
+        }
+      }
+    }
     return call<PurchaseOrder>("update", "purchases", id, {
       status: "received",
       grnNo,
@@ -408,12 +437,19 @@ export const inventoryService = {
 };
 
 export const accountingService = {
+  listAccounts: () => call<Account[]>("list", "accounts"),
+  createAccount: (data: Omit<Account, "id" | "createdAt">) =>
+    call<Account>("create", "accounts", undefined, { ...data, createdAt: new Date().toISOString() }),
+  updateAccount: (id: string, data: Partial<Account>) => call<Account>("update", "accounts", id, data),
+  removeAccount: (id: string) => call<{ ok: true }>("remove", "accounts", id),
   listLedger: () => call<LedgerEntry[]>("list", "ledger"),
   listVouchers: () => call<Voucher[]>("list", "vouchers"),
   createVoucher: async (data: {
     type: VoucherType;
     account: PaymentMethod;
     amount: number;
+    partyType?: "customer" | "supplier";
+    partyId?: string;
     partyName?: string;
     notes?: string;
   }) => {
@@ -425,11 +461,14 @@ export const accountingService = {
       date: new Date().toISOString(),
       account: data.account,
       amount: data.amount,
+      partyType: data.partyType,
+      partyId: data.partyId,
       partyName: data.partyName,
       notes: data.notes,
       createdAt: new Date().toISOString(),
     });
-    const account = data.account === "cheque" || data.account === "mobile" ? "bank" : data.account === "cash" || data.account === "bank" ? data.account : "cash";
+    // We shouldn't normalize user-defined accounts back to "bank" or "cash" in ledger, we want to track them explicitly.
+    const account = data.account;
     if (data.type !== "journal") {
       await postLedger({
         date: voucher.date,
@@ -464,6 +503,17 @@ export const accountingService = {
     }
     return call<{ ok: true }>("remove", "vouchers", id);
   },
+  listCoa: () => call<ChartOfAccount[]>("list", "chartOfAccounts"),
+  createCoa: (data: Omit<ChartOfAccount, "id" | "createdAt">) =>
+    call<ChartOfAccount>("create", "chartOfAccounts", undefined, { ...data, createdAt: new Date().toISOString() }),
+  updateCoa: (id: string, data: Partial<ChartOfAccount>) => call<ChartOfAccount>("update", "chartOfAccounts", id, data),
+  removeCoa: (id: string) => call<{ ok: true }>("remove", "chartOfAccounts", id),
+  
+  listAssets: () => call<BusinessAsset[]>("list", "assets"),
+  createAsset: (data: Omit<BusinessAsset, "id" | "createdAt">) =>
+    call<BusinessAsset>("create", "assets", undefined, { ...data, createdAt: new Date().toISOString() }),
+  updateAsset: (id: string, data: Partial<BusinessAsset>) => call<BusinessAsset>("update", "assets", id, data),
+  removeAsset: (id: string) => call<{ ok: true }>("remove", "assets", id),
 };
 
 export const hrService = {

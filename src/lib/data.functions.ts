@@ -11,7 +11,7 @@ type CollName =
   | "customers" | "suppliers" | "products" | "cylinders" | "movements"
   | "sales" | "deliveries" | "expenses" | "ledger"
   | "purchases" | "stockMovements" | "vouchers" | "employees" | "payroll"
-  | "appUsers";
+  | "appUsers" | "accounts" | "chartOfAccounts" | "assets";
 
 // Strip Mongo's _id so returned docs are plain and serializable.
 const clean = <T,>(doc: any): T => {
@@ -20,7 +20,7 @@ const clean = <T,>(doc: any): T => {
   return rest as T;
 };
 
-let seedPromise: Promise<void> | null = null;
+let seedPromise: Promise<void> | null = null; // cached seed promise
 async function ensureSeeded() {
   if (seedPromise) return seedPromise;
   seedPromise = (async () => {
@@ -117,7 +117,7 @@ function dhakaDay(d: Date) {
 
 function balanceFor(ledger: LedgerEntry[], account: "cash" | "bank") {
   return ledger
-    .filter((e) => e.account === account)
+    .filter((e) => account === "bank" ? e.account !== "cash" : e.account === "cash")
     .reduce((a, e) => a + (e.direction === "in" ? e.amount : -e.amount), 0);
 }
 
@@ -165,13 +165,19 @@ export const dashboardFn = createServerFn({ method: "GET" }).handler(async (): P
   }
   const todayExpense = todaysExpenses.reduce((a, e) => a + (e.amount || 0), 0);
 
+  const vouchers = (await db.collection("vouchers").find({}).toArray()) as unknown as Voucher[];
+
   const customerDue =
     sales.reduce((a, o) => a + Math.max(0, (o.total || 0) - (o.paid || 0)), 0) +
-    customers.reduce((a, c) => a + Math.max(0, c.openingBalance || 0), 0);
+    customers.reduce((a, c) => a + Math.max(0, c.openingBalance || 0), 0) -
+    vouchers.filter((v) => v.partyType === "customer" && v.type === "receipt").reduce((a, v) => a + v.amount, 0) +
+    vouchers.filter((v) => v.partyType === "customer" && v.type === "payment").reduce((a, v) => a + v.amount, 0);
 
   const purchaseDue = purchases.reduce((a, p) => a + Math.max(0, (p.total || 0) - (p.paid || 0)), 0);
   const supplierPayable =
-    suppliers.reduce((a, s) => a + Math.max(0, s.openingBalance || 0), 0) + purchaseDue;
+    suppliers.reduce((a, s) => a + Math.max(0, s.openingBalance || 0), 0) + purchaseDue -
+    vouchers.filter((v) => v.partyType === "supplier" && v.type === "payment").reduce((a, v) => a + v.amount, 0) +
+    vouchers.filter((v) => v.partyType === "supplier" && v.type === "receipt").reduce((a, v) => a + v.amount, 0);
 
   const monthPrefix = todayStr.slice(0, 7);
   const monthlySales = sales
@@ -214,7 +220,8 @@ export const mongoHealthFn = createServerFn({ method: "GET" }).handler(async () 
     for (const name of [
       "customers", "suppliers", "products", "cylinders", "movements",
       "sales", "deliveries", "expenses", "ledger",
-      "purchases", "stockMovements", "vouchers", "employees", "payroll",
+      "purchases", "stockMovements", "vouchers", "employees", "payroll", "accounts",
+      "chartOfAccounts", "assets"
     ] as const) {
       counts[name] = await db.collection(name).countDocuments();
     }

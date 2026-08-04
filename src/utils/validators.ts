@@ -37,6 +37,7 @@ export const lineItemSchema = z.object({
   quantity: z.coerce.number().min(1),
   price: z.coerce.number().min(0),
   taxRate: z.coerce.number().min(0),
+  cylinderIds: z.array(z.string()).optional(),
 });
 
 export const salesOrderSchema = z.object({
@@ -70,8 +71,10 @@ export const employeeSchema = z.object({
 
 export const voucherSchema = z.object({
   type: z.enum(["payment", "receipt", "journal"]),
-  account: z.enum(["cash", "bank", "cheque", "mobile"]),
+  account: z.string().min(1),
   amount: z.coerce.number().min(1),
+  partyType: z.enum(["customer", "supplier"]).optional(),
+  partyId: z.string().optional(),
   partyName: z.string().optional(),
   notes: z.string().optional(),
 });

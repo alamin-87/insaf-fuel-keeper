@@ -309,6 +309,7 @@ export const en = {
   "accounting.vouchers": "Vouchers",
   "accounting.cashBook": "Cash Book",
   "accounting.bankBook": "Bank Book",
+  "accounting.accounts": "Accounts",
   "accounting.voucherNo": "Voucher #",
   "accounting.paymentVoucher": "Payment Voucher",
   "accounting.receiptVoucher": "Receipt Voucher",
