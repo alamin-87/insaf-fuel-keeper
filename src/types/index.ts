@@ -225,6 +225,8 @@ export interface Voucher {
   partyType?: "customer" | "supplier";
   partyId?: string;
   partyName?: string;
+  drAccount?: string;
+  crAccount?: string;
   notes?: string;
   createdAt: string;
 }

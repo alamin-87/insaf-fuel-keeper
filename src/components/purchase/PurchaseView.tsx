@@ -76,6 +76,7 @@ export function PurchaseView({ id }: { id: string }) {
                 <Link to="/purchases/$id/edit" params={{ id: po.id }}>{t("common.edit")}</Link>
               </Button>
             )}
+            <Button variant="outline" onClick={() => window.print()} className="no-print">{t("common.print")}</Button>
             <Badge>{t(`status.${po.status}` as any)}</Badge>
           </div>
         }
@@ -112,7 +113,7 @@ export function PurchaseView({ id }: { id: string }) {
           </div>
         </CardContent></Card>
 
-        <div className="space-y-4">
+        <div className="space-y-4 no-print">
           <Card><CardContent className="pt-6 space-y-3">
             <h3 className="font-semibold">{t("sales.workflow")}</h3>
             {(po.status === "ordered" || po.status === "draft") && (

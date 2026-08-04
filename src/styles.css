@@ -685,3 +685,31 @@ body.login-route {
     transform: none !important;
   }
 }
+
+@media print {
+  body {
+    background-color: white !important;
+    color: black !important;
+  }
+  .app-navbar,
+  .app-sidebar,
+  [data-sidebar="sidebar"],
+  [data-sidebar="menu"],
+  button,
+  .no-print {
+    display: none !important;
+  }
+  .app-main-panel {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+  .bg-card {
+    border: none !important;
+    box-shadow: none !important;
+  }
+  @page {
+    margin: 1cm;
+  }
+}

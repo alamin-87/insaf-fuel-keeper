@@ -76,5 +76,7 @@ export const voucherSchema = z.object({
   partyType: z.enum(["customer", "supplier"]).optional(),
   partyId: z.string().optional(),
   partyName: z.string().optional(),
+  drAccount: z.string().optional(),
+  crAccount: z.string().optional(),
   notes: z.string().optional(),
 });

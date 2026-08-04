@@ -457,6 +457,8 @@ export const accountingService = {
     partyType?: "customer" | "supplier";
     partyId?: string;
     partyName?: string;
+    drAccount?: string;
+    crAccount?: string;
     notes?: string;
   }) => {
     if (data.amount <= 0) throw new Error("Amount must be positive");
@@ -470,6 +472,8 @@ export const accountingService = {
       partyType: data.partyType,
       partyId: data.partyId,
       partyName: data.partyName,
+      drAccount: data.drAccount,
+      crAccount: data.crAccount,
       notes: data.notes,
       createdAt: new Date().toISOString(),
     });
@@ -487,16 +491,30 @@ export const accountingService = {
         notes: data.notes || voucher.voucherNo,
       });
     } else {
-      await postLedger({
-        date: voucher.date,
-        account,
-        direction: "in",
-        amount: data.amount,
-        category: "journal",
-        refType: "voucher",
-        refId: voucher.id,
-        notes: data.notes || voucher.voucherNo,
-      });
+      if (data.drAccount) {
+        await postLedger({
+          date: voucher.date,
+          account: data.drAccount as PaymentMethod,
+          direction: "in",
+          amount: data.amount,
+          category: "journal",
+          refType: "voucher",
+          refId: voucher.id,
+          notes: data.notes || voucher.voucherNo,
+        });
+      }
+      if (data.crAccount) {
+        await postLedger({
+          date: voucher.date,
+          account: data.crAccount as PaymentMethod,
+          direction: "out",
+          amount: data.amount,
+          category: "journal",
+          refType: "voucher",
+          refId: voucher.id,
+          notes: data.notes || voucher.voucherNo,
+        });
+      }
     }
     return voucher;
   },

@@ -36,14 +36,16 @@ export function AccountingPage() {
   const { data: accounts = [] } = useQuery({ queryKey: ["accounts"], queryFn: accountingService.listAccounts });
   const { data: customers = [] } = useQuery({ queryKey: ["customers"], queryFn: customerService.list });
   const { data: suppliers = [] } = useQuery({ queryKey: ["suppliers"], queryFn: supplierService.list });
+  const { data: coa = [] } = useQuery({ queryKey: ["coa"], queryFn: accountingService.listCoa });
   const [open, setOpen] = useState(false);
   const [selectedBank, setSelectedBank] = useState<string>("all");
 
   const { register, handleSubmit, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(voucherSchema),
-    defaultValues: { type: "payment", account: "cash", amount: 0, partyType: undefined, partyId: "", partyName: "", notes: "" },
+    defaultValues: { type: "payment", account: "cash", amount: 0, partyType: undefined, partyId: "", partyName: "", drAccount: "", crAccount: "", notes: "" },
   });
 
+  const voucherType = watch("type");
   const partyType = watch("partyType");
 
   const create = useMutation({
@@ -96,21 +98,48 @@ export function AccountingPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
-                <Label>{t("common.account")}</Label>
-                <Select value={watch("account")} onValueChange={(v) => setValue("account", v as FormValues["account"])}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">{t("common.cash")}</SelectItem>
-                    <SelectItem value="bank">{t("common.bank")}</SelectItem>
-                    <SelectItem value="cheque">{t("common.cheque")}</SelectItem>
-                    <SelectItem value="mobile">{t("common.mobileBanking")}</SelectItem>
-                    {accounts.map(acc => (
-                      <SelectItem key={acc.id} value={acc.name}>{acc.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {voucherType === "journal" ? (
+                <>
+                  <div className="space-y-1.5">
+                    <Label>Dr. Account</Label>
+                    <Select value={watch("drAccount") || ""} onValueChange={(v) => setValue("drAccount", v)}>
+                      <SelectTrigger><SelectValue placeholder="Select Debit" /></SelectTrigger>
+                      <SelectContent>
+                        {coa.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+                        <SelectItem value="cash">{t("common.cash")}</SelectItem>
+                        <SelectItem value="bank">{t("common.bank")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Cr. Account</Label>
+                    <Select value={watch("crAccount") || ""} onValueChange={(v) => setValue("crAccount", v)}>
+                      <SelectTrigger><SelectValue placeholder="Select Credit" /></SelectTrigger>
+                      <SelectContent>
+                        {coa.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+                        <SelectItem value="cash">{t("common.cash")}</SelectItem>
+                        <SelectItem value="bank">{t("common.bank")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-1.5">
+                  <Label>{t("common.account")}</Label>
+                  <Select value={watch("account")} onValueChange={(v) => setValue("account", v as FormValues["account"])}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">{t("common.cash")}</SelectItem>
+                      <SelectItem value="bank">{t("common.bank")}</SelectItem>
+                      <SelectItem value="cheque">{t("common.cheque")}</SelectItem>
+                      <SelectItem value="mobile">{t("common.mobileBanking")}</SelectItem>
+                      {accounts.map(acc => (
+                        <SelectItem key={acc.id} value={acc.name}>{acc.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="space-y-1.5">
                 <Label>{t("common.amount")}</Label>
                 <Input type="number" step="0.01" {...register("amount")} />
@@ -194,7 +223,7 @@ export function AccountingPage() {
               { key: "no", header: t("accounting.voucherNo"), sortable: true, sortValue: (r) => r.voucherNo, render: (r) => <span className="font-mono text-xs">{r.voucherNo}</span> },
               { key: "date", header: t("common.date"), sortable: true, sortValue: (r) => r.date, render: (r) => formatDate(r.date) },
               { key: "type", header: t("common.type"), sortable: true, sortValue: (r) => r.type, render: (r) => r.type },
-              { key: "account", header: t("common.account"), sortable: true, sortValue: (r) => r.account, render: (r) => r.account },
+              { key: "account", header: t("common.account"), sortable: true, sortValue: (r) => r.account, render: (r) => r.type === "journal" ? `Dr: ${r.drAccount} | Cr: ${r.crAccount}` : r.account },
               { key: "party", header: t("common.party"), render: (r) => r.partyName ?? "—" },
               { key: "amount", header: t("common.amount"), sortable: true, sortValue: (r) => r.amount, render: (r) => formatCurrency(r.amount), className: "text-right" },
               {

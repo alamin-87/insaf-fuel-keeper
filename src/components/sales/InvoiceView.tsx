@@ -146,7 +146,7 @@ export function InvoiceView({ id }: { id: string }) {
           </div>
         </CardContent></Card>
 
-        <div className="space-y-4">
+        <div className="space-y-4 no-print">
           <Card><CardContent className="pt-6 space-y-3">
             <h3 className="font-semibold">{t("sales.workflow")}</h3>
             {order.status === "draft" && (
