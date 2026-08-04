@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { salesService } from "@/services/sales.service";
 import { purchaseService } from "@/services/purchase.service";
@@ -58,13 +58,33 @@ export function ReportsPage() {
     return [...map.entries()].map(([id, v]) => ({ id, ...v }));
   }, [sales]);
 
-  const arRows = sales
-    .filter((s) => s.total > s.paid && s.status !== "cancelled")
-    .map((s) => ({ id: s.id, orderNo: s.orderNo, customerName: s.customerName, due: s.total - s.paid }));
+  const arRows = useMemo(() => {
+    const map = new Map<string, { id: string; customerName: string; due: number; orders: { id: string; orderNo: string; date: string; due: number }[] }>();
+    for (const s of sales) {
+      if (s.total > s.paid && s.status !== "cancelled") {
+        const due = s.total - s.paid;
+        const cur = map.get(s.customerId) ?? { id: s.customerId, customerName: s.customerName, due: 0, orders: [] };
+        cur.due += due;
+        cur.orders.push({ id: s.id, orderNo: s.orderNo, date: s.date, due });
+        map.set(s.customerId, cur);
+      }
+    }
+    return [...map.values()];
+  }, [sales]);
 
-  const apRows = purchases
-    .filter((p) => p.total > p.paid && p.status !== "cancelled")
-    .map((p) => ({ id: p.id, orderNo: p.orderNo, supplierName: p.supplierName, due: p.total - p.paid }));
+  const apRows = useMemo(() => {
+    const map = new Map<string, { id: string; supplierName: string; due: number; orders: { id: string; orderNo: string; date: string; due: number }[] }>();
+    for (const p of purchases) {
+      if (p.total > p.paid && p.status !== "cancelled") {
+        const due = p.total - p.paid;
+        const cur = map.get(p.supplierId) ?? { id: p.supplierId, supplierName: p.supplierName, due: 0, orders: [] };
+        cur.due += due;
+        cur.orders.push({ id: p.id, orderNo: p.orderNo, date: p.date, due });
+        map.set(p.supplierId, cur);
+      }
+    }
+    return [...map.values()];
+  }, [purchases]);
 
   return (
     <div className="space-y-4">
@@ -134,23 +154,67 @@ export function ReportsPage() {
           {active === "ar" && (
             <DataTable
               rows={arRows}
-              searchKeys={["orderNo", "customerName"]}
+              searchKeys={["customerName"]}
               columns={[
-                { key: "no", header: t("sales.orderNo"), render: (r) => r.orderNo },
-                { key: "cust", header: t("common.customer"), render: (r) => r.customerName },
-                { key: "due", header: t("common.due"), render: (r) => formatCurrency(r.due), className: "text-right" },
+                { key: "cust", header: t("common.customer"), render: (r) => <span className="font-medium">{r.customerName}</span> },
+                { key: "orders", header: t("sales.title"), render: (r) => <span className="text-muted-foreground text-sm">{r.orders.length} {t("sales.title")}</span> },
+                { key: "due", header: t("common.due"), render: (r) => <span className="font-medium">{formatCurrency(r.due)}</span>, className: "text-right" },
               ]}
+              renderSubComponent={(r) => (
+                <div className="bg-muted/30 p-4 pl-12 rounded-b-md">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-muted-foreground text-left">
+                        <th className="pb-2 font-medium">{t("sales.orderNo")}</th>
+                        <th className="pb-2 font-medium">{t("common.date")}</th>
+                        <th className="pb-2 font-medium text-right">{t("common.due")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {r.orders.map((o) => (
+                        <tr key={o.id} className="border-b last:border-0">
+                          <td className="py-2">{o.orderNo}</td>
+                          <td className="py-2">{formatDate(o.date)}</td>
+                          <td className="py-2 text-right">{formatCurrency(o.due)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             />
           )}
           {active === "ap" && (
             <DataTable
               rows={apRows}
-              searchKeys={["orderNo", "supplierName"]}
+              searchKeys={["supplierName"]}
               columns={[
-                { key: "no", header: t("purchases.poNo"), render: (r) => r.orderNo },
-                { key: "sup", header: t("common.supplier"), render: (r) => r.supplierName },
-                { key: "due", header: t("common.due"), render: (r) => formatCurrency(r.due), className: "text-right" },
+                { key: "sup", header: t("common.supplier"), render: (r) => <span className="font-medium">{r.supplierName}</span> },
+                { key: "orders", header: t("purchases.title"), render: (r) => <span className="text-muted-foreground text-sm">{r.orders.length} {t("purchases.title")}</span> },
+                { key: "due", header: t("common.due"), render: (r) => <span className="font-medium">{formatCurrency(r.due)}</span>, className: "text-right" },
               ]}
+              renderSubComponent={(r) => (
+                <div className="bg-muted/30 p-4 pl-12 rounded-b-md">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-muted-foreground text-left">
+                        <th className="pb-2 font-medium">{t("purchases.poNo")}</th>
+                        <th className="pb-2 font-medium">{t("common.date")}</th>
+                        <th className="pb-2 font-medium text-right">{t("common.due")}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {r.orders.map((o) => (
+                        <tr key={o.id} className="border-b last:border-0">
+                          <td className="py-2">{o.orderNo}</td>
+                          <td className="py-2">{formatDate(o.date)}</td>
+                          <td className="py-2 text-right">{formatCurrency(o.due)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             />
           )}
           {active === "cash" && (

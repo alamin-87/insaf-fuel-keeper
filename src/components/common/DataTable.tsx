@@ -1,10 +1,10 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode, Fragment } from "react";
 import { Input } from "@/components/ui/input";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
-import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Search, ChevronRight, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useT } from "@/i18n";
 import { DateRangeFilter } from "@/components/common/DateRangeFilter";
@@ -24,7 +24,7 @@ type SortDir = "asc" | "desc";
 type DateKey<T> = keyof T | ((row: T) => string | number | Date | null | undefined);
 
 export function DataTable<T extends { id: string }>({
-  rows, columns, searchKeys, onRowClick, empty, dateKey, dateRange, onDateRangeChange,
+  rows, columns, searchKeys, onRowClick, empty, dateKey, dateRange, onDateRangeChange, renderSubComponent,
 }: {
   rows: T[];
   columns: Column<T>[];
@@ -36,12 +36,15 @@ export function DataTable<T extends { id: string }>({
   /** Controlled date range (optional — uncontrolled if omitted). */
   dateRange?: DateRange;
   onDateRangeChange?: (next: DateRange) => void;
+  /** Function to render a sub-component when a row is expanded */
+  renderSubComponent?: (row: T) => ReactNode;
 }) {
   const t = useT();
   const [q, setQ] = useState("");
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [internalRange, setInternalRange] = useState<DateRange>(EMPTY_DATE_RANGE);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const emptyLabel = empty ?? t("common.noRecords");
 
   const range = dateRange ?? internalRange;
@@ -91,6 +94,11 @@ export function DataTable<T extends { id: string }>({
       setSortKey(key);
       setSortDir("asc");
     }
+  };
+
+  const toggleExpand = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
   const showToolbar = Boolean(searchKeys) || Boolean(dateKey);
@@ -155,15 +163,41 @@ export function DataTable<T extends { id: string }>({
               </TableRow>
             ) : (
               filtered.map((row) => (
-                <TableRow
-                  key={row.id}
-                  className={onRowClick ? "cursor-pointer" : ""}
-                  onClick={() => onRowClick?.(row)}
-                >
-                  {columns.map((c) => (
-                    <TableCell key={c.key} className={c.className}>{c.render(row)}</TableCell>
-                  ))}
-                </TableRow>
+                <Fragment key={row.id}>
+                  <TableRow
+                    className={onRowClick || renderSubComponent ? "cursor-pointer" : ""}
+                    onClick={() => {
+                      if (onRowClick) onRowClick(row);
+                      else if (renderSubComponent) toggleExpand(row.id);
+                    }}
+                  >
+                    {columns.map((c, i) => (
+                      <TableCell key={c.key} className={c.className}>
+                        {i === 0 && renderSubComponent ? (
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              className="text-muted-foreground hover:text-foreground focus:outline-none"
+                              onClick={(e) => toggleExpand(row.id, e)}
+                            >
+                              {expanded[row.id] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            </button>
+                            {c.render(row)}
+                          </div>
+                        ) : (
+                          c.render(row)
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                  {renderSubComponent && expanded[row.id] && (
+                    <TableRow className="bg-muted/10 hover:bg-muted/10">
+                      <TableCell colSpan={columns.length} className="p-0 border-b">
+                        {renderSubComponent(row)}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </Fragment>
               ))
             )}
           </TableBody>
