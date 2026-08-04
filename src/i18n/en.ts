@@ -373,6 +373,7 @@ export const en = {
   "reports.gl": "General Ledger",
   "reports.pnl": "Profit & Loss",
   "reports.balanceSheet": "Balance Sheet",
+  "reports.cashFlow": "Cash Flow Statement",
   "reports.expense": "Expense Report",
   "reports.delivery": "Vehicle-wise Delivery",
   "reports.product": "Product-wise Sales",

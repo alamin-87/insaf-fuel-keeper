@@ -23,7 +23,7 @@ const reports = [
   { id: "stock", key: "reports.stock" }, { id: "cylinder", key: "reports.cylinder" },
   { id: "ar", key: "reports.ar" }, { id: "ap", key: "reports.ap" },
   { id: "cash", key: "reports.cash" }, { id: "bank", key: "reports.bank" },
-  { id: "gl", key: "reports.gl" }, { id: "pnl", key: "reports.pnl" }, { id: "balanceSheet", key: "reports.balanceSheet" },
+  { id: "gl", key: "reports.gl" }, { id: "pnl", key: "reports.pnl" }, { id: "balanceSheet", key: "reports.balanceSheet" }, { id: "cashFlow", key: "reports.cashFlow" },
   { id: "expense", key: "reports.expense" }, { id: "delivery", key: "reports.delivery" },
   { id: "product", key: "reports.product" },
 ] as const;
@@ -180,6 +180,43 @@ export function ReportsPage() {
       totalLiabilitiesAndEquity
     };
   }, [ledger, products, customers, sales, assets, suppliers, purchases, pnlData]);
+
+  const cashFlow = useMemo(() => {
+    const cashLedger = ledger.filter(e => e.account === "cash" || e.account === "bank");
+
+    let opReceipts = 0, opPayments = 0;
+    let invReceipts = 0, invPayments = 0;
+    let finReceipts = 0, finPayments = 0;
+    
+    for (const e of cashLedger) {
+      const amt = e.amount;
+      const isIn = e.direction === "in";
+
+      if (e.category === "collection" || e.category === "receipt") {
+        if (isIn) opReceipts += amt; else opPayments += amt;
+      } else if (e.category === "purchase" || e.category === "expense" || e.refType === "payroll" || e.category === "payment") {
+        if (isIn) opReceipts += amt; else opPayments += amt;
+      } else if (e.category === "opening" || e.refType === "equity") {
+        if (isIn) finReceipts += amt; else finPayments += amt;
+      } else if (e.category === "journal") {
+        if (isIn) finReceipts += amt; else finPayments += amt;
+      } else {
+        if (isIn) opReceipts += amt; else opPayments += amt;
+      }
+    }
+
+    const netOperating = opReceipts - opPayments;
+    const netInvesting = invReceipts - invPayments;
+    const netFinancing = finReceipts - finPayments;
+    const netCashFlow = netOperating + netInvesting + netFinancing;
+
+    return {
+      opReceipts, opPayments, netOperating,
+      invReceipts, invPayments, netInvesting,
+      finReceipts, finPayments, netFinancing,
+      netCashFlow
+    };
+  }, [ledger]);
 
   return (
     <div className="space-y-4">
@@ -518,6 +555,61 @@ export function ReportsPage() {
                   <tr className="border-t-4 border-b-[6px] border-double border-primary/40 bg-muted/20">
                     <td className="py-5 font-bold uppercase text-base">Total Liabilities & Equities</td>
                     <td className="py-5 text-right font-bold text-[15px]">{formatCurrency(balanceSheet.totalLiabilitiesAndEquity)}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div className="mt-8 flex justify-end no-print">
+                 <Button onClick={() => window.print()}>{t("common.print")}</Button>
+              </div>
+            </div>
+          )}
+          {active === "cashFlow" && (
+            <div className="mx-auto max-w-3xl border border-muted p-8 rounded bg-card/40">
+              <div className="text-center mb-8">
+                <h2 className="text-2xl font-bold uppercase tracking-wider">{t("reports.cashFlow")}</h2>
+                <p className="text-muted-foreground">{range.from ? formatDate(range.from.toISOString()) : ""} - {range.to ? formatDate(range.to.toISOString()) : "Today"}</p>
+              </div>
+              <table className="w-full text-sm">
+                <tbody>
+                  {/* OPERATING ACTIVITIES */}
+                  <tr><td colSpan={2} className="font-bold uppercase pb-2 pt-4 text-primary italic">Operating activities</td></tr>
+                  <tr>
+                    <td className="py-2.5 pl-6 text-muted-foreground">Cash receipt (from customers)</td>
+                    <td className="py-2.5 text-right">{formatCurrency(cashFlow.opReceipts)}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2.5 pl-6 text-muted-foreground">Cash paid</td>
+                    <td className="py-2.5 text-right">({formatCurrency(cashFlow.opPayments)})</td>
+                  </tr>
+
+                  {/* INVESTING ACTIVITIES */}
+                  <tr><td colSpan={2} className="font-bold uppercase pb-2 pt-8 text-primary italic">Investing activities</td></tr>
+                  <tr>
+                    <td className="py-2.5 pl-6 text-muted-foreground">Cash receipt from sales</td>
+                    <td className="py-2.5 text-right">{formatCurrency(cashFlow.invReceipts)}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2.5 pl-6 text-muted-foreground">Equipment cost</td>
+                    <td className="py-2.5 text-right">({formatCurrency(cashFlow.invPayments)})</td>
+                  </tr>
+
+                  {/* FINANCING ACTIVITIES */}
+                  <tr><td colSpan={2} className="font-bold uppercase pb-2 pt-8 text-primary italic">Financing activities</td></tr>
+                  <tr>
+                    <td className="py-2.5 pl-6 text-muted-foreground">Cash receipt / Capital</td>
+                    <td className="py-2.5 text-right">{formatCurrency(cashFlow.finReceipts)}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2.5 pl-6 text-muted-foreground">Loan payment</td>
+                    <td className="py-2.5 text-right">({formatCurrency(cashFlow.finPayments)})</td>
+                  </tr>
+
+                  {/* NET CASH FLOW */}
+                  <tr className="border-t-2 border-primary/30 bg-primary/10 mt-6">
+                    <td className="py-5 pl-2 font-bold uppercase text-base text-primary">Net cash flow</td>
+                    <td className={`py-5 text-right font-bold text-lg ${cashFlow.netCashFlow < 0 ? 'text-destructive' : 'text-primary'}`}>
+                      {cashFlow.netCashFlow < 0 ? `(${formatCurrency(Math.abs(cashFlow.netCashFlow))})` : formatCurrency(cashFlow.netCashFlow)}
+                    </td>
                   </tr>
                 </tbody>
               </table>
