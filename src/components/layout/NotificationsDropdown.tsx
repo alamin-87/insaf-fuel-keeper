@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { notificationsService } from "@/services/_services";
 import { useT } from "@/i18n";
 import { Badge } from "@/components/ui/badge";
+import { useState, useMemo } from "react";
 
 export function NotificationsDropdown() {
   const t = useT();
@@ -17,16 +18,35 @@ export function NotificationsDropdown() {
   const pendingPurchases = notifications?.pendingPurchases || [];
   const pendingSales = notifications?.pendingSales || [];
 
-  const totalNotifications = lowStock.length + pendingDeliveries.length + pendingPurchases.length + pendingSales.length;
+  const allIds = useMemo(() => [
+    ...lowStock.map(p => `stock-${p.id}`),
+    ...pendingDeliveries.map(d => `del-${d.id}`),
+    ...pendingPurchases.map(p => `po-${p.id}`),
+    ...pendingSales.map(s => `so-${s.id}`)
+  ], [lowStock, pendingDeliveries, pendingPurchases, pendingSales]);
+
+  const [seenIds, setSeenIds] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem("seenNotifications") || "[]"); } catch { return []; }
+  });
+
+  const unreadCount = allIds.filter(id => !seenIds.includes(id)).length;
+  const totalNotifications = allIds.length;
+
+  const handleOpenChange = (open: boolean) => {
+    if (open) {
+      setSeenIds(allIds);
+      localStorage.setItem("seenNotifications", JSON.stringify(allIds));
+    }
+  };
 
   return (
-    <Popover>
+    <Popover onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative h-9 w-9">
           <Bell className="h-4 w-4" />
-          {totalNotifications > 0 && (
-            <Badge className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full p-0 text-[10px] text-white">
-              {totalNotifications}
+          {unreadCount > 0 && (
+            <Badge className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full p-0 text-[10px] text-white bg-red-500">
+              {unreadCount}
             </Badge>
           )}
         </Button>
