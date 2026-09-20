@@ -9,7 +9,7 @@ import { productService } from "@/services/product.service";
 import { cylinderService } from "@/services/cylinder.service";
 import { customerService } from "@/services/customer.service";
 import { hrService } from "@/services/hr.service";
-import { isCylinderProduct } from "@/lib/cylinder-product";
+import { isCylinderTrackedLine } from "@/lib/cylinder-product";
 import { getCylinderTrackingFn } from "@/lib/settings.functions";
 import { isDeliveryStaff } from "@/lib/hr-staff";
 import { DeliveryCylinderDialog } from "@/components/delivery/DeliveryCylinderDialog";
@@ -94,7 +94,7 @@ export function DeliveryChallan({ id }: { id: string }) {
   });
 
   const needsCylinders = (d?.items || []).some((it) =>
-    isCylinderProduct(products.find((p) => p.id === it.productId)),
+    isCylinderTrackedLine(it, products.find((p) => p.id === it.productId)),
   );
   const canConfirm = d && (d.status === "pending" || d.status === "in_transit");
   const canDelete = d?.status === "pending";
@@ -130,9 +130,9 @@ export function DeliveryChallan({ id }: { id: string }) {
             )}
             {canConfirm && (
               <>
-                <Button disabled={busy} onClick={startConfirm}>{t("deliveries.confirm")}</Button>
+                <Button disabled={busy} data-testid="delivery-confirm" onClick={startConfirm}>{t("deliveries.confirm")}</Button>
                 {needsCylinders && (
-                  <Button variant="outline" disabled={busy} onClick={() => confirm.mutate({ skipCylinders: true })}>
+                  <Button variant="outline" disabled={busy} data-testid="delivery-confirm-gas-only" onClick={() => confirm.mutate({ skipCylinders: true })}>
                     {t("deliveries.sellGasOnly")}
                   </Button>
                 )}
@@ -254,7 +254,7 @@ export function DeliveryChallan({ id }: { id: string }) {
           <p className="text-center text-[10px] text-muted-foreground">{t("doc.pageFooter")}</p>
 
           <div className="no-print flex justify-end">
-            <Button onClick={startConfirm} disabled={!canConfirm || confirm.isPending}>
+            <Button onClick={startConfirm} disabled={!canConfirm || confirm.isPending} data-testid="delivery-confirm">
               {canConfirm ? t("deliveries.confirm") : t(`status.${d.status}` as any)}
             </Button>
           </div>

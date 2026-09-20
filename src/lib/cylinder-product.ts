@@ -8,20 +8,45 @@ export function isCylinderProduct(p?: Pick<Product, "uom" | "productType"> | nul
   return p.uom === "cyl";
 }
 
+export type SaleItemType = "gas" | "cylinder" | "product";
+
+/** Line classification. Historical rows without itemType follow the product (Gas vs Cylinder). */
+export function saleItemType(
+  item?: Pick<LineItem, "itemType"> | null,
+  p?: Pick<Product, "uom" | "productType"> | null,
+): SaleItemType {
+  if (item?.itemType === "gas" || item?.itemType === "cylinder" || item?.itemType === "product") {
+    return item.itemType;
+  }
+  return isCylinderProduct(p) ? "cylinder" : "gas";
+}
+
+/** Serial/cylinder movement applies only to Cylinder-typed lines (or historical cylinder products). */
+export function isCylinderTrackedLine(
+  item?: Pick<LineItem, "itemType"> | null,
+  p?: Pick<Product, "uom" | "productType"> | null,
+) {
+  const kind = saleItemType(item, p);
+  if (kind === "gas" || kind === "product") return false;
+  return isCylinderProduct(p);
+}
+
 /** Company cylinder on a sales line that should not hit the invoice. */
-export function isCylinderMovementOnly(item: Pick<LineItem, "price" | "sellCylinder">, p?: Pick<Product, "uom" | "productType"> | null) {
-  if (!isCylinderProduct(p)) return false;
+export function isCylinderMovementOnly(item: Pick<LineItem, "price" | "sellCylinder" | "itemType">, p?: Pick<Product, "uom" | "productType"> | null) {
+  if (!isCylinderTrackedLine(item, p)) return false;
   if (item.sellCylinder) return false;
   return !(Number(item.price) > 0);
 }
 
-export function isCylinderSaleLine(item: Pick<LineItem, "price" | "sellCylinder">, p?: Pick<Product, "uom" | "productType"> | null) {
+export function isCylinderSaleLine(item: Pick<LineItem, "price" | "sellCylinder" | "itemType">, p?: Pick<Product, "uom" | "productType"> | null) {
+  if (!isCylinderTrackedLine(item, p)) return false;
   if (p?.productType !== "cylinder") return false;
   return Boolean(item.sellCylinder) || Number(item.price) > 0;
 }
 
-export function lineFromProduct(p: Product): LineItem {
-  const movementOnly = p.productType === "cylinder";
+export function lineFromProduct(p: Product, itemType?: SaleItemType): LineItem {
+  const kind = itemType ?? (isCylinderProduct(p) ? "cylinder" : "gas");
+  const movementOnly = kind === "cylinder" && p.productType === "cylinder";
   return {
     productId: p.id,
     productName: p.name,
@@ -29,6 +54,8 @@ export function lineFromProduct(p: Product): LineItem {
     price: movementOnly ? 0 : p.price,
     taxRate: 0,
     sellCylinder: false,
+    itemType: kind,
+    category: p.category,
   };
 }
 
@@ -152,8 +179,16 @@ export function pickFifo(
     .map((c) => c.id);
 }
 
-export function suggestSerials(code: string, qty: number) {
+export function suggestSerials(code: string, qty: number, existingSerials: string[] = []) {
   const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   const prefix = (code || "CYL").replace(/\s+/g, "").toUpperCase();
-  return Array.from({ length: qty }, (_, i) => `${prefix}-${stamp}-${String(i + 1).padStart(3, "0")}`);
+  const namespace = `${prefix}-${stamp}-`;
+  let max = 0;
+  for (const raw of existingSerials) {
+    const serial = String(raw || "").trim().toUpperCase();
+    if (!serial.startsWith(namespace)) continue;
+    const n = Number.parseInt(serial.slice(namespace.length), 10);
+    if (Number.isFinite(n) && n > max) max = n;
+  }
+  return Array.from({ length: qty }, (_, i) => `${prefix}-${stamp}-${String(max + i + 1).padStart(3, "0")}`);
 }

@@ -28,6 +28,7 @@ export function ReceiveCylinderDialog({
 }) {
   const t = useT();
   const { data: products = [] } = useQuery({ queryKey: ["products"], queryFn: productService.list });
+  const { data: cylinders = [], refetch: refetchCylinders } = useQuery({ queryKey: ["cylinders"], queryFn: cylinderService.list });
   const { data: tracking = "serial" } = useQuery({ queryKey: ["cylinderTracking"], queryFn: () => getCylinderTrackingFn() });
   const [texts, setTexts] = useState<string[]>([]);
   const [qtys, setQtys] = useState<string[]>([]);
@@ -52,7 +53,8 @@ export function ReceiveCylinderDialog({
     setLotNumber("");
     setQtys(po.items.map((it) => String(lineRemainingQty(it, po))));
     setTexts(po.items.map(() => ""));
-  }, [open, po]);
+    void refetchCylinders();
+  }, [open, po, refetchCylinders]);
 
   const parsedQty = (index: number) => {
     const n = Number(qtys[index]);
@@ -65,7 +67,9 @@ export function ReceiveCylinderDialog({
     if (qty === 0) return true;
     if (tracking === "lot") return Boolean(lotNumber.trim());
     if (tracking === "serial" && isCylinderProduct(product)) {
-      return parseSerials(texts[index] || "").length === qty;
+      const serials = parseSerials(texts[index] || "");
+      if (serials.length === 0) return true;
+      return serials.length === qty;
     }
     return true;
   }) && lines.some((_, index) => parsedQty(index) > 0);
@@ -116,8 +120,15 @@ export function ReceiveCylinderDialog({
                         type="button"
                         size="sm"
                         variant="outline"
-                        onClick={() => {
-                          const generated = suggestSerials(product?.code || it.productName, qty);
+                        data-testid="generate-serials"
+                        onClick={async () => {
+                          const fresh = await refetchCylinders();
+                          const list = fresh.data ?? cylinders;
+                          const existing = [
+                            ...list.filter((c) => c.productId === product?.id).map((c) => c.serialNumber),
+                            ...texts.flatMap((row, i) => (i === index ? [] : parseSerials(row || ""))),
+                          ];
+                          const generated = suggestSerials(product?.code || it.productName, qty, existing);
                           setTexts((prev) => prev.map((row, i) => (i === index ? generated.join("\n") : row)));
                         }}
                       >
@@ -141,6 +152,7 @@ export function ReceiveCylinderDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
           <Button
             disabled={!ready || pending}
+            data-testid="grn-submit"
             onClick={() => {
               if (pending || !ready) return;
               onReceive({

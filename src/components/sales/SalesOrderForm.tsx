@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 import { customerService } from "@/services/customer.service";
 import { productService } from "@/services/product.service";
+import { productCategoryService } from "@/services/product-category.service";
 import { salesService } from "@/services/sales.service";
 import { computeTotals, genOrderNo, lineAmount, paymentStatus } from "@/utils/helpers";
 import { formatCurrency } from "@/utils/formatters";
@@ -28,7 +29,7 @@ import { cylinderService } from "@/services/cylinder.service";
 import { deliveryService } from "@/services/delivery.service";
 import { inventoryService } from "@/services/inventory.service";
 import { buildProductInventory } from "@/lib/cylinder-inventory";
-import { isCylinderMovementOnly, isCylinderProduct, isCylinderSaleLine, lineFromProduct } from "@/lib/cylinder-product";
+import { isCylinderMovementOnly, isCylinderProduct, isCylinderSaleLine, isCylinderTrackedLine, lineFromProduct, saleItemType, type SaleItemType } from "@/lib/cylinder-product";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -58,6 +59,7 @@ export function SalesOrderForm({
   const editing = Boolean(id);
   const { data: customers = [] } = useQuery({ queryKey: ["customers"], queryFn: customerService.list });
   const { data: products = [] } = useQuery({ queryKey: ["products"], queryFn: productService.list });
+  const { data: categoryRows = [] } = useQuery({ queryKey: ["productCategories"], queryFn: productCategoryService.list });
   const { data: employees = [] } = useQuery({ queryKey: ["employees"], queryFn: hrService.listEmployees });
   const deliveryStaff = employees.filter(isDeliveryStaff);
   const { data: existing, isLoading } = useQuery({
@@ -120,7 +122,7 @@ export function SalesOrderForm({
 
   const totals = computeTotals(
     items
-      .filter((it) => it.productId && (!sellGasOnly || !isCylinderProduct(products.find((p) => p.id === it.productId))))
+      .filter((it) => it.productId && (!sellGasOnly || !isCylinderTrackedLine(it, products.find((p) => p.id === it.productId))))
       .map((it) => {
         const p = products.find((x) => x.id === it.productId);
         return isCylinderMovementOnly(it, p) ? { ...it, price: 0 } : it;
@@ -134,20 +136,40 @@ export function SalesOrderForm({
   };
 
   const applyProduct = (idx: number, p: Product) => {
-    setItems((prev) => prev.map((it, i) => (
-      i === idx ? { ...lineFromProduct(p), quantity: it.quantity || 1 } : it
-    )));
+    setItems((prev) => prev.map((it, i) => {
+      if (i !== idx) return it;
+      const kind: SaleItemType = it.itemType === "product" ? "product" : (isCylinderProduct(p) ? "cylinder" : "gas");
+      return { ...lineFromProduct(p, kind), quantity: it.quantity || 1 };
+    }));
     setProductOpenIdx(null);
     setProductQuery("");
   };
 
-  const setLineKind = (idx: number, kind: "gas" | "cylinder") => {
+  const setLineKind = (idx: number, kind: SaleItemType) => {
     const it = items[idx];
-    const current = products.find((p) => p.id === it.productId);
+    if (kind === "product") {
+      const p = products.find((x) => x.id === it.productId);
+      update(idx, {
+        itemType: "product",
+        sellCylinder: false,
+        price: it.price > 0 ? it.price : (p?.price ?? it.price),
+      });
+      return;
+    }
+    const current = products.find((x) => x.id === it.productId);
     const matches = (p: Product) => (kind === "cylinder" ? isCylinderProduct(p) : !isCylinderProduct(p));
-    if (current && matches(current)) return;
+    if (current && matches(current)) {
+      update(idx, { itemType: kind, category: it.category || current.category });
+      return;
+    }
     const next = products.find(matches);
-    if (next) applyProduct(idx, next);
+    if (next) {
+      setItems((prev) => prev.map((row, i) => (
+        i === idx ? { ...lineFromProduct(next, kind), quantity: row.quantity || 1 } : row
+      )));
+      return;
+    }
+    update(idx, { itemType: kind });
   };
 
   const mutation = useMutation({
@@ -170,7 +192,9 @@ export function SalesOrderForm({
         for (const it of workingItems) {
           const row = stockRows.find((r) => r.productId === it.productId);
           const p = products.find((x) => x.id === it.productId);
-          const avail = sellGasOnly ? Math.max(0, p?.stock ?? 0) : (row?.available ?? p?.stock ?? 0);
+          const avail = sellGasOnly || saleItemType(it, p) === "product"
+            ? Math.max(0, p?.stock ?? 0)
+            : (row?.available ?? p?.stock ?? 0);
           if (it.quantity > avail) {
             throw new Error(t("sales.insufficientStock", { available: avail, requested: it.quantity }));
           }
@@ -411,7 +435,10 @@ export function SalesOrderForm({
                 )}
                 {items.map((it, idx) => {
                   const p = products.find((x) => x.id === it.productId);
-                  const kind = isCylinderProduct(p) ? "cylinder" : "gas";
+                  const kind = saleItemType(it, p);
+                  const categoryNames = [...new Set(categoryRows.map((c) => c.name).filter(Boolean))];
+                  const lineCategory = it.category || p?.category || "";
+                  if (lineCategory && !categoryNames.includes(lineCategory)) categoryNames.unshift(lineCategory);
                   return (
                   <TableRow key={idx}>
                     <TableCell className="tabular-nums text-muted-foreground">{idx + 1}</TableCell>
@@ -466,13 +493,27 @@ export function SalesOrderForm({
                         </PopoverContent>
                       </Popover>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{p?.category || "—"}</TableCell>
                     <TableCell>
-                      <Select value={kind} onValueChange={(v) => setLineKind(idx, v as "gas" | "cylinder")}>
+                      <Select
+                        value={lineCategory || "__none"}
+                        onValueChange={(v) => update(idx, { category: v === "__none" ? "" : v })}
+                      >
+                        <SelectTrigger><SelectValue placeholder={t("common.select")} /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none">—</SelectItem>
+                          {categoryNames.map((c) => (
+                            <SelectItem key={c} value={c}>{c}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <Select value={kind} onValueChange={(v) => setLineKind(idx, v as SaleItemType)}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="gas">{t("products.type.gas")}</SelectItem>
                           <SelectItem value="cylinder">{t("products.type.cylinder")}</SelectItem>
+                          <SelectItem value="product">{t("products.type.product")}</SelectItem>
                         </SelectContent>
                       </Select>
                     </TableCell>
@@ -480,8 +521,12 @@ export function SalesOrderForm({
                       <Input type="number" min={1} value={it.quantity} onChange={(e) => update(idx, { quantity: Number(e.target.value) })} className="text-right" />
                       {(() => {
                         const row = stockRows.find((r) => r.productId === it.productId);
-                        if (row && it.quantity > row.available) {
-                          return <p className="mt-1 text-[10px] text-destructive">{t("sales.stockWarn", { qty: row.available })}</p>;
+                        if (!p && !row) return null;
+                        const avail = saleItemType(it, p) === "product"
+                          ? Math.max(0, p?.stock ?? 0)
+                          : (row?.available ?? p?.stock ?? 0);
+                        if (it.quantity > avail) {
+                          return <p className="mt-1 text-[10px] text-destructive">{t("sales.stockWarn", { qty: avail })}</p>;
                         }
                         return null;
                       })()}

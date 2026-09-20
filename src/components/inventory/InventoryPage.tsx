@@ -346,7 +346,7 @@ export function InventoryPage() {
             <div className="space-y-1.5">
               <Label>{t("common.type")}</Label>
               <Select value={type} onValueChange={(v) => setType(v as typeof type)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger data-testid="adjust-type"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="in">{t("inventory.stockIn")}</SelectItem>
                   <SelectItem value="out">{t("inventory.stockOut")}</SelectItem>

@@ -34,6 +34,7 @@ import { Route as SalesIdRouteImport } from './routes/sales.$id'
 import { Route as PurchasesNewRouteImport } from './routes/purchases.new'
 import { Route as PurchasesIdRouteImport } from './routes/purchases.$id'
 import { Route as ProductsNewRouteImport } from './routes/products.new'
+import { Route as ProductsCategoriesRouteImport } from './routes/products.categories'
 import { Route as ProductsIdRouteImport } from './routes/products.$id'
 import { Route as HrEmployeesRouteImport } from './routes/hr.employees'
 import { Route as HrIdRouteImport } from './routes/hr.$id'
@@ -181,6 +182,11 @@ const ProductsNewRoute = ProductsNewRouteImport.update({
   path: '/products/new',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProductsCategoriesRoute = ProductsCategoriesRouteImport.update({
+  id: '/products/categories',
+  path: '/products/categories',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProductsIdRoute = ProductsIdRouteImport.update({
   id: '/products/$id',
   path: '/products/$id',
@@ -307,6 +313,7 @@ export interface FileRoutesByFullPath {
   '/hr/$id': typeof HrIdRouteWithChildren
   '/hr/employees': typeof HrEmployeesRoute
   '/products/$id': typeof ProductsIdRouteWithChildren
+  '/products/categories': typeof ProductsCategoriesRoute
   '/products/new': typeof ProductsNewRoute
   '/purchases/$id': typeof PurchasesIdRouteWithChildren
   '/purchases/new': typeof PurchasesNewRoute
@@ -354,6 +361,7 @@ export interface FileRoutesByTo {
   '/hr/$id': typeof HrIdRouteWithChildren
   '/hr/employees': typeof HrEmployeesRoute
   '/products/$id': typeof ProductsIdRouteWithChildren
+  '/products/categories': typeof ProductsCategoriesRoute
   '/products/new': typeof ProductsNewRoute
   '/purchases/$id': typeof PurchasesIdRouteWithChildren
   '/purchases/new': typeof PurchasesNewRoute
@@ -403,6 +411,7 @@ export interface FileRoutesById {
   '/hr/$id': typeof HrIdRouteWithChildren
   '/hr/employees': typeof HrEmployeesRoute
   '/products/$id': typeof ProductsIdRouteWithChildren
+  '/products/categories': typeof ProductsCategoriesRoute
   '/products/new': typeof ProductsNewRoute
   '/purchases/$id': typeof PurchasesIdRouteWithChildren
   '/purchases/new': typeof PurchasesNewRoute
@@ -453,6 +462,7 @@ export interface FileRouteTypes {
     | '/hr/$id'
     | '/hr/employees'
     | '/products/$id'
+    | '/products/categories'
     | '/products/new'
     | '/purchases/$id'
     | '/purchases/new'
@@ -500,6 +510,7 @@ export interface FileRouteTypes {
     | '/hr/$id'
     | '/hr/employees'
     | '/products/$id'
+    | '/products/categories'
     | '/products/new'
     | '/purchases/$id'
     | '/purchases/new'
@@ -548,6 +559,7 @@ export interface FileRouteTypes {
     | '/hr/$id'
     | '/hr/employees'
     | '/products/$id'
+    | '/products/categories'
     | '/products/new'
     | '/purchases/$id'
     | '/purchases/new'
@@ -595,6 +607,7 @@ export interface RootRouteChildren {
   DeliveriesIdRoute: typeof DeliveriesIdRouteWithChildren
   DeliveriesNewRoute: typeof DeliveriesNewRoute
   ProductsIdRoute: typeof ProductsIdRouteWithChildren
+  ProductsCategoriesRoute: typeof ProductsCategoriesRoute
   ProductsNewRoute: typeof ProductsNewRoute
   PurchasesIdRoute: typeof PurchasesIdRouteWithChildren
   PurchasesNewRoute: typeof PurchasesNewRoute
@@ -788,6 +801,13 @@ declare module '@tanstack/react-router' {
       path: '/products/new'
       fullPath: '/products/new'
       preLoaderRoute: typeof ProductsNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/products/categories': {
+      id: '/products/categories'
+      path: '/products/categories'
+      fullPath: '/products/categories'
+      preLoaderRoute: typeof ProductsCategoriesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/products/$id': {
@@ -1069,6 +1089,7 @@ const rootRouteChildren: RootRouteChildren = {
   DeliveriesIdRoute: DeliveriesIdRouteWithChildren,
   DeliveriesNewRoute: DeliveriesNewRoute,
   ProductsIdRoute: ProductsIdRouteWithChildren,
+  ProductsCategoriesRoute: ProductsCategoriesRoute,
   ProductsNewRoute: ProductsNewRoute,
   PurchasesIdRoute: PurchasesIdRouteWithChildren,
   PurchasesNewRoute: PurchasesNewRoute,

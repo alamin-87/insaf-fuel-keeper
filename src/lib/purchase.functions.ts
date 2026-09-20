@@ -165,6 +165,11 @@ async function receivePurchaseInDb(
     }
 
     const serials = (payload?.serialsByItem?.[i] || []).map((s) => s.trim()).filter(Boolean);
+    // Serials are optional. Empty list = quantity GRN only (no cylinder records, no fake serials).
+    if (serials.length === 0) {
+      nextItems[i] = { ...item, receivedQty: lineReceivedQty(item, po) + qty };
+      continue;
+    }
     if (serials.length !== qty) {
       throw new Error("Serial quantity does not match received quantity.");
     }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { cylinderService } from "@/services/cylinder.service";
 import { productService } from "@/services/product.service";
-import { isCylinderProduct, pickFifo, cylinderIsEmpty } from "@/lib/cylinder-product";
+import { isCylinderTrackedLine, pickFifo, cylinderIsEmpty } from "@/lib/cylinder-product";
 import { getCylinderTrackingFn } from "@/lib/settings.functions";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,7 +36,7 @@ export function DeliveryCylinderDialog({
 
   const cylLines = useMemo(
     () => delivery.items.map((it, index) => ({ it, index, product: products.find((p) => p.id === it.productId) }))
-      .filter((row) => isCylinderProduct(row.product)),
+      .filter((row) => isCylinderTrackedLine(row.it, row.product)),
     [delivery.items, products],
   );
 

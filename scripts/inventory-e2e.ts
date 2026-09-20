@@ -198,9 +198,9 @@ async function main() {
     });
     const serials1 = suggestSerials(`CYL-${tag.slice(-6)}`, 2);
     await executePurchaseReceive(db, null, poCylId, { qtyByItem: [2], serialsByItem: [serials1], requestId: `${tag}-c1` }, "serial");
-    const serials2 = suggestSerials(`CYL-${tag.slice(-6)}`, 2).map((x) => `${x}-B`);
+    const serials2 = suggestSerials(`CYL-${tag.slice(-6)}`, 2, serials1);
     await executePurchaseReceive(db, null, poCylId, { qtyByItem: [2], serialsByItem: [serials2], requestId: `${tag}-c2` }, "serial");
-    const serials3 = suggestSerials(`CYL-${tag.slice(-6)}`, 1).map((x) => `${x}-C`);
+    const serials3 = suggestSerials(`CYL-${tag.slice(-6)}`, 1, [...serials1, ...serials2]);
     await executePurchaseReceive(db, null, poCylId, { qtyByItem: [1], serialsByItem: [serials3], requestId: `${tag}-c3` }, "serial");
     const cyls = await db.collection("cylinders").find({ productId: cylId }).toArray();
     must(cyls.length === 5, `expected 5 serials got ${cyls.length}`);
@@ -218,6 +218,25 @@ async function main() {
     const availAfterIssue = availableOf([cylProduct as Product], cylsAfter as Cylinder[], [], [], [], cylId);
     must(availAfterIssue === 4, `issued serial not available, got ${availAfterIssue}`);
 
+    const poCylLoose = `pol-${tag}`;
+    const stockCylBeforeLoose = Number((await db.collection("products").findOne({ id: cylId }))?.stock) || 0;
+    const cylCountBeforeLoose = await db.collection("cylinders").countDocuments({ productId: cylId });
+    await db.collection("purchases").insertOne({
+      id: poCylLoose, orderNo: `POL-${tag}`, supplierId, supplierName: `E2E Supplier ${tag}`, date: now,
+      items: [{ productId: cylId, productName: `E2E Cyl ${tag}`, quantity: 2, price: 5, taxRate: 0, receivedQty: 0 }],
+      subtotal: 10, tax: 0, total: 10, paid: 0, status: "ordered", createdAt: now,
+    });
+    refs.poCylLoose = poCylLoose;
+    await executePurchaseReceive(db, null, poCylLoose, { qtyByItem: [2], serialsByItem: [[]], requestId: `${tag}-c-loose` }, "serial");
+    const cylCountAfterLoose = await db.collection("cylinders").countDocuments({ productId: cylId });
+    must(cylCountAfterLoose === cylCountBeforeLoose, "serial-less GRN must not create fake cylinders");
+    const loosePo = await poState(db, poCylLoose);
+    must(loosePo.received === 2 && loosePo.remaining === 0, "serial-less GRN must post received qty");
+    const stockCylAfterLoose = Number((await db.collection("products").findOne({ id: cylId }))?.stock) || 0;
+    must(stockCylAfterLoose === stockCylBeforeLoose + 2, "serial-less GRN must Inventory IN receive qty only");
+    const fakeSerials = await db.collection("cylinders").find({ productId: cylId, serialNumber: /placeholder|fake|TEMP|QTY-/i }).toArray();
+    must(fakeSerials.length === 0, "no placeholder serials");
+
     console.log("LIVE E2E PASS");
     console.log(JSON.stringify({
       refs,
@@ -229,7 +248,7 @@ async function main() {
     await db.collection("costLayers").deleteMany({ productId: { $in: [productId, cylId] } });
     await db.collection("cylinders").deleteMany({ productId: cylId });
     await db.collection("movements").deleteMany({ notes: new RegExp(tag) });
-    await db.collection("purchases").deleteMany({ id: { $in: [poId, poCylId] } });
+    await db.collection("purchases").deleteMany({ id: { $in: [poId, poCylId, `pol-${tag}`] } });
     await db.collection("sales").deleteOne({ id: soId });
     await db.collection("deliveries").deleteMany({ id: { $in: [delivId, `${delivId}-2`] } });
     await db.collection("products").deleteMany({ id: { $in: [productId, cylId] } });

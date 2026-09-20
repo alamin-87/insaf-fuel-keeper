@@ -4,13 +4,13 @@ import type {
   Expense, LedgerEntry, PaymentMethod, PurchaseOrder, PurchaseStatus,
   StockMovement, Voucher, VoucherType, Employee, PayrollRun, Account,
   ChartOfAccount, BusinessAsset, CostLayer, CostingMethod, LayerConsumption,
-  JournalLine,
+  JournalLine, ProductCategory,
 } from "@/types";
 import { crudFn, dashboardFn, notificationsFn } from "@/lib/data.functions";
 import { getCylinderTrackingFn } from "@/lib/settings.functions";
 import { receivePurchaseFn } from "@/lib/purchase.functions";
 import { genOrderNo } from "@/utils/helpers";
-import { cylinderIsEmpty, cylinderIsFullStock, isCylinderProduct, isCylinderSaleLine, pickFifo, suggestSerials } from "@/lib/cylinder-product";
+import { cylinderIsEmpty, cylinderIsFullStock, isCylinderProduct, isCylinderSaleLine, isCylinderTrackedLine, pickFifo, suggestSerials } from "@/lib/cylinder-product";
 import { remainingOrderQty, buildProductInventory } from "@/lib/cylinder-inventory";
 import { issueLockIsActive } from "@/lib/cylinder-lock";
 
@@ -301,7 +301,7 @@ function productStockLines(items: LineItem[], products: Product[], treatAllAsGas
     if (!(Number(item.quantity) > 0)) return false;
     if (treatAllAsGas) return true;
     const p = products.find((x) => x.id === item.productId);
-    if (!isCylinderProduct(p)) return true;
+    if (!isCylinderTrackedLine(item, p)) return true;
     return isCylinderSaleLine(item, p);
   });
 }
@@ -340,9 +340,9 @@ async function assertSalesStock(
     if (qty <= 0) continue;
     const p = products.find((x) => x.id === item.productId);
     const row = rows.find((r) => r.productId === item.productId);
-    const available = !opts?.sellGasOnly && isCylinderProduct(p)
+    const available = !opts?.sellGasOnly && isCylinderTrackedLine(item, p)
       ? Math.max(0, row?.available ?? 0)
-      : Math.max(0, opts?.sellGasOnly ? (p?.stock ?? 0) : (row?.available ?? p?.stock ?? 0));
+      : Math.max(0, opts?.sellGasOnly || item.itemType === "product" ? (p?.stock ?? 0) : (row?.available ?? p?.stock ?? 0));
     if (qty > available) {
       throw new Error(`Insufficient stock. Available: ${available}, Requested: ${qty}.`);
     }
@@ -361,12 +361,12 @@ function defaultExpectedReturnAt() {
 
 async function gasLineItems(items: LineItem[]) {
   const products = await call<Product[]>("list", "products");
-  return items.filter((item) => !isCylinderProduct(products.find((p) => p.id === item.productId)));
+  return items.filter((item) => !isCylinderTrackedLine(item, products.find((p) => p.id === item.productId)));
 }
 
 async function hasCylinderLines(items: LineItem[]) {
   const products = await call<Product[]>("list", "products");
-  return items.some((item) => isCylinderProduct(products.find((p) => p.id === item.productId)));
+  return items.some((item) => isCylinderTrackedLine(item, products.find((p) => p.id === item.productId)));
 }
 
 async function deliveredForSales(salesOrderId: string, excludeDeliveryId?: string) {
@@ -894,7 +894,7 @@ export const deliveryService = {
     for (let i = 0; i < nextItems.length; i += 1) {
       const item = nextItems[i];
       const p = products.find((x) => x.id === item.productId);
-      if (!isCylinderProduct(p)) continue;
+      if (!isCylinderTrackedLine(item, p)) continue;
       const sold = isCylinderSaleLine(item, p);
       if (!sold && item.quantity > 0 && !payload?.expectedReturnAt) {
         throw new Error("Expected return date is required for customer cylinder send");
@@ -924,7 +924,7 @@ export const deliveryService = {
     for (let i = 0; i < nextItems.length; i += 1) {
       const item = nextItems[i];
       const p = products.find((x) => x.id === item.productId);
-      if (!isCylinderProduct(p)) continue;
+      if (!isCylinderTrackedLine(item, p)) continue;
       let ids = item.cylinderIds || [];
       if (ids.length !== item.quantity) {
         const picked = await takeWarehouseFull(item.productId, item.quantity, payload?.lotNumber);
@@ -1737,7 +1737,7 @@ export const inventoryService = {
             status: "in_stock",
             fillLevel: "full",
             location: "Warehouse",
-            gasCategory: product.category,
+            gasCategory: product.category as ProductCategory,
           });
         }
       } else {

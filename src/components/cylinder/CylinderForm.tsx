@@ -21,6 +21,11 @@ import type { ProductCategory } from "@/types";
 type FormValues = z.infer<typeof cylinderSchema>;
 const GAS_CATEGORIES: ProductCategory[] = ["LPG", "Industrial", "Medical", "Other"];
 
+function asGasCategory(value?: string): ProductCategory | undefined {
+  if (value === "LPG" || value === "Industrial" || value === "Medical" || value === "Other") return value;
+  return undefined;
+}
+
 export function CylinderForm({ id }: { id?: string }) {
   const t = useT();
   const editing = Boolean(id);
@@ -44,7 +49,7 @@ export function CylinderForm({ id }: { id?: string }) {
           capacity: existing.capacity,
           status: existing.status,
           location: existing.location,
-          gasCategory: existing.gasCategory || products.find((p) => p.id === existing.productId)?.category,
+          gasCategory: existing.gasCategory || asGasCategory(products.find((p) => p.id === existing.productId)?.category),
         }
       : undefined,
     defaultValues: { status: "in_stock", location: "Warehouse", capacity: 0 },
@@ -84,7 +89,10 @@ export function CylinderForm({ id }: { id?: string }) {
             <Select value={watch("productId")} onValueChange={(v) => {
               setValue("productId", v);
               const p = products.find((x) => x.id === v);
-              if (p?.category) setValue("gasCategory", p.category);
+              if (p?.category) {
+                const gas = asGasCategory(p.category);
+                if (gas) setValue("gasCategory", gas);
+              }
             }}>
               <SelectTrigger><SelectValue placeholder={t("common.select")} /></SelectTrigger>
               <SelectContent>

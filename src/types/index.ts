@@ -29,7 +29,16 @@ export interface Supplier {
   createdAt: string;
 }
 
+/** Built-in names used by cylinders; product.category may also be a managed catalog name. */
 export type ProductCategory = "LPG" | "Industrial" | "Medical" | "Other";
+
+export interface ProductCategoryRecord {
+  id: ID;
+  name: string;
+  nameKey?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
 export type UnitOfMeasure = "kg" | "cyl" | "ltr" | "pcs";
 export type CostingMethod = "fifo" | "lifo" | "average";
 export type ProductType = "gas" | "cylinder";
@@ -38,7 +47,7 @@ export interface Product {
   id: ID;
   code: string;
   name: string;
-  category: ProductCategory;
+  category: string;
   /** Gas = invoice/revenue. Cylinder = movement unless a sale price is entered. */
   productType?: ProductType;
   uom: UnitOfMeasure;
@@ -156,6 +165,10 @@ export interface LineItem {
   receivedQty?: number;
   /** Cylinder line billed as an ownership sale (not movement-only). */
   sellCylinder?: boolean;
+  /** Sales-line classification. Omitted on historical rows (inferred from the product). */
+  itemType?: "gas" | "cylinder" | "product";
+  /** Snapshot of category on this sales line. Does not update Product master. */
+  category?: string;
 }
 
 export type SalesStatus = "draft" | "confirmed" | "invoiced" | "paid" | "cancelled";

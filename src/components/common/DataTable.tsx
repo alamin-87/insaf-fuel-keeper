@@ -174,6 +174,11 @@ export function DataTable<T extends { id: string }>({
                 <Fragment key={row.id}>
                   <TableRow
                     className={onRowClick || renderSubComponent ? "cursor-pointer" : ""}
+                    data-testid={`datatable-row-${row.id}`}
+                    data-id={row.id}
+                    {...("salesOrderId" in row && (row as { salesOrderId?: string }).salesOrderId
+                      ? { "data-sales-order-id": (row as { salesOrderId: string }).salesOrderId }
+                      : {})}
                     onClick={() => {
                       if (onRowClick) onRowClick(row);
                       else if (renderSubComponent) toggleExpand(row.id);

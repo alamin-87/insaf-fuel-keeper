@@ -6,6 +6,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { ImagePlus, Trash2 } from "lucide-react";
 import { productService } from "@/services/product.service";
+import { productCategoryService } from "@/services/product-category.service";
 import { accountingService } from "@/services/accounting.service";
 import { productSchema } from "@/utils/validators";
 import { fileToProductImage } from "@/lib/image-upload";
@@ -42,6 +43,10 @@ export function ProductForm({ id }: { id?: string }) {
     enabled: !!id,
   });
   const { data: coa = [] } = useQuery({ queryKey: ["coa"], queryFn: accountingService.listCoa });
+  const { data: categoryRows = [] } = useQuery({
+    queryKey: ["productCategories"],
+    queryFn: productCategoryService.list,
+  });
   const incomeAccounts = coa.filter((a) => a.type === "Income");
   const expenseAccounts = coa.filter((a) => a.type === "Expense");
 
@@ -98,6 +103,7 @@ export function ProductForm({ id }: { id?: string }) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["products"] });
+      qc.invalidateQueries({ queryKey: ["productCategories"] });
       if (id) qc.invalidateQueries({ queryKey: ["products", id] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       toast.success(t("common.save"));
@@ -111,6 +117,13 @@ export function ProductForm({ id }: { id?: string }) {
 
   const costing = watch("costingMethod") || "fifo";
   const image = watch("image") || "";
+  const categoryOptions = (() => {
+    const names = [...new Set(categoryRows.map((c) => c.name).filter(Boolean))];
+    const current = watch("category");
+    if (current && !names.includes(current)) names.unshift(current);
+    if (names.length === 0) return ["LPG", "Industrial", "Medical", "Other"];
+    return names;
+  })();
 
   const onPickImage = async (file?: File) => {
     if (!file) return;
@@ -165,7 +178,7 @@ export function ProductForm({ id }: { id?: string }) {
             <Select value={watch("category")} onValueChange={(v) => setValue("category", v as FormValues["category"])}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {["LPG", "Industrial", "Medical", "Other"].map((c) => (
+                {categoryOptions.map((c) => (
                   <SelectItem key={c} value={c}>{c}</SelectItem>
                 ))}
               </SelectContent>

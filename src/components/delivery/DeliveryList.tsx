@@ -36,7 +36,7 @@ export function DeliveryList() {
       />
       <DataTable<Delivery>
         rows={data}
-        searchKeys={["challanNo", "customerName", "vehicleNo"]}
+        searchKeys={["challanNo", "customerName", "vehicleNo", "salesOrderId"]}
         dateKey="date"
         onRowClick={(r) => navigate({ to: "/deliveries/$id", params: { id: r.id } })}
         columns={[

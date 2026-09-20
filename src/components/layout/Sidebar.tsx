@@ -6,6 +6,7 @@ import {
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader,
+  SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
 import { BrandLogo } from "@/components/common/BrandLogo";
 import { useModuleAccess } from "@/hooks/useModuleAccess";
@@ -19,6 +20,11 @@ export function AppSidebar() {
     if (url === "/") return pathname === "/";
     if (url === "/hr") return pathname === "/hr" || pathname === "/hr/";
     if (url === "/hr/employees") return pathname.startsWith("/hr/employees") || /^\/hr\/[^/]+/.test(pathname);
+    if (url === "/products") {
+      return pathname === "/products" || pathname === "/products/" ||
+        (pathname.startsWith("/products/") && !pathname.startsWith("/products/categories"));
+    }
+    if (url === "/products/categories") return pathname.startsWith("/products/categories");
     return pathname.startsWith(url);
   };
 
@@ -97,6 +103,17 @@ export function AppSidebar() {
                         <span>{t(item.titleKey)}</span>
                       </Link>
                     </SidebarMenuButton>
+                    {item.url === "/products" && canAccessUrl("/products/categories") && (
+                      <SidebarMenuSub>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton asChild isActive={isActive("/products/categories")} size="sm">
+                            <Link to="/products/categories">
+                              <span>{t("nav.categories")}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      </SidebarMenuSub>
+                    )}
                   </SidebarMenuItem>
                 ))}
               </SidebarMenu>
