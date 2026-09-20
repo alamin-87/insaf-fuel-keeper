@@ -7,9 +7,11 @@ import type {
   JournalLine,
 } from "@/types";
 import { crudFn, dashboardFn, notificationsFn } from "@/lib/data.functions";
+import { getCylinderTrackingFn } from "@/lib/settings.functions";
+import { receivePurchaseFn } from "@/lib/purchase.functions";
 import { genOrderNo } from "@/utils/helpers";
 import { cylinderIsEmpty, cylinderIsFullStock, isCylinderProduct, isCylinderSaleLine, pickFifo, suggestSerials } from "@/lib/cylinder-product";
-import { remainingOrderQty } from "@/lib/cylinder-inventory";
+import { remainingOrderQty, buildProductInventory } from "@/lib/cylinder-inventory";
 import { issueLockIsActive } from "@/lib/cylinder-lock";
 
 const call = async <T,>(op: any, coll: any, id?: string, payload?: any): Promise<T> => {
@@ -17,8 +19,7 @@ const call = async <T,>(op: any, coll: any, id?: string, payload?: any): Promise
 };
 
 async function takeWarehouseFull(productId: string, qty: number, lotNumber?: string) {
-  const { getCylinderTracking } = await import("@/lib/settings.server");
-  const method = await getCylinderTracking();
+  const method = await getCylinderTrackingFn();
   const product = await call<Product | null>("get", "products", productId);
   if (!product) throw new Error("Product not found");
   if (method === "lot" && !lotNumber?.trim()) throw new Error("Lot number required");
@@ -143,6 +144,7 @@ async function consumeLayers(
 async function receiveStock(productId: string, qty: number, unitCost: number, meta?: StockMeta) {
   const product = await call<Product | null>("get", "products", productId);
   if (!product || qty <= 0) return;
+  if (meta?.refType && meta?.refId && await hasPostedStock(meta.refType, meta.refId, productId, "in")) return;
   await ensureOpeningLayer(product);
   const cost = Number.isFinite(unitCost) ? unitCost : (product.cost ?? 0);
   await call("create", "costLayers", undefined, {
@@ -178,6 +180,7 @@ async function receiveStock(productId: string, qty: number, unitCost: number, me
 async function issueStock(productId: string, qty: number, meta?: StockMeta) {
   const product = await call<Product | null>("get", "products", productId);
   if (!product || qty <= 0) return;
+  if (meta?.refType && meta?.refId && await hasPostedStock(meta.refType, meta.refId, productId, "out")) return;
   await ensureOpeningLayer(product);
   const available = product.stock ?? 0;
   const take = Math.min(qty, available);
@@ -273,6 +276,16 @@ async function restoreStock(productId: string, qty: number, meta?: StockMeta, fa
   });
 }
 
+async function hasPostedStock(
+  refType: NonNullable<StockMovement["refType"]>,
+  refId: string,
+  productId: string,
+  type: "in" | "out",
+) {
+  const all = await call<StockMovement[]>("list", "stockMovements");
+  return all.some((m) => m.refType === refType && m.refId === refId && m.productId === productId && m.type === type);
+}
+
 async function hasStockOut(refType: NonNullable<StockMovement["refType"]>, refId: string) {
   const all = await call<StockMovement[]>("list", "stockMovements");
   return all.some((m) => m.refType === refType && m.refId === refId && m.type === "out");
@@ -281,6 +294,59 @@ async function hasStockOut(refType: NonNullable<StockMovement["refType"]>, refId
 async function hasStockIn(refType: NonNullable<StockMovement["refType"]>, refId: string) {
   const all = await call<StockMovement[]>("list", "stockMovements");
   return all.some((m) => m.refType === refType && m.refId === refId && (m.type === "in" || m.type === "return"));
+}
+
+function productStockLines(items: LineItem[], products: Product[], treatAllAsGas: boolean) {
+  return items.filter((item) => {
+    if (!(Number(item.quantity) > 0)) return false;
+    if (treatAllAsGas) return true;
+    const p = products.find((x) => x.id === item.productId);
+    if (!isCylinderProduct(p)) return true;
+    return isCylinderSaleLine(item, p);
+  });
+}
+
+async function reversePostedStock(
+  refType: NonNullable<StockMovement["refType"]>,
+  refId: string,
+  notes: string,
+  by: string,
+) {
+  const all = await call<StockMovement[]>("list", "stockMovements");
+  if (all.some((m) =>
+    m.refType === refType
+    && m.refId === refId
+    && (m.type === "in" || m.type === "return")
+    && /Reverse/i.test(m.notes || ""),
+  )) return;
+  const outs = all.filter((m) => m.refType === refType && m.refId === refId && m.type === "out");
+  for (const m of outs) {
+    await restoreStock(m.productId, m.quantity, { refType, refId, notes, by }, m.unitCost);
+  }
+}
+
+async function assertSalesStock(
+  items: LineItem[],
+  opts?: { sellGasOnly?: boolean; excludeOrderId?: string },
+) {
+  const products = await call<Product[]>("list", "products");
+  const cylinders = await call<Cylinder[]>("list", "cylinders");
+  const sales = (await call<SalesOrder[]>("list", "sales")).filter((s) => s.id !== opts?.excludeOrderId);
+  const deliveries = await call<Delivery[]>("list", "deliveries");
+  const movements = await call<StockMovement[]>("list", "stockMovements");
+  const rows = buildProductInventory(products, cylinders, sales, deliveries, movements);
+  for (const item of items) {
+    const qty = Number(item.quantity) || 0;
+    if (qty <= 0) continue;
+    const p = products.find((x) => x.id === item.productId);
+    const row = rows.find((r) => r.productId === item.productId);
+    const available = !opts?.sellGasOnly && isCylinderProduct(p)
+      ? Math.max(0, row?.available ?? 0)
+      : Math.max(0, opts?.sellGasOnly ? (p?.stock ?? 0) : (row?.available ?? p?.stock ?? 0));
+    if (qty > available) {
+      throw new Error(`Insufficient stock. Available: ${available}, Requested: ${qty}.`);
+    }
+  }
 }
 
 function isOpenSalesStatus(status: SalesStatus) {
@@ -325,25 +391,19 @@ async function fulfillSalesOrder(order: SalesOrder) {
   if (!isOpenSalesStatus(order.status)) return;
   if (await salesAlreadyFulfilled(order)) return;
   const deliveries = await call<Delivery[]>("list", "deliveries");
-  let delivery = deliveries.find((d) => d.salesOrderId === order.id && (d.status === "pending" || d.status === "in_transit"));
-  if (!delivery) {
-    delivery = await call<Delivery>("create", "deliveries", undefined, {
-      challanNo: genOrderNo("DC"),
-      salesOrderId: order.id,
-      customerId: order.customerId,
-      customerName: order.customerName,
-      driverName: order.driverName || "",
-      vehicleNo: "",
-      items: order.items,
-      status: "pending",
-      date: order.date || new Date().toISOString(),
-      receiverName: order.receiverName,
-    });
-  }
-  const hasCyl = order.sellGasOnly ? false : await hasCylinderLines(order.items);
-  await deliveryService.confirm(delivery.id, {
-    skipCylinders: !hasCyl,
-    expectedReturnAt: hasCyl ? defaultExpectedReturnAt() : undefined,
+  const open = deliveries.find((d) => d.salesOrderId === order.id && (d.status === "pending" || d.status === "in_transit"));
+  if (open) return;
+  await call<Delivery>("create", "deliveries", undefined, {
+    challanNo: genOrderNo("DC"),
+    salesOrderId: order.id,
+    customerId: order.customerId,
+    customerName: order.customerName,
+    driverName: order.driverName || "",
+    vehicleNo: "",
+    items: order.items,
+    status: "pending",
+    date: order.date || new Date().toISOString(),
+    receiverName: order.receiverName,
   });
 }
 
@@ -357,12 +417,7 @@ async function unfulfillSalesOrder(order: SalesOrder) {
     }
     if (d.status !== "delivered" && d.status !== "confirmed") continue;
     if (await hasStockOut("delivery", d.id)) {
-      const gas = await gasLineItems(d.items);
-      if (gas.length) {
-        await adjustStock(gas, 1, {
-          refType: "delivery", refId: d.id, notes: `Reverse ${d.challanNo}`, by: "Sales",
-        });
-      }
+      await reversePostedStock("delivery", d.id, `Reverse ${d.challanNo}`, "Sales");
     }
     for (const item of d.items) {
       for (const cid of item.cylinderIds || []) {
@@ -381,12 +436,7 @@ async function unfulfillSalesOrder(order: SalesOrder) {
     await call("update", "deliveries", d.id, { status: "returned" });
   }
   if (await hasStockOut("sales", order.id)) {
-    const gas = await gasLineItems(order.items);
-    if (gas.length) {
-      await adjustStock(gas, 1, {
-        refType: "sales", refId: order.id, notes: `Reverse ${order.orderNo}`, by: "Sales",
-      });
-    }
+    await reversePostedStock("sales", order.id, `Reverse ${order.orderNo}`, "Sales");
   }
 }
 
@@ -621,23 +671,18 @@ export const salesService = {
   list: () => call<SalesOrder[]>("list", "sales"),
   get: (id: string) => call<SalesOrder | null>("get", "sales", id),
   create: async (data: Omit<SalesOrder, "id">) => {
+    if (isOpenSalesStatus(data.status)) {
+      await assertSalesStock(data.items, { sellGasOnly: data.sellGasOnly });
+    }
     const order = await call<SalesOrder>("create", "sales", undefined, {
       ...data,
       createdAt: data.createdAt ?? new Date().toISOString(),
     });
-    try {
-      if (isOpenSalesStatus(order.status)) {
-        await postReservationMoves(order, "Reserved");
-        try {
-          await fulfillSalesOrder(order);
-        } catch {
-          /* Keep the saved order; stock can post on delivery if warehouse qty is short. */
-        }
-      }
-      return await call<SalesOrder | null>("get", "sales", order.id) ?? order;
-    } catch (err) {
-      throw err;
+    if (isOpenSalesStatus(order.status)) {
+      await postReservationMoves(order, "Reserved");
+      await fulfillSalesOrder(order);
     }
+    return await call<SalesOrder | null>("get", "sales", order.id) ?? order;
   },
   update: async (id: string, data: Partial<SalesOrder>) => {
     const existing = await call<SalesOrder | null>("get", "sales", id);
@@ -659,6 +704,10 @@ export const salesService = {
       throw new Error("Order total cannot be less than amount already paid");
     }
     let status = data.status ?? existing.status;
+    const becomingOpen = isOpenSalesStatus(status) && !isOpenSalesStatus(existing.status);
+    if (becomingOpen || (data.items && isOpenSalesStatus(status))) {
+      await assertSalesStock(data.items || existing.items, { sellGasOnly: data.sellGasOnly ?? existing.sellGasOnly, excludeOrderId: id });
+    }
     if (status !== "draft" && status !== "cancelled") {
       if (paid + 0.009 >= total && total > 0) status = "paid";
       else if (paid > 0 && status === "paid") status = "invoiced";
@@ -694,6 +743,7 @@ export const salesService = {
       throw new Error(`Cannot change status from ${order.status}`);
     }
     if (order.status === "draft" && (status === "confirmed" || status === "invoiced")) {
+      await assertSalesStock(order.items, { sellGasOnly: order.sellGasOnly, excludeOrderId: id });
       await postReservationMoves({ ...order, status }, "Reserved");
     }
     if ((order.status === "confirmed" || order.status === "invoiced") && status === "cancelled") {
@@ -712,6 +762,7 @@ export const salesService = {
     const order = await call<SalesOrder | null>("get", "sales", id);
     if (!order) throw new Error("Quotation not found");
     if (order.status !== "draft") throw new Error("Only draft quotations can be converted");
+    await assertSalesStock(order.items, { sellGasOnly: order.sellGasOnly, excludeOrderId: id });
     const updated = await call<SalesOrder>("update", "sales", id, {
       status: "confirmed",
       orderNo: order.orderNo.startsWith("QT") ? order.orderNo.replace(/^QT/, "SO") : order.orderNo,
@@ -819,12 +870,9 @@ export const deliveryService = {
     if (payload?.skipCylinders) {
       const alreadyOut = await hasStockOut("delivery", id);
       const soAlreadyOut = delivery.salesOrderId ? await hasStockOut("sales", delivery.salesOrderId) : false;
-      const gasItems = nextItems.filter((item) => {
-        const p = products.find((x) => x.id === item.productId);
-        return !isCylinderProduct(p);
-      });
-      if (!alreadyOut && !soAlreadyOut && gasItems.length) {
-        await adjustStock(gasItems, -1, {
+      const stockItems = productStockLines(nextItems, products, true);
+      if (!alreadyOut && !soAlreadyOut && stockItems.length) {
+        await adjustStock(stockItems, -1, {
           refType: "delivery", refId: id, notes: delivery.challanNo, by: delivery.receiverName || "Delivery",
         });
       }
@@ -890,12 +938,9 @@ export const deliveryService = {
 
     const alreadyOut = await hasStockOut("delivery", id);
     const soAlreadyOut = delivery.salesOrderId ? await hasStockOut("sales", delivery.salesOrderId) : false;
-    const gasItems = nextItems.filter((item) => {
-      const p = products.find((x) => x.id === item.productId);
-      return !isCylinderProduct(p);
-    });
-    if (!alreadyOut && !soAlreadyOut && gasItems.length) {
-      await adjustStock(gasItems, -1, {
+    const stockItems = productStockLines(nextItems, products, false);
+    if (!alreadyOut && !soAlreadyOut && stockItems.length) {
+      await adjustStock(stockItems, -1, {
         refType: "delivery", refId: id, notes: delivery.challanNo, by: delivery.receiverName || "Delivery",
       });
     }
@@ -1069,7 +1114,7 @@ export const purchaseService = {
     if (status !== "cancelled") {
       if (paid + 0.009 >= total && total > 0) status = "paid";
       else if (status === "paid") {
-        status = existing.grnNo || existing.receivedAt ? "billed" : "ordered";
+        status = existing.status === "partial" ? "partial" : (existing.grnNo || existing.receivedAt ? "billed" : "ordered");
       }
     }
     const { paid: _ignorePaid, ...rest } = data;
@@ -1097,109 +1142,13 @@ export const purchaseService = {
     if (po.status === "cancelled" || po.status === "paid") {
       throw new Error(`Cannot change status from ${po.status}`);
     }
-    if (status === "cancelled" && (po.status === "received" || po.status === "billed")) {
+    if (status === "cancelled" && (po.status === "received" || po.status === "billed" || po.status === "partial")) {
       throw new Error("Cannot cancel after goods received");
     }
     return call<PurchaseOrder>("update", "purchases", id, { status });
   },
-  receive: async (id: string, payload?: { serialsByItem?: string[][]; lotNumber?: string }) => {
-    const po = await call<PurchaseOrder | null>("get", "purchases", id);
-    if (!po) throw new Error("Purchase order not found");
-    if (po.status !== "ordered" && po.status !== "draft") {
-      throw new Error("Only ordered/draft POs can be received");
-    }
-    const { getCylinderTracking } = await import("@/lib/settings.server");
-    const method = await getCylinderTracking();
-    const products = await call<Product[]>("list", "products");
-    let cylinders = await call<Cylinder[]>("list", "cylinders");
-    const nextItems = [...po.items];
-
-    for (let i = 0; i < nextItems.length; i++) {
-      const item = nextItems[i];
-      const p = products.find((x) => x.id === item.productId);
-      if (!isCylinderProduct(p)) continue;
-      if (item.cylinderIds?.length === item.quantity) continue;
-      const ids: string[] = [];
-      const stamp = Date.now().toString(36);
-      if (method === "quantity" || method === "lot") {
-        if (method === "lot" && !payload?.lotNumber?.trim()) throw new Error("Lot number required");
-        for (let n = 0; n < item.quantity; n += 1) {
-          const serial = method === "lot"
-            ? `${payload!.lotNumber!.trim()}-${stamp}-${String(n + 1).padStart(3, "0")}`
-            : `QTY-${(p?.code || "CYL").replace(/\s+/g, "")}-${stamp}-${n + 1}`;
-          const created = await cylinderService.create({
-            serialNumber: serial,
-            productId: item.productId,
-            capacity: 0,
-            status: "in_transit",
-            location: po.supplierName,
-            lotNumber: payload?.lotNumber?.trim() || undefined,
-            ownedBy: "company",
-            skipIntakeMovement: true,
-          });
-          cylinders = [...cylinders, created];
-          ids.push(created.id);
-        }
-        nextItems[i] = { ...item, cylinderIds: ids };
-        continue;
-      }
-      const serials = (payload?.serialsByItem?.[i] || []).map((s) => s.trim()).filter(Boolean);
-      if (serials.length !== item.quantity) {
-        throw new Error(`Enter ${item.quantity} serial number(s) for ${item.productName}`);
-      }
-      const seen = new Set<string>();
-      for (const serial of serials) {
-        const key = serial.toLowerCase();
-        if (seen.has(key)) throw new Error(`Duplicate serial ${serial}`);
-        seen.add(key);
-        let found = cylinders.find((c) => c.serialNumber.toLowerCase() === key);
-        if (!found) {
-          found = await cylinderService.create({
-            serialNumber: serial,
-            productId: item.productId,
-            capacity: 0,
-            status: "in_transit",
-            location: po.supplierName,
-            skipIntakeMovement: true,
-          });
-          cylinders = [...cylinders, found];
-        } else {
-          if (found.productId !== item.productId) {
-            throw new Error(`Cylinder ${serial} does not match ${item.productName}`);
-          }
-          if (found.status === "in_stock" || found.status === "at_customer" || found.ownedBy === "customer") {
-            throw new Error(`${serial} is already assigned`);
-          }
-        }
-        ids.push(found.id);
-      }
-      nextItems[i] = { ...item, cylinderIds: ids };
-    }
-
-    const grnNo = genOrderNo("GRN");
-    if (!(await hasStockIn("purchase", id))) {
-      await adjustStock(nextItems, 1, { refType: "purchase", refId: id, notes: grnNo, by: "Warehouse" });
-    }
-
-    for (const item of nextItems) {
-      for (const cid of item.cylinderIds || []) {
-        await cylinderService.addMovement({
-          cylinderId: cid,
-          type: "received",
-          supplierId: po.supplierId,
-          fromLocation: po.supplierName,
-          toLocation: "Warehouse",
-          notes: `Auto-received from PO ${po.orderNo} (GRN ${grnNo})`,
-          by: "Purchase",
-        });
-      }
-    }
-    return call<PurchaseOrder>("update", "purchases", id, {
-      status: "received",
-      grnNo,
-      receivedAt: new Date().toISOString(),
-      items: nextItems,
-    });
+  receive: async (id: string, payload?: { serialsByItem?: string[][]; lotNumber?: string; qtyByItem?: number[]; requestId?: string }) => {
+    return receivePurchaseFn({ data: { id, payload } });
   },
   recordPayment: async (id: string, amount: number, method: PaymentMethod = "cash", accountName?: string) => {
     const po = await call<PurchaseOrder | null>("get", "purchases", id);

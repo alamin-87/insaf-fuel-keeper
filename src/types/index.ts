@@ -152,6 +152,8 @@ export interface LineItem {
   price: number;
   taxRate?: number;
   cylinderIds?: string[];
+  /** Cumulative GRN qty. Omitted on historical rows (inferred from PO status). */
+  receivedQty?: number;
   /** Cylinder line billed as an ownership sale (not movement-only). */
   sellCylinder?: boolean;
 }
@@ -196,7 +198,14 @@ export interface Delivery {
   emptyReturned?: number;
 }
 
-export type PurchaseStatus = "draft" | "ordered" | "received" | "billed" | "paid" | "cancelled";
+export type PurchaseStatus = "draft" | "ordered" | "partial" | "received" | "billed" | "paid" | "cancelled";
+
+export type PurchaseGrn = {
+  id: string;
+  grnNo: string;
+  receivedAt: string;
+  items: Array<{ productId: ID; quantity: number }>;
+};
 
 export interface PurchaseOrder {
   id: ID;
@@ -213,7 +222,9 @@ export interface PurchaseOrder {
   grnNo?: string;
   receivedAt?: string;
   notes?: string;
-}
+  /** Completed GRN events. Inventory posts against each grnNo, not the PO ordered qty. */
+  grns?: PurchaseGrn[];
+};
 
 export type StockMovementType = "in" | "out" | "adjust" | "return";
 

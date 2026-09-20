@@ -166,11 +166,13 @@ export function SalesOrderForm({
       });
       if (!parsed.success) throw new Error(parsed.error.errors[0]?.message || "Invalid form");
 
-      if (!sellGasOnly) {
+      if (!asQuote) {
         for (const it of workingItems) {
           const row = stockRows.find((r) => r.productId === it.productId);
-          if (row && it.quantity > row.available) {
-            throw new Error(t("sales.stockWarn", { qty: row.available }));
+          const p = products.find((x) => x.id === it.productId);
+          const avail = sellGasOnly ? Math.max(0, p?.stock ?? 0) : (row?.available ?? p?.stock ?? 0);
+          if (it.quantity > avail) {
+            throw new Error(t("sales.insufficientStock", { available: avail, requested: it.quantity }));
           }
         }
       }

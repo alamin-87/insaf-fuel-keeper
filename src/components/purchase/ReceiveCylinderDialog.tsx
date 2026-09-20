@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { cylinderService } from "@/services/cylinder.service";
 import { productService } from "@/services/product.service";
 import { isCylinderProduct, parseSerials, suggestSerials } from "@/lib/cylinder-product";
+import { lineOrderedQty, lineReceivedQty, lineRemainingQty } from "@/lib/purchase-qty";
 import { getCylinderTrackingFn } from "@/lib/settings.functions";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,77 +23,116 @@ export function ReceiveCylinderDialog({
   po: PurchaseOrder;
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onReceive: (payload: { serialsByItem?: string[][]; lotNumber?: string }) => void;
+  onReceive: (payload: { serialsByItem?: string[][]; lotNumber?: string; qtyByItem?: number[]; requestId?: string }) => void;
   pending?: boolean;
 }) {
   const t = useT();
   const { data: products = [] } = useQuery({ queryKey: ["products"], queryFn: productService.list });
-  const { data: cylinders = [] } = useQuery({ queryKey: ["cylinders"], queryFn: cylinderService.list });
   const { data: tracking = "serial" } = useQuery({ queryKey: ["cylinderTracking"], queryFn: () => getCylinderTrackingFn() });
   const [texts, setTexts] = useState<string[]>([]);
+  const [qtys, setQtys] = useState<string[]>([]);
   const [lotNumber, setLotNumber] = useState("");
+  const requestIdRef = useRef("");
 
-  const cylLines = useMemo(
-    () => po.items.map((it, index) => ({ it, index, product: products.find((p) => p.id === it.productId) }))
-      .filter((row) => isCylinderProduct(row.product)),
-    [po.items, products],
+  const lines = useMemo(
+    () => po.items.map((it, index) => ({
+      it,
+      index,
+      product: products.find((p) => p.id === it.productId),
+      ordered: lineOrderedQty(it),
+      received: lineReceivedQty(it, po),
+      remaining: lineRemainingQty(it, po),
+    })),
+    [po, products],
   );
 
   useEffect(() => {
     if (!open) return;
-    setTexts(po.items.map((it) => {
-      const ids = it.cylinderIds || [];
-      return cylinders.filter((c) => ids.includes(c.id)).map((c) => c.serialNumber).join("\n");
-    }));
-  }, [open, po, cylinders]);
+    requestIdRef.current = `grn-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    setLotNumber("");
+    setQtys(po.items.map((it) => String(lineRemainingQty(it, po))));
+    setTexts(po.items.map(() => ""));
+  }, [open, po]);
 
-  const ready = tracking === "lot"
-    ? Boolean(lotNumber.trim())
-    : cylLines.every(({ it, index }) => parseSerials(texts[index] || "").length === it.quantity);
+  const parsedQty = (index: number) => {
+    const n = Number(qtys[index]);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const ready = lines.every(({ it, index, remaining, product }) => {
+    const qty = parsedQty(index);
+    if (qty < 0 || qty > remaining) return false;
+    if (qty === 0) return true;
+    if (tracking === "lot") return Boolean(lotNumber.trim());
+    if (tracking === "serial" && isCylinderProduct(product)) {
+      return parseSerials(texts[index] || "").length === qty;
+    }
+    return true;
+  }) && lines.some((_, index) => parsedQty(index) > 0);
+
+  const hasCylinders = lines.some((row) => isCylinderProduct(row.product) && parsedQty(row.index) > 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{t("purchases.receiveCylinders")}</DialogTitle>
+          <DialogTitle>{hasCylinders ? t("purchases.receiveCylinders") : t("purchases.receive")}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          {tracking === "lot" && (
+          {tracking === "lot" && hasCylinders && (
             <div className="space-y-1.5">
               <Label>{t("inventory.lotNumber")}</Label>
               <Input value={lotNumber} onChange={(e) => setLotNumber(e.target.value)} placeholder="LOT-2026-001" />
             </div>
           )}
-          {tracking !== "lot" && cylLines.map(({ it, index, product }) => {
+          {lines.map(({ it, index, product, ordered, received, remaining }) => {
+            const qty = parsedQty(index);
             const serials = parseSerials(texts[index] || "");
+            const cyl = isCylinderProduct(product);
             return (
               <section key={index} className="space-y-2 rounded-lg border p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <p className="font-medium">{it.productName}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {t("deliveries.selectedCount", { selected: serials.length, qty: it.quantity })}
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      const generated = suggestSerials(product?.code || it.productName, it.quantity);
-                      setTexts((prev) => prev.map((row, i) => (i === index ? generated.join("\n") : row)));
-                    }}
-                  >
-                    {t("purchases.generateSerials")}
-                  </Button>
+                <p className="font-medium">{it.productName}</p>
+                <p className="text-xs text-muted-foreground">
+                  {t("purchases.orderedQty")}: {ordered} · {t("purchases.receivedQty")}: {received} · {t("purchases.remainingQty")}: {remaining}
+                </p>
+                <div className="space-y-1.5">
+                  <Label>{t("purchases.receiveNow")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={remaining}
+                    step="1"
+                    value={qtys[index] ?? ""}
+                    onChange={(e) => setQtys((prev) => prev.map((row, i) => (i === index ? e.target.value : row)))}
+                  />
                 </div>
-                <p className="text-xs text-muted-foreground">{t("purchases.serialHint", { qty: it.quantity })}</p>
-                <Textarea
-                  rows={Math.min(6, Math.max(3, it.quantity))}
-                  value={texts[index] || ""}
-                  onChange={(e) => setTexts((prev) => prev.map((row, i) => (i === index ? e.target.value : row)))}
-                  placeholder="INS-001"
-                />
+                {tracking === "serial" && cyl && qty > 0 && (
+                  <>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs text-muted-foreground">
+                        {t("deliveries.selectedCount", { selected: serials.length, qty })}
+                      </p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const generated = suggestSerials(product?.code || it.productName, qty);
+                          setTexts((prev) => prev.map((row, i) => (i === index ? generated.join("\n") : row)));
+                        }}
+                      >
+                        {t("purchases.generateSerials")}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{t("purchases.serialHint", { qty })}</p>
+                    <Textarea
+                      rows={Math.min(6, Math.max(3, qty))}
+                      value={texts[index] || ""}
+                      onChange={(e) => setTexts((prev) => prev.map((row, i) => (i === index ? e.target.value : row)))}
+                      placeholder="INS-001"
+                    />
+                  </>
+                )}
               </section>
             );
           })}
@@ -101,10 +141,15 @@ export function ReceiveCylinderDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
           <Button
             disabled={!ready || pending}
-            onClick={() => onReceive({
-              serialsByItem: tracking === "serial" ? po.items.map((_, i) => parseSerials(texts[i] || "")) : undefined,
-              lotNumber: lotNumber || undefined,
-            })}
+            onClick={() => {
+              if (pending || !ready) return;
+              onReceive({
+                qtyByItem: po.items.map((_, i) => parsedQty(i)),
+                serialsByItem: tracking === "serial" ? po.items.map((_, i) => parseSerials(texts[i] || "")) : undefined,
+                lotNumber: lotNumber || undefined,
+                requestId: requestIdRef.current,
+              });
+            }}
           >
             {t("purchases.receive")}
           </Button>

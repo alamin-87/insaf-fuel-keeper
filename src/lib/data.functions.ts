@@ -356,7 +356,7 @@ export const notificationsFn = createServerFn({ method: "GET" }).handler(async (
   const lowStock = products.filter(p => (p.stock || 0) <= (p.reorderLevel || 0));
 
   const pendingDeliveries = await db.collection("deliveries").find({ status: "pending" }).toArray() as unknown as Delivery[];
-  const pendingPurchases = await db.collection("purchases").find({ status: "ordered" }).toArray() as unknown as PurchaseOrder[];
+  const pendingPurchases = await db.collection("purchases").find({ status: { $in: ["ordered", "partial"] } }).toArray() as unknown as PurchaseOrder[];
   const pendingSales = await db.collection("sales").find({ status: "confirmed" }).toArray() as unknown as SalesOrder[];
 
   const customers = await db.collection("customers").find({}).toArray() as unknown as Customer[];

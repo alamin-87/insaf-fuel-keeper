@@ -14,7 +14,7 @@ import type { PurchaseOrder, PurchaseStatus } from "@/types";
 import { useT } from "@/i18n";
 
 const statusVariant: Record<PurchaseStatus, "default" | "secondary" | "destructive" | "outline"> = {
-  draft: "secondary", ordered: "outline", received: "default", billed: "default", paid: "default", cancelled: "destructive",
+  draft: "secondary", ordered: "outline", partial: "outline", received: "default", billed: "default", paid: "default", cancelled: "destructive",
 };
 
 export function PurchaseList() {

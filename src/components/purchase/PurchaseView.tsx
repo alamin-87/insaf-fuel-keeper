@@ -7,8 +7,7 @@ import { productService } from "@/services/product.service";
 import { supplierService } from "@/services/supplier.service";
 import { accountingService } from "@/services/accounting.service";
 import { cylinderService } from "@/services/cylinder.service";
-import { isCylinderProduct } from "@/lib/cylinder-product";
-import { getCylinderTrackingFn } from "@/lib/settings.functions";
+import { lineReceivedQty, lineRemainingQty } from "@/lib/purchase-qty";
 import { ReceiveCylinderDialog } from "@/components/purchase/ReceiveCylinderDialog";
 import { formatCurrency, formatDate } from "@/utils/formatters";
 import { lineAmount, paymentStatus } from "@/utils/helpers";
@@ -61,7 +60,6 @@ export function PurchaseView({ id }: { id: string }) {
   const [receiveOpen, setReceiveOpen] = useState(false);
   const { data: products = [] } = useQuery({ queryKey: ["products"], queryFn: productService.list });
   const { data: cylinders = [] } = useQuery({ queryKey: ["cylinders"], queryFn: cylinderService.list });
-  const { data: tracking = "serial" } = useQuery({ queryKey: ["cylinderTracking"], queryFn: () => getCylinderTrackingFn() });
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["purchases"] });
@@ -76,7 +74,7 @@ export function PurchaseView({ id }: { id: string }) {
   };
 
   const receive = useMutation({
-    mutationFn: (payload?: { serialsByItem?: string[][]; lotNumber?: string }) => purchaseService.receive(id, payload),
+    mutationFn: (payload?: { serialsByItem?: string[][]; lotNumber?: string; qtyByItem?: number[]; requestId?: string }) => purchaseService.receive(id, payload),
     onSuccess: () => { setReceiveOpen(false); invalidate(); toast.success(t("purchases.received")); },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -111,11 +109,10 @@ export function PurchaseView({ id }: { id: string }) {
   const due = po.total - po.paid;
   const busy = receive.isPending || pay.isPending || cancel.isPending || remove.isPending;
   const canDelete = po.status === "draft" || po.status === "cancelled";
-  const needsCylinders = po.items.some((it) => isCylinderProduct(products.find((p) => p.id === it.productId)));
+  const canReceive = po.status === "ordered" || po.status === "draft" || po.status === "partial";
   const startReceive = () => {
-    if (needsCylinders && tracking === "serial") setReceiveOpen(true);
-    else if (needsCylinders && tracking === "lot") setReceiveOpen(true);
-    else receive.mutate(undefined);
+    if (busy) return;
+    setReceiveOpen(true);
   };
   const serialsOf = (ids?: string[]) =>
     (ids || []).map((cid) => cylinders.find((c) => c.id === cid)?.serialNumber || cid).join(", ") || "—";
@@ -239,7 +236,12 @@ export function PurchaseView({ id }: { id: string }) {
                     <TableCell>{it.productName}</TableCell>
                     <TableCell className="font-mono text-xs">{products.find((p) => p.id === it.productId)?.code || "—"}</TableCell>
                     <TableCell className="no-print font-mono text-xs">{serialsOf(it.cylinderIds)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{it.quantity}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      <div>{it.quantity}</div>
+                      <div className="no-print text-[10px] text-muted-foreground">
+                        {t("purchases.receivedQty")} {lineReceivedQty(it, po)} · {t("purchases.remainingQty")} {lineRemainingQty(it, po)}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right tabular-nums">{formatCurrency(it.price)}</TableCell>
                     <TableCell className="text-right font-medium tabular-nums">
                       {formatCurrency(lineAmount(it))}
@@ -272,7 +274,7 @@ export function PurchaseView({ id }: { id: string }) {
         <div className="space-y-4 no-print">
           <Card><CardContent className="pt-6 space-y-3">
             <h3 className="font-semibold">{t("sales.workflow")}</h3>
-            {(po.status === "ordered" || po.status === "draft") && (
+            {canReceive && (
               <Button className="w-full" disabled={busy} onClick={startReceive}>{t("purchases.receive")}</Button>
             )}
             {(po.status === "ordered" || po.status === "draft") && (
@@ -405,7 +407,10 @@ export function PurchaseView({ id }: { id: string }) {
         open={receiveOpen}
         onOpenChange={setReceiveOpen}
         pending={receive.isPending}
-        onReceive={(payload) => receive.mutate(payload)}
+        onReceive={(payload) => {
+          if (receive.isPending) return;
+          receive.mutate(payload);
+        }}
       />
     </div>
   );
