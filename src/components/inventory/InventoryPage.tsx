@@ -131,7 +131,7 @@ export function InventoryPage() {
   const [notes, setNotes] = useState("");
   const [supplierId, setSupplierId] = useState("");
   const [customerId, setCustomerId] = useState("");
-  const [partyKind, setPartyKind] = useState<"customer" | "supplier">("customer");
+  const [partyKind, setPartyKind] = useState<"customer" | "supplier" | "warehouse">("customer");
   const [sendDate, setSendDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [expectedReturn, setExpectedReturn] = useState("");
   const [condition, setCondition] = useState<"full" | "empty" | "damaged">("full");
@@ -212,9 +212,13 @@ export function InventoryPage() {
         });
       }
       if (type === "mark_lost") {
+        const partyId = partyKind === "customer" ? customerId : partyKind === "supplier" ? supplierId : "";
+        if (partyKind !== "warehouse" && !partyId) {
+          throw new Error(t("common.select"));
+        }
         return inventoryService.markLost({
           partyKind,
-          partyId: partyKind === "customer" ? customerId : supplierId,
+          partyId,
           productId,
           quantity: Number(qty),
           lostDate: sendDate,
@@ -232,11 +236,13 @@ export function InventoryPage() {
     },
     onSuccess: () => {
       invalidate();
+      setAdjustOpen(false);
       toast.success(
         type === "refill" ? t("inventory.refilled")
           : type === "send_supplier" ? t("inventory.sentSupplier")
             : type === "receive_supplier" ? t("inventory.receivedSupplier")
-              : t("inventory.updated"),
+              : type === "mark_lost" ? t("status.lost")
+                : t("inventory.updated"),
       );
       setNotes("");
     },
@@ -317,7 +323,10 @@ export function InventoryPage() {
         </button>
       </div>
 
-      <Dialog open={adjustOpen} onOpenChange={setAdjustOpen}>
+      <Dialog open={adjustOpen} onOpenChange={(open) => {
+        setAdjustOpen(open);
+        if (open) setPartyKind("customer");
+      }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{t("inventory.adjust")}</DialogTitle>
@@ -384,10 +393,11 @@ export function InventoryPage() {
               <div className="space-y-1.5">
                 <Label>{t("inventory.partyKind")}</Label>
                 <Select value={partyKind} onValueChange={(v) => setPartyKind(v as typeof partyKind)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger data-testid="lost-party-kind"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="customer">{t("common.customer")}</SelectItem>
                     <SelectItem value="supplier">{t("common.supplier")}</SelectItem>
+                    <SelectItem value="warehouse">{t("dash.cylAtWarehouse")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -469,7 +479,12 @@ export function InventoryPage() {
               <Label>{type === "refill" ? t("inventory.receivedBy") : t("common.notes")}</Label>
               <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>
-            <Button className="w-full" disabled={!productId || adjust.isPending || Number(qty) < 0 || ((type === "send_supplier" || type === "receive_supplier" || (type === "mark_lost" && partyKind === "supplier")) && !supplierId) || ((type === "return_empty" || type === "loan" || type === "sell_cylinder" || type === "customer_sent" || type === "exchange" || (type === "mark_lost" && partyKind === "customer")) && !customerId) || ((type === "customer_sent" || type === "loan" || type === "exchange") && !expectedReturn)} onClick={() => { if (adjust.isPending) return; adjust.mutate(); }}>
+            <Button
+              className="w-full"
+              data-testid="adjust-apply"
+              disabled={!productId || adjust.isPending || Number(qty) < 0 || ((type === "send_supplier" || type === "receive_supplier" || (type === "mark_lost" && partyKind === "supplier")) && !supplierId) || ((type === "return_empty" || type === "loan" || type === "sell_cylinder" || type === "customer_sent" || type === "exchange" || (type === "mark_lost" && partyKind === "customer")) && !customerId) || ((type === "customer_sent" || type === "loan" || type === "exchange") && !expectedReturn)}
+              onClick={() => { if (adjust.isPending) return; adjust.mutate(); }}
+            >
               {t("inventory.apply")}
             </Button>
           </div>

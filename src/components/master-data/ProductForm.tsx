@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -51,30 +52,13 @@ export function ProductForm({ id }: { id?: string }) {
   const expenseAccounts = coa.filter((a) => a.type === "Expense");
 
   const {
-    register, handleSubmit, setValue, watch, formState: { errors, isSubmitting },
+    register, handleSubmit, setValue, watch, reset, formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(productSchema),
-    values: existing
-      ? {
-          code: existing.code,
-          name: existing.name,
-          category: existing.category,
-          productType: existing.productType ?? (existing.uom === "cyl" ? "cylinder" : "gas"),
-          uom: existing.uom,
-          price: existing.price,
-          cost: existing.cost ?? 0,
-          image: existing.image || "",
-          stock: existing.stock,
-          reorderLevel: existing.reorderLevel,
-          incomeAccountId: existing.incomeAccountId || "",
-          expenseAccountId: existing.expenseAccountId || "",
-          costingMethod: existing.costingMethod || "fifo",
-        }
-      : undefined,
     defaultValues: {
       category: "LPG",
       productType: "gas",
-      uom: "cyl",
+      uom: "kg",
       price: 0,
       cost: 0,
       image: "",
@@ -86,20 +70,48 @@ export function ProductForm({ id }: { id?: string }) {
     },
   });
 
+  useEffect(() => {
+    if (!existing) return;
+    reset({
+      code: existing.code,
+      name: existing.name,
+      category: existing.category || "LPG",
+      productType: existing.productType ?? (existing.uom === "cyl" ? "cylinder" : "gas"),
+      uom: existing.uom || (existing.productType === "cylinder" ? "cyl" : "kg"),
+      price: Number(existing.price) || 0,
+      cost: Number(existing.cost) || 0,
+      image: existing.image || "",
+      stock: Number(existing.stock) || 0,
+      reorderLevel: Number(existing.reorderLevel) || 0,
+      incomeAccountId: existing.incomeAccountId || "",
+      expenseAccountId: existing.expenseAccountId || "",
+      costingMethod: existing.costingMethod || "fifo",
+    });
+  }, [existing, reset]);
+
   const mutation = useMutation({
     mutationFn: (v: FormValues) => {
       const payload = {
-        ...v,
+        code: v.code,
+        name: v.name,
+        category: v.category,
+        productType: v.productType,
+        uom: v.uom,
         price: Number(v.price) || 0,
         cost: Number(v.cost) || 0,
         image: v.image || undefined,
         incomeAccountId: v.incomeAccountId || undefined,
         expenseAccountId: v.expenseAccountId || undefined,
+        costingMethod: v.costingMethod || "fifo",
+        reorderLevel: Number(v.reorderLevel) || 0,
         taxRate: 0,
+        ...(mode === "create" ? { stock: Number(v.stock) || 0 } : {}),
       };
-      return mode === "edit"
-        ? productService.update(id!, payload as never)
-        : productService.create(payload as never);
+      if (mode === "edit") {
+        if (!id) throw new Error("Missing product id");
+        return productService.update(id, payload as never);
+      }
+      return productService.create(payload as never);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["products"] });
@@ -139,7 +151,13 @@ export function ProductForm({ id }: { id?: string }) {
     <div>
       <PageHeader title={mode === "create" ? t("products.new") : t("products.edit")} backTo={id ? { to: "/products/$id", params: { id } } : "/products"} />
       <Card><CardContent className="pt-6">
-        <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="grid gap-4 md:grid-cols-2">
+        <form
+          onSubmit={handleSubmit(
+            (v) => mutation.mutate(v),
+            () => toast.error(t("products.validationFailed")),
+          )}
+          className="grid gap-4 md:grid-cols-2"
+        >
           <div className="md:col-span-2 flex flex-col gap-3 rounded-xl border bg-muted/20 p-4 sm:flex-row sm:items-center">
             <ProductImage src={image || undefined} alt={watch("name") || "product"} size="lg" />
             <div className="min-w-0 flex-1 space-y-2">

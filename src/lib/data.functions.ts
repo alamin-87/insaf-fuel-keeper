@@ -1,5 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getDb } from "./mongo.server";
 import { allSeed } from "./seed-data";
 import { isDemoLoginEnabled, requireUser } from "./session.server";
 import { issueLockExpiredBefore } from "./cylinder-lock";
@@ -11,6 +10,11 @@ import type {
 } from "@/types";
 import { isBankBookAccount, isCashBookAccount } from "@/lib/money-accounts";
 import { creditReminderNotice, customerOpeningSigned } from "@/lib/customer-balance";
+
+async function getDb() {
+  const { getDb: loadDb } = await import("./mongo.server");
+  return loadDb();
+}
 
 type CollName =
   | "customers" | "suppliers" | "products" | "cylinders" | "movements"
@@ -56,10 +60,15 @@ async function collAll<T>(name: CollName): Promise<T[]> {
   return docs.map((d) => clean<T>(d));
 }
 
+async function findById(name: CollName, id: string) {
+  const db = await getDb();
+  return db.collection(name).findOne({ id: String(id) });
+}
+
 async function collGet<T>(name: CollName, id: string): Promise<T | null> {
   const db = await getDb();
   await ensureSeeded();
-  const doc = await db.collection(name).findOne({ id: String(id) });
+  const doc = await findById(name, id);
   return doc ? clean<T>(doc) : null;
 }
 
@@ -159,8 +168,13 @@ async function collUpdate<T>(name: CollName, id: string, patch: any): Promise<T>
       update.$unset = { ...(update.$unset || {}), serialKey: "" };
     }
   }
+  const existing = await findById(name, id);
+  if (!existing) throw new Error(`Record not found (${name}/${id})`);
+  const filter = existing.id != null
+    ? { id: String(existing.id) }
+    : { _id: existing._id };
   try {
-    const result = await db.collection(name).updateOne({ id: String(id) }, update);
+    const result = await db.collection(name).updateOne(filter, update);
     if (result.matchedCount === 0) {
       throw new Error(`Record not found (${name}/${id})`);
     }
@@ -170,7 +184,7 @@ async function collUpdate<T>(name: CollName, id: string, patch: any): Promise<T>
     }
     throw e;
   }
-  const doc = await db.collection(name).findOne({ id: String(id) });
+  const doc = await findById(name, String(existing.id ?? id));
   if (!doc) throw new Error("Update failed — record missing after write");
   return clean<T>(doc);
 }

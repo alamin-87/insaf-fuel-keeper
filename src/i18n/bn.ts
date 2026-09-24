@@ -292,6 +292,7 @@ export const bn = {
   "products.new": "নতুন পণ্য",
   "products.edit": "পণ্য সম্পাদনা",
   "products.notFound": "পণ্য পাওয়া যায়নি।",
+  "products.validationFailed": "হাইলাইট করা পণ্য ফিল্ডগুলো সংশোধন করুন।",
   "products.deleted": "পণ্য মুছে ফেলা হয়েছে",
   "products.code": "কোড",
   "products.productType": "পণ্যের ধরন",
@@ -447,6 +448,10 @@ export const bn = {
   "purchases.deleted": "পিও মুছে ফেলা হয়েছে",
   "purchases.deleteConfirm": "এই ক্রয় অর্ডার মুছবেন?",
   "purchases.cost": "খরচ",
+  "purchases.receivingStatus": "গ্রহণ স্ট্যাটাস",
+  "purchases.recv.none": "গৃহীত হয় নাই",
+  "purchases.recv.partial": "আংশিক গৃহীত",
+  "purchases.recv.full": "গৃহীত",
 
   // Inventory
   "inventory.title": "সিলিন্ডার সামারি",

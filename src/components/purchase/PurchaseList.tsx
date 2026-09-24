@@ -11,6 +11,8 @@ import { RowActions, actionsColumnClass } from "@/components/common/RowActions";
 import { PartyNameLink } from "@/components/common/PartyNameLink";
 import { formatCurrency, formatDate } from "@/utils/formatters";
 import type { PurchaseOrder, PurchaseStatus } from "@/types";
+import { paymentStatus } from "@/utils/helpers";
+import { receivingStatus } from "@/lib/purchase-qty";
 import { useT } from "@/i18n";
 
 const statusVariant: Record<PurchaseStatus, "default" | "secondary" | "destructive" | "outline"> = {
@@ -53,6 +55,11 @@ export function PurchaseList() {
           { key: "total", header: t("common.total"), sortable: true, sortValue: (r) => r.total, render: (r) => formatCurrency(r.total), className: "text-right" },
           { key: "paid", header: t("common.paid"), sortable: true, sortValue: (r) => r.paid, render: (r) => formatCurrency(r.paid), className: "text-right" },
           { key: "due", header: t("common.due"), sortable: true, sortValue: (r) => r.total - r.paid, render: (r) => formatCurrency(r.total - r.paid), className: "text-right" },
+          { key: "pay", header: t("sales.paymentStatus"), sortable: true, sortValue: (r) => paymentStatus(r.total, r.paid), render: (r) => t(`sales.${paymentStatus(r.total, r.paid)}`) },
+          { key: "recv", header: t("purchases.receivingStatus"), sortable: true, sortValue: (r) => receivingStatus(r.items, r), render: (r) => {
+            const recv = receivingStatus(r.items, r);
+            return t(recv === "received" ? "purchases.recv.full" : recv === "partial" ? "purchases.recv.partial" : "purchases.recv.none");
+          } },
           { key: "st", header: t("common.status"), sortable: true, sortValue: (r) => r.status, render: (r) => <Badge variant={statusVariant[r.status]}>{t(`status.${r.status}` as any)}</Badge> },
           {
             key: "actions",

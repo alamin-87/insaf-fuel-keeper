@@ -7,6 +7,7 @@ import type {
   JournalLine, ProductCategory,
 } from "@/types";
 import { crudFn, dashboardFn, notificationsFn } from "@/lib/data.functions";
+import { updateProductFn } from "@/lib/products.functions";
 import { getCylinderTrackingFn } from "@/lib/settings.functions";
 import { receivePurchaseFn } from "@/lib/purchase.functions";
 import { genOrderNo } from "@/utils/helpers";
@@ -588,7 +589,10 @@ export const productService = {
     }
     return created;
   },
-  update: (id: string, data: Partial<Product>) => call<Product>("update", "products", id, data),
+  update: async (id: string, data: Partial<Product>) => {
+    const { stock: _ignoreStock, id: _ignoreId, createdAt: _ignoreCreated, ...rest } = data;
+    return updateProductFn({ data: { id, payload: rest } });
+  },
   remove: (id: string) => call<{ ok: true }>("remove", "products", id),
   stockAlerts: async (): Promise<StockAlert[]> => {
     const list = await call<Product[]>("list", "products");
@@ -639,6 +643,11 @@ export const cylinderService = {
     return all.filter((m) => m.cylinderId === cylinderId).sort((a, b) => b.timestamp.localeCompare(a.timestamp));
   },
   addMovement: async (data: Omit<CylinderMovement, "id" | "timestamp">) => {
+    const current = await call<Cylinder | null>("get", "cylinders", data.cylinderId);
+    if (!current) throw new Error("Cylinder not found");
+    if (data.type === "lost" && current.status === "lost") {
+      throw new Error("Cylinder is already marked lost");
+    }
     const now = new Date().toISOString();
     const mv = await call<CylinderMovement>("create", "movements", undefined, { ...data, timestamp: now });
     const status = statusFromMovement(data.type);
@@ -849,6 +858,15 @@ export const deliveryService = {
       throw new Error("Already confirmed");
     }
 
+    const productsEarly = await call<Product[]>("list", "products");
+    const hasCylLines = delivery.items.some((item) =>
+      isCylinderTrackedLine(item, productsEarly.find((p) => p.id === item.productId)),
+    );
+    const confirmPayload = !hasCylLines
+      ? { ...payload, skipCylinders: true as const }
+      : payload;
+    const expectedReturnAt = confirmPayload?.expectedReturnAt || defaultExpectedReturnAt();
+
     if (delivery.salesOrderId) {
       const so = await call<SalesOrder | null>("get", "sales", delivery.salesOrderId);
       if (so && await salesAlreadyFulfilled(so, id)) {
@@ -860,14 +878,14 @@ export const deliveryService = {
       }
     }
 
-    const products = await call<Product[]>("list", "products");
+    const products = productsEarly;
     const allCyl = await call<Cylinder[]>("list", "cylinders");
     const nextItems = delivery.items.map((item, i) => {
-      const assigned = payload?.issuedIdsByItem?.[i];
+      const assigned = confirmPayload?.issuedIdsByItem?.[i];
       return assigned ? { ...item, cylinderIds: assigned } : item;
     });
 
-    if (payload?.skipCylinders) {
+    if (confirmPayload?.skipCylinders) {
       const alreadyOut = await hasStockOut("delivery", id);
       const soAlreadyOut = delivery.salesOrderId ? await hasStockOut("sales", delivery.salesOrderId) : false;
       const stockItems = productStockLines(nextItems, products, true);
@@ -896,7 +914,7 @@ export const deliveryService = {
       const p = products.find((x) => x.id === item.productId);
       if (!isCylinderTrackedLine(item, p)) continue;
       const sold = isCylinderSaleLine(item, p);
-      if (!sold && item.quantity > 0 && !payload?.expectedReturnAt) {
+      if (!sold && item.quantity > 0 && !expectedReturnAt) {
         throw new Error("Expected return date is required for customer cylinder send");
       }
       const ids = item.cylinderIds || [];
@@ -927,7 +945,7 @@ export const deliveryService = {
       if (!isCylinderTrackedLine(item, p)) continue;
       let ids = item.cylinderIds || [];
       if (ids.length !== item.quantity) {
-        const picked = await takeWarehouseFull(item.productId, item.quantity, payload?.lotNumber);
+        const picked = await takeWarehouseFull(item.productId, item.quantity, confirmPayload?.lotNumber);
         ids = picked.map((c) => c.id);
         nextItems[i] = { ...item, cylinderIds: ids };
       } else {
@@ -952,8 +970,8 @@ export const deliveryService = {
     }
 
     const issuedCount = nextItems.reduce((n, item) => n + (item.cylinderIds?.length || 0), 0);
-    const returnedCount = payload?.returnedIds?.length || 0;
-    if (payload?.asExchange) {
+    const returnedCount = confirmPayload?.returnedIds?.length || 0;
+    if (confirmPayload?.asExchange) {
       if (issuedCount <= 0 || returnedCount <= 0) {
         throw new Error("Exchange requires empty returns and full issues");
       }
@@ -961,7 +979,7 @@ export const deliveryService = {
         throw new Error("Exchange requires equal empty returns and full issues");
       }
     }
-    const exchange = payload?.asExchange === true;
+    const exchange = confirmPayload?.asExchange === true;
 
     for (const item of nextItems) {
       const p = products.find((x) => x.id === item.productId);
@@ -981,13 +999,13 @@ export const deliveryService = {
           by: "Delivery",
           sold,
           purpose: sold ? "sale" : exchange ? "exchange_out" : "sent",
-          expectedReturnAt: sold ? undefined : payload?.expectedReturnAt,
+          expectedReturnAt: sold ? undefined : expectedReturnAt,
         });
       }
     }
 
     const priorMoves = await call<CylinderMovement[]>("list", "movements");
-    for (const cid of payload?.returnedIds || []) {
+    for (const cid of confirmPayload?.returnedIds || []) {
       const cyl = allCyl.find((c) => c.id === cid);
       if (!cyl) throw new Error("Return cylinder not found");
       if (cyl.customerId && cyl.customerId !== delivery.customerId) {
@@ -1009,7 +1027,7 @@ export const deliveryService = {
     return call<Delivery>("update", "deliveries", id, {
       status: "delivered",
       confirmedAt: new Date().toISOString(),
-      emptyReturned: payload?.returnedIds?.length || 0,
+      emptyReturned: confirmPayload?.returnedIds?.length || 0,
       items: nextItems,
     });
     } catch (err) {
@@ -1111,11 +1129,8 @@ export const purchaseService = {
       throw new Error("Purchase total cannot be less than amount already paid");
     }
     let status = data.status ?? existing.status;
-    if (status !== "cancelled") {
-      if (paid + 0.009 >= total && total > 0) status = "paid";
-      else if (status === "paid") {
-        status = existing.status === "partial" ? "partial" : (existing.grnNo || existing.receivedAt ? "billed" : "ordered");
-      }
+    if (status === "paid" && paid + 0.009 < total) {
+      status = existing.status === "partial" || existing.status === "received" ? existing.status : "ordered";
     }
     const { paid: _ignorePaid, ...rest } = data;
     return call<PurchaseOrder>("update", "purchases", id, { ...rest, paid, status, tax: 0 });
@@ -1139,7 +1154,7 @@ export const purchaseService = {
   setStatus: async (id: string, status: PurchaseStatus) => {
     const po = await call<PurchaseOrder | null>("get", "purchases", id);
     if (!po) throw new Error("Purchase order not found");
-    if (po.status === "cancelled" || po.status === "paid") {
+    if (po.status === "cancelled") {
       throw new Error(`Cannot change status from ${po.status}`);
     }
     if (status === "cancelled" && (po.status === "received" || po.status === "billed" || po.status === "partial")) {
@@ -1161,9 +1176,7 @@ export const purchaseService = {
     if (payMethod === "bank" && !accountName) throw new Error("Select a bank account");
     const account = payMethod === "cash" ? "cash" : accountName!;
     const paid = (po.paid || 0) + amount;
-    let status: PurchaseStatus = po.status === "ordered" || po.status === "draft" ? "billed" : po.status;
-    if (po.status === "received") status = "billed";
-    if (paid + 0.009 >= po.total) status = "paid";
+    const status: PurchaseStatus = po.status === "draft" ? "ordered" : po.status;
     const updated = await call<PurchaseOrder>("update", "purchases", id, { paid, status });
     const payDate = new Date().toISOString();
     const voucher = await call<Voucher>("create", "vouchers", undefined, {
@@ -1334,7 +1347,7 @@ export const inventoryService = {
     });
   },
   markLost: async (data: {
-    partyKind: "customer" | "supplier";
+    partyKind: "customer" | "supplier" | "warehouse";
     partyId: string;
     productId: string;
     quantity: number;
@@ -1350,21 +1363,35 @@ export const inventoryService = {
     const cylinders = await call<Cylinder[]>("list", "cylinders");
     const pool = cylinders.filter((c) => {
       if (c.productId !== data.productId || c.status === "lost" || c.ownedBy === "customer") return false;
+      if (data.partyKind === "warehouse") {
+        return c.status === "in_stock" && !c.supplierId;
+      }
       if (data.partyKind === "customer") return c.status === "at_customer" && c.customerId === data.partyId;
-      return c.supplierId === data.partyId && c.status !== "damaged";
+      return Boolean(data.partyId) && c.supplierId === data.partyId && c.status !== "damaged";
     }).sort((a, b) => a.lastMovementAt.localeCompare(b.lastMovementAt));
-    if (pool.length < qty) throw new Error(`Only ${pool.length} cylinder(s) outstanding with this party`);
-    const party = data.partyKind === "customer"
-      ? await call<Customer | null>("get", "customers", data.partyId)
-      : await call<Supplier | null>("get", "suppliers", data.partyId);
-    if (!party) throw new Error("Party not found");
+    if (pool.length < qty) {
+      throw new Error(
+        data.partyKind === "warehouse"
+          ? `Only ${pool.length} warehouse cylinder(s) available to mark lost`
+          : `Only ${pool.length} cylinder(s) outstanding with this party`,
+      );
+    }
+    let partyName = "Warehouse";
+    if (data.partyKind !== "warehouse") {
+      if (!data.partyId) throw new Error("Select the customer or supplier who holds the cylinder");
+      const party = data.partyKind === "customer"
+        ? await call<Customer | null>("get", "customers", data.partyId)
+        : await call<Supplier | null>("get", "suppliers", data.partyId);
+      if (!party) throw new Error("Party not found");
+      partyName = party.name;
+    }
     for (const c of pool.slice(0, qty)) {
       await cylinderService.addMovement({
         cylinderId: c.id,
         type: "lost",
         customerId: data.partyKind === "customer" ? data.partyId : undefined,
         supplierId: data.partyKind === "supplier" ? data.partyId : undefined,
-        fromLocation: party.name,
+        fromLocation: partyName,
         toLocation: "Lost",
         notes: data.reason?.trim() || `Marked lost · ${product.name}`,
         by: "Warehouse",
@@ -1375,13 +1402,13 @@ export const inventoryService = {
       });
     }
     const penalty = Number(data.penaltyAmount) || 0;
-    if (penalty > 0 && data.accountingTreatment === "charge") {
+    if (data.partyKind !== "warehouse" && penalty > 0 && data.accountingTreatment === "charge") {
       const now = data.lostDate ? new Date(`${data.lostDate}T12:00:00`).toISOString() : new Date().toISOString();
       if (data.partyKind === "customer") {
         await call("create", "sales", undefined, {
           orderNo: genOrderNo("SO"),
           customerId: data.partyId,
-          customerName: party.name,
+          customerName: partyName,
           date: now,
           items: [{
             productId: product.id,
@@ -1408,7 +1435,7 @@ export const inventoryService = {
           amount: penalty,
           partyType: "supplier",
           partyId: data.partyId,
-          partyName: party.name,
+          partyName,
           notes: data.reason?.trim() || `Lost cylinder charge · ${product.name}`,
           createdAt: now,
         });
@@ -1420,7 +1447,7 @@ export const inventoryService = {
         direction: "out",
         amount: penalty,
         category: "expense",
-        notes: `Lost cylinder write-off · ${party.name} · ${product.name}`,
+        notes: `Lost cylinder write-off · ${partyName} · ${product.name}`,
       });
     }
   },

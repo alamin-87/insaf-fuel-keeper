@@ -28,14 +28,25 @@ export function poHasAnyReceived(items: LineItem[], po: Pick<PurchaseOrder, "sta
   return items.some((it) => lineReceivedQty(it, po) > 0);
 }
 
+export type ReceivingStatus = "none" | "partial" | "received";
+
+export function receivingStatus(items: LineItem[], po: Pick<PurchaseOrder, "status">): ReceivingStatus {
+  if (poIsFullyReceived(items, po)) return "received";
+  if (poHasAnyReceived(items, po)) return "partial";
+  return "none";
+}
+
+export function poCanReceive(items: LineItem[], po: Pick<PurchaseOrder, "status">) {
+  if (po.status === "cancelled") return false;
+  return items.some((it) => lineRemainingQty(it, po) > 0);
+}
+
 export function nextPurchaseStatus(items: LineItem[], po: Pick<PurchaseOrder, "status" | "paid" | "total">): PurchaseStatus {
-  if (po.status === "cancelled" || po.status === "paid") return po.status;
+  if (po.status === "cancelled") return po.status;
   const fully = poIsFullyReceived(items, { status: "ordered" });
-  if (fully) {
-    if ((po.paid || 0) + 0.009 >= (po.total || 0) && (po.total || 0) > 0) return "paid";
-    if (po.status === "billed") return "billed";
-    return "received";
-  }
+  if (fully) return "received";
   if (poHasAnyReceived(items, { status: "ordered" })) return "partial";
-  return po.status === "draft" ? "draft" : "ordered";
+  if (po.status === "draft") return "draft";
+  if (po.status === "billed" || po.status === "paid") return po.status;
+  return "ordered";
 }

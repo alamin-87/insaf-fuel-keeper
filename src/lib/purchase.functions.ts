@@ -4,7 +4,7 @@ import type {
 } from "@/types";
 import { isCylinderProduct } from "@/lib/cylinder-product";
 import { normalizeSerialKey, trackingEnforcesSerialUnique } from "@/lib/cylinder-serial";
-import { lineOrderedQty, lineReceivedQty, nextPurchaseStatus } from "@/lib/purchase-qty";
+import { lineOrderedQty, lineReceivedQty, nextPurchaseStatus, poCanReceive } from "@/lib/purchase-qty";
 import { genOrderNo } from "@/utils/helpers";
 
 export type ReceivePayload = {
@@ -108,8 +108,11 @@ async function receivePurchaseInDb(
   const poDoc = await db.collection("purchases").findOne({ id: String(id) }, opt);
   const po = poDoc ? clean<PurchaseOrder>(poDoc) : null;
   if (!po) throw new Error("Purchase order not found");
-  if (po.status !== "ordered" && po.status !== "draft" && po.status !== "partial") {
-    throw new Error("Only ordered/draft POs can be received");
+  if (po.status === "cancelled") {
+    throw new Error("Cannot receive a cancelled purchase order.");
+  }
+  if (!poCanReceive(po.items, po)) {
+    throw new Error("This purchase order has no remaining quantity to receive.");
   }
   if (payload?.requestId && (po.grns || []).some((g) => g.id === payload.requestId)) {
     return po;
@@ -269,7 +272,7 @@ async function receivePurchaseInDb(
   };
 
   const updated = await db.collection("purchases").findOneAndUpdate(
-    { id: String(id), status: { $in: ["ordered", "draft", "partial"] } },
+    { id: String(id), status: { $ne: "cancelled" } },
     {
       $set: {
         status,

@@ -286,6 +286,7 @@ export const en = {
   "products.new": "New Product",
   "products.edit": "Edit Product",
   "products.notFound": "Product not found.",
+  "products.validationFailed": "Please correct the highlighted product fields.",
   "products.deleted": "Product deleted",
   "products.code": "Code",
   "products.productType": "Product Type",
@@ -439,6 +440,10 @@ export const en = {
   "purchases.deleted": "PO deleted",
   "purchases.deleteConfirm": "Delete this purchase order?",
   "purchases.cost": "Cost",
+  "purchases.receivingStatus": "Receiving status",
+  "purchases.recv.none": "Not received",
+  "purchases.recv.partial": "Partially received",
+  "purchases.recv.full": "Received",
 
   "inventory.title": "Cylinder Summary",
   "inventory.desc": "Warehouse stock levels and movement ledger.",

@@ -100,7 +100,7 @@ export function DeliveryChallan({ id }: { id: string }) {
   const canDelete = d?.status === "pending";
   const startConfirm = () => {
     if (needsCylinders) setAssignOpen(true);
-    else confirm.mutate(undefined);
+    else confirm.mutate({ skipCylinders: true });
   };
   const serialsOf = (ids?: string[]) =>
     (ids || []).map((cid) => cylinders.find((c) => c.id === cid)?.serialNumber || cid).join(", ") || "—";

@@ -4,14 +4,14 @@ import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { notificationsService } from "@/services/_services";
+import { notificationsFn } from "@/lib/data.functions";
 import { useT } from "@/i18n";
 import { Badge } from "@/components/ui/badge";
 import { useState, useMemo } from "react";
 
 export function NotificationsDropdown() {
   const t = useT();
-  const { data: notifications } = useQuery({ queryKey: ["notifications"], queryFn: notificationsService.getNotifications });
+  const { data: notifications } = useQuery({ queryKey: ["notifications"], queryFn: () => notificationsFn() });
 
   const lowStock = notifications?.lowStock || [];
   const pendingDeliveries = notifications?.pendingDeliveries || [];

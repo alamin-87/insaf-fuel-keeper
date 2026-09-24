@@ -7,7 +7,7 @@ import { productService } from "@/services/product.service";
 import { supplierService } from "@/services/supplier.service";
 import { accountingService } from "@/services/accounting.service";
 import { cylinderService } from "@/services/cylinder.service";
-import { lineReceivedQty, lineRemainingQty } from "@/lib/purchase-qty";
+import { lineReceivedQty, lineRemainingQty, poCanReceive, receivingStatus } from "@/lib/purchase-qty";
 import { ReceiveCylinderDialog } from "@/components/purchase/ReceiveCylinderDialog";
 import { formatCurrency, formatDate } from "@/utils/formatters";
 import { lineAmount, paymentStatus } from "@/utils/helpers";
@@ -37,6 +37,12 @@ function payStatusLabel(t: (key: MessageKey) => string, total: number, paid: num
   if (status === "paid") return t("sales.paid");
   if (status === "partial") return t("sales.partial");
   return t("purchases.unpaid");
+}
+
+function recvStatusLabel(t: (key: MessageKey) => string, recv: ReturnType<typeof receivingStatus>) {
+  if (recv === "received") return t("purchases.recv.full");
+  if (recv === "partial") return t("purchases.recv.partial");
+  return t("purchases.recv.none");
 }
 
 export function PurchaseView({ id }: { id: string }) {
@@ -109,7 +115,8 @@ export function PurchaseView({ id }: { id: string }) {
   const due = po.total - po.paid;
   const busy = receive.isPending || pay.isPending || cancel.isPending || remove.isPending;
   const canDelete = po.status === "draft" || po.status === "cancelled";
-  const canReceive = po.status === "ordered" || po.status === "draft" || po.status === "partial";
+  const recv = receivingStatus(po.items, po);
+  const canReceive = poCanReceive(po.items, po);
   const startReceive = () => {
     if (busy) return;
     setReceiveOpen(true);
@@ -257,6 +264,7 @@ export function PurchaseView({ id }: { id: string }) {
               { label: t("common.paid"), value: formatCurrency(po.paid) },
               { label: t("common.due"), value: formatCurrency(due), bold: true },
               { label: t("sales.paymentStatus"), value: payStatusLabel(t, po.total, po.paid) },
+              { label: t("purchases.receivingStatus"), value: recvStatusLabel(t, recv) },
             ]}
           />
           {po.notes && (
@@ -301,6 +309,10 @@ export function PurchaseView({ id }: { id: string }) {
               <div>
                 <p className="text-[10px] uppercase text-muted-foreground">{t("sales.paymentStatus")}</p>
                 <p className="font-medium">{payStatusLabel(t, po.total, po.paid)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase text-muted-foreground">{t("purchases.receivingStatus")}</p>
+                <p className="font-medium">{recvStatusLabel(t, recv)}</p>
               </div>
             </div>
             {history.length > 0 && (

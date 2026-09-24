@@ -32,7 +32,11 @@ export function DeliveryCylinderDialog({
   const [issued, setIssued] = useState<string[][]>([]);
   const [returned, setReturned] = useState<string[]>([]);
   const [lotNumber, setLotNumber] = useState("");
-  const [expectedReturn, setExpectedReturn] = useState("");
+  const [expectedReturn, setExpectedReturn] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    return d.toISOString().slice(0, 10);
+  });
 
   const cylLines = useMemo(
     () => delivery.items.map((it, index) => ({ it, index, product: products.find((p) => p.id === it.productId) }))
