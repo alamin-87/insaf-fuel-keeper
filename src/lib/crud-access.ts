@@ -1,4 +1,5 @@
 import type { AppModule } from "./settings-store";
+import type { AppPermission } from "./rbac";
 
 export type CrudCollName =
   | "customers" | "suppliers" | "products" | "cylinders" | "movements"
@@ -16,18 +17,18 @@ const WRITE: Record<CrudCollName, AppModule[]> = {
   movements: ["cylinders", "inventory", "deliveries", "sales", "purchases"],
   sales: ["sales", "deliveries", "inventory"],
   deliveries: ["deliveries", "sales"],
-  expenses: ["expenses"],
-  ledger: ["accounting", "expenses", "sales", "purchases", "inventory"],
-  purchases: ["purchases"],
+  expenses: ["expenses", "accounting"],
+  ledger: ["accounting"],
+  purchases: ["purchases", "inventory"],
   stockMovements: ["inventory", "purchases", "sales", "deliveries"],
-  vouchers: ["accounting", "inventory", "sales", "purchases"],
+  vouchers: ["accounting"],
   employees: ["hr"],
   payroll: ["hr"],
   appUsers: ["settings"],
   accounts: ["accounting"],
   chartOfAccounts: ["accounting"],
   assets: ["accounting"],
-  costLayers: ["inventory", "purchases", "sales"],
+  costLayers: ["inventory"],
 };
 
 const READ: Record<CrudCollName, AppModule[]> = {
@@ -60,4 +61,66 @@ export function isKnownCrudCollection(coll: string): coll is CrudCollName {
 
 export function modulesForCrud(coll: CrudCollName, op: CrudOp): AppModule[] {
   return WRITE_OPS.has(op) ? WRITE[coll] : READ[coll];
+}
+
+export function permissionForCrud(coll: CrudCollName, op: CrudOp): AppPermission {
+  const isRead = op === "list" || op === "get";
+  switch (coll) {
+    case "sales":
+      if (isRead) return "sales.read";
+      if (op === "create") return "sales.create";
+      if (op === "update") return "sales.update";
+      return "sales.delete";
+
+    case "products":
+    case "stockMovements":
+    case "costLayers":
+      if (isRead) return "inventory.read";
+      if (op === "create") return "inventory.create";
+      if (op === "remove") return "inventory.delete";
+      return "inventory.adjust";
+
+    case "ledger":
+    case "vouchers":
+    case "accounts":
+    case "chartOfAccounts":
+    case "assets":
+    case "expenses":
+      if (isRead) return "accounting.read";
+      if (op === "create") return "accounting.create";
+      if (op === "update") return "accounting.update";
+      return "accounting.delete";
+
+    case "payroll":
+    case "employees":
+      if (isRead) return "payroll.read";
+      if (op === "create") return "payroll.create";
+      if (op === "update") return "payroll.update";
+      return "payroll.delete";
+
+    case "appUsers":
+      if (isRead) return "users.read";
+      if (op === "create") return "users.create";
+      if (op === "update") return "users.update";
+      return "users.delete";
+
+    case "customers":
+      return isRead ? "customers.read" : "customers.write";
+
+    case "suppliers":
+      return isRead ? "suppliers.read" : "suppliers.write";
+
+    case "purchases":
+      return isRead ? "suppliers.read" : "inventory.create";
+
+    case "deliveries":
+      return isRead ? "deliveries.read" : "deliveries.write";
+
+    case "cylinders":
+    case "movements":
+      return isRead ? "cylinders.read" : "cylinders.write";
+
+    default:
+      return isRead ? "reports.read" : "settings.write";
+  }
 }

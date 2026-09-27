@@ -241,15 +241,29 @@ export interface PurchaseOrder {
 
 export type StockMovementType = "in" | "out" | "adjust" | "return";
 
+export type MovementTypeKind =
+  | "RECEIPT"
+  | "SALE_ISSUE"
+  | "RETURN"
+  | "ADJUSTMENT_IN"
+  | "ADJUSTMENT_OUT"
+  | "DAMAGE"
+  | "LOSS"
+  | "TRANSFER_IN"
+  | "TRANSFER_OUT";
+
 export interface StockMovement {
   id: ID;
   date: string;
   productId: ID;
   productName: string;
   type: StockMovementType;
+  movementType?: MovementTypeKind;
+  direction?: "in" | "out";
   quantity: number;
   balanceAfter: number;
   unitCost?: number;
+  totalCost?: number;
   cogsAmount?: number;
   costingMethod?: CostingMethod;
   consumptions?: LayerConsumption[];

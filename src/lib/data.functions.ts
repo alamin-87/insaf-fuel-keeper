@@ -10,6 +10,7 @@ import type {
 } from "@/types";
 import { isBankBookAccount, isCashBookAccount } from "@/lib/money-accounts";
 import { creditReminderNotice, customerOpeningSigned } from "@/lib/customer-balance";
+import { computeCustomerReceivables, computeSupplierPayables } from "@/lib/accounting-engine";
 
 async function getDb() {
   const { getDb: loadDb } = await import("./mongo.server");
@@ -41,6 +42,23 @@ async function ensureSeeded() {
       // Unique index on business `id` prevents duplicate seed rows across races.
       try { await coll.createIndex({ id: 1 }, { unique: true }); } catch {}
       if (name === "cylinders") await ensureCylinderSerialIndex(db);
+      if (name === "stockMovements") {
+        try {
+          await coll.createIndex({ refType: 1, refId: 1, productId: 1, type: 1 });
+        } catch {}
+      }
+      if (name === "sales") {
+        try { await coll.createIndex({ orderNo: 1 }, { unique: true, sparse: true }); } catch {}
+      }
+      if (name === "purchases") {
+        try { await coll.createIndex({ orderNo: 1 }, { unique: true, sparse: true }); } catch {}
+      }
+      if (name === "vouchers") {
+        try { await coll.createIndex({ voucherNo: 1 }, { unique: true, sparse: true }); } catch {}
+      }
+      if (name === "deliveries") {
+        try { await coll.createIndex({ challanNo: 1 }, { unique: true, sparse: true }); } catch {}
+      }
       const count = await coll.estimatedDocumentCount();
       if (count === 0) {
         const docs = (allSeed as any)[name] as any[];
@@ -48,6 +66,67 @@ async function ensureSeeded() {
           try { await coll.insertMany(docs.map((d) => ({ ...d })), { ordered: false }); } catch {}
         }
       }
+    }
+
+    // Migration / Backfill: Check for and correct known legacy discrepancies (LPG-12 and Nitrogen)
+    try {
+      const p1 = await db.collection("products").findOne({ id: "p1" });
+      if (p1 && p1.stock === 65) {
+        const hasSm5 = await db.collection("stockMovements").findOne({ refType: "sales", refId: "so4", productId: "p1", type: "out" });
+        if (!hasSm5) {
+          await db.collection("stockMovements").insertOne({
+            id: "sm5",
+            date: new Date().toISOString(),
+            productId: "p1",
+            productName: p1.name || "LPG Domestic 12kg",
+            type: "out",
+            movementType: "SALE_ISSUE",
+            direction: "out",
+            quantity: 6,
+            balanceAfter: 59,
+            unitCost: 1200,
+            totalCost: 7200,
+            cogsAmount: 7200,
+            costingMethod: "fifo",
+            refType: "sales",
+            refId: "so4",
+            notes: "SO-2026-0004",
+            by: "Sales",
+          });
+        }
+        await db.collection("products").updateOne({ id: "p1" }, { $set: { stock: 59 } });
+        await db.collection("costLayers").updateOne({ id: "cl-p1" }, { $set: { qtyRemaining: 59 } });
+      }
+
+      const p5 = await db.collection("products").findOne({ id: "p5" });
+      if (p5 && p5.stock === 6) {
+        const hasSm4 = await db.collection("stockMovements").findOne({ refType: "sales", refId: "so3", productId: "p5", type: "out" });
+        if (!hasSm4) {
+          await db.collection("stockMovements").insertOne({
+            id: "sm4",
+            date: new Date().toISOString(),
+            productId: "p5",
+            productName: p5.name || "Nitrogen Industrial",
+            type: "out",
+            movementType: "SALE_ISSUE",
+            direction: "out",
+            quantity: 4,
+            balanceAfter: 2,
+            unitCost: 880,
+            totalCost: 3520,
+            cogsAmount: 3520,
+            costingMethod: "fifo",
+            refType: "sales",
+            refId: "so3",
+            notes: "SO-2026-0003",
+            by: "Sales",
+          });
+        }
+        await db.collection("products").updateOne({ id: "p5" }, { $set: { stock: 2 } });
+        await db.collection("costLayers").updateOne({ id: "cl-p5" }, { $set: { qtyRemaining: 2 } });
+      }
+    } catch {
+      /* ignore migration race */
     }
   })().catch((e) => { seedPromise = null; throw e; });
   return seedPromise;
@@ -57,7 +136,14 @@ async function collAll<T>(name: CollName): Promise<T[]> {
   const db = await getDb();
   await ensureSeeded();
   const docs = await db.collection(name).find({}).sort({ createdAt: -1, date: -1, timestamp: -1 }).toArray();
-  return docs.map((d) => clean<T>(d));
+  return docs.map((d) => {
+    const c = clean<any>(d);
+    if (name === "appUsers") {
+      delete c.password;
+      delete c.passwordHash;
+    }
+    return c as T;
+  });
 }
 
 async function findById(name: CollName, id: string) {
@@ -69,7 +155,13 @@ async function collGet<T>(name: CollName, id: string): Promise<T | null> {
   const db = await getDb();
   await ensureSeeded();
   const doc = await findById(name, id);
-  return doc ? clean<T>(doc) : null;
+  if (!doc) return null;
+  const c = clean<any>(doc);
+  if (name === "appUsers") {
+    delete c.password;
+    delete c.passwordHash;
+  }
+  return c as T;
 }
 
 async function ensureCylinderSerialIndex(db?: Awaited<ReturnType<typeof getDb>>) {
@@ -107,15 +199,37 @@ async function serialTaken(serial: string, excludeId?: string) {
   });
 }
 
-async function collCreate<T extends { id?: string }>(name: CollName, data: any): Promise<T> {
+async function collCreate<T extends { id?: string }>(name: CollName, data: any, user?: { username?: string }): Promise<T> {
   const db = await getDb();
   await ensureSeeded();
+  const { getNextSequence } = await import("./document-sequence");
   const id = data.id ?? Math.random().toString(36).slice(2, 10);
   const doc: Record<string, unknown> = {
     ...data,
     id,
     createdAt: data.createdAt ?? new Date().toISOString(),
   };
+
+  // Database-backed collision-safe sequence numbering
+  if (name === "sales" && (!doc.orderNo || String(doc.orderNo).startsWith("SO-"))) {
+    if (!doc.orderNo || String(doc.orderNo).length < 15) {
+      doc.orderNo = await getNextSequence(db, "SO");
+    }
+  } else if (name === "purchases" && (!doc.orderNo || String(doc.orderNo).startsWith("PO-"))) {
+    if (!doc.orderNo || String(doc.orderNo).length < 15) {
+      doc.orderNo = await getNextSequence(db, "PO");
+    }
+  } else if (name === "vouchers" && (!doc.voucherNo || String(doc.voucherNo).startsWith("RV-") || String(doc.voucherNo).startsWith("PV-") || String(doc.voucherNo).startsWith("JV-"))) {
+    const pfx = String(doc.voucherNo || "").slice(0, 2) || "RV";
+    if (!doc.voucherNo || String(doc.voucherNo).length < 15) {
+      doc.voucherNo = await getNextSequence(db, pfx);
+    }
+  } else if (name === "deliveries" && (!doc.challanNo || String(doc.challanNo).startsWith("DC-"))) {
+    if (!doc.challanNo || String(doc.challanNo).length < 15) {
+      doc.challanNo = await getNextSequence(db, "DC");
+    }
+  }
+
   if (name === "cylinders") {
     await ensureCylinderSerialIndex(db);
     const { getCylinderTracking } = await import("./settings.server");
@@ -137,12 +251,29 @@ async function collCreate<T extends { id?: string }>(name: CollName, data: any):
     if (name === "cylinders" && isDuplicateKeyError(e)) {
       throw new Error(`Serial number ${data?.serialNumber} is already assigned`);
     }
+    if (isDuplicateKeyError(e)) {
+      throw new Error(`Duplicate document key error in ${name}`);
+    }
     throw e;
   }
+
+  try {
+    const { logAudit } = await import("./audit");
+    await logAudit(db, {
+      userId: user?.username || "system",
+      username: user?.username || "system",
+      action: "CREATE",
+      entityType: name as any,
+      entityId: id,
+      after: doc,
+      details: `Created record in ${name} (id: ${id})`,
+    });
+  } catch {}
+
   return clean<T>(doc);
 }
 
-async function collUpdate<T>(name: CollName, id: string, patch: any): Promise<T> {
+async function collUpdate<T>(name: CollName, id: string, patch: any, user?: { username?: string }): Promise<T> {
   const db = await getDb();
   await ensureSeeded();
   if (!id) throw new Error("Missing record id");
@@ -182,10 +313,28 @@ async function collUpdate<T>(name: CollName, id: string, patch: any): Promise<T>
     if (name === "cylinders" && isDuplicateKeyError(e)) {
       throw new Error(`Serial number ${rest.serialNumber} is already assigned`);
     }
+    if (isDuplicateKeyError(e)) {
+      throw new Error(`Duplicate document key error in ${name}`);
+    }
     throw e;
   }
   const doc = await findById(name, String(existing.id ?? id));
   if (!doc) throw new Error("Update failed — record missing after write");
+
+  try {
+    const { logAudit } = await import("./audit");
+    await logAudit(db, {
+      userId: user?.username || "system",
+      username: user?.username || "system",
+      action: "UPDATE",
+      entityType: name as any,
+      entityId: id,
+      before: clean(existing),
+      after: clean(doc),
+      details: `Updated record in ${name} (id: ${id})`,
+    });
+  } catch {}
+
   return clean<T>(doc);
 }
 
@@ -216,14 +365,28 @@ async function collClaim(name: CollName, id: string, payload?: { statuses?: stri
   return clean(doc);
 }
 
-async function collRemove(name: CollName, id: string): Promise<void> {
+async function collRemove(name: CollName, id: string, user?: { username?: string }): Promise<void> {
   const db = await getDb();
   await ensureSeeded();
   if (!id) throw new Error("Missing record id");
+  const existing = await findById(name, id);
   const result = await db.collection(name).deleteOne({ id: String(id) });
   if (result.deletedCount === 0) {
     throw new Error(`Record not found (${name}/${id})`);
   }
+
+  try {
+    const { logAudit } = await import("./audit");
+    await logAudit(db, {
+      userId: user?.username || "system",
+      username: user?.username || "system",
+      action: "DELETE",
+      entityType: name as any,
+      entityId: id,
+      before: existing ? clean(existing) : null,
+      details: `Deleted record in ${name} (id: ${id})`,
+    });
+  } catch {}
 }
 
 // ---------- Generic CRUD server functions ----------
@@ -242,19 +405,18 @@ export const crudFn = createServerFn({ method: "POST" })
     if (!isKnownCrudCollection(data.coll)) {
       throw new Error("Not allowed");
     }
-    const { roleCanAccess } = await import("./settings.server");
-    if (user.role !== "Administrator") {
-      const needed = modulesForCrud(data.coll, data.op);
-      const ok = await Promise.all(needed.map((mod) => roleCanAccess(user.role, mod)));
-      if (!ok.some(Boolean)) throw new Error("Not allowed");
-    }
+    const { permissionForCrud } = await import("./crud-access");
+    const { assertPermission } = await import("./rbac");
+    const requiredPermission = permissionForCrud(data.coll, data.op);
+    assertPermission(user, requiredPermission);
+
     const id = data.id != null ? String(data.id) : undefined;
     switch (data.op) {
       case "list": return await collAll(data.coll);
       case "get": return await collGet(data.coll, id!);
-      case "create": return await collCreate(data.coll, data.payload);
-      case "update": return await collUpdate(data.coll, id!, data.payload);
-      case "remove": await collRemove(data.coll, id!); return { ok: true };
+      case "create": return await collCreate(data.coll, data.payload, user);
+      case "update": return await collUpdate(data.coll, id!, data.payload, user);
+      case "remove": await collRemove(data.coll, id!, user); return { ok: true };
       case "claim": return await collClaim(data.coll, id!, data.payload);
       default: return null;
     }
@@ -287,52 +449,22 @@ export const dashboardFn = createServerFn({ method: "GET" }).handler(async (): P
   const purchases = (await db.collection("purchases").find({}).toArray()) as unknown as PurchaseOrder[];
 
   const todayStr = dhakaDay(new Date());
-  let todaysOrders = sales.filter((s) => s.date && dhakaDay(new Date(s.date)) === todayStr);
-  if (todaysOrders.length === 0) {
-    const dhakaDates = sales
-      .map((s) => (s.date ? dhakaDay(new Date(s.date)) : ""))
-      .filter(Boolean)
-      .sort();
-    const fallback = dhakaDates[dhakaDates.length - 1];
-    if (fallback) {
-      todaysOrders = sales.filter((s) => s.date && dhakaDay(new Date(s.date)) === fallback);
-    }
-  }
-
+  const todaysOrders = sales.filter((s) => s.date && dhakaDay(new Date(s.date)) === todayStr && s.status !== "cancelled" && s.status !== "draft");
   const todaySales = todaysOrders.reduce((a, o) => a + (o.total || 0), 0);
   const todayCollection = todaysOrders.reduce((a, o) => a + (o.paid || 0), 0);
 
-  let todaysExpenses = expenses.filter((e) => e.date && dhakaDay(new Date(e.date)) === todayStr);
-  if (todaysExpenses.length === 0) {
-    const expenseDates = expenses
-      .map((e) => (e.date ? dhakaDay(new Date(e.date)) : ""))
-      .filter(Boolean)
-      .sort();
-    const fallback = expenseDates[expenseDates.length - 1];
-    if (fallback) {
-      todaysExpenses = expenses.filter((e) => e.date && dhakaDay(new Date(e.date)) === fallback);
-    }
-  }
+  const todaysExpenses = expenses.filter((e) => e.date && dhakaDay(new Date(e.date)) === todayStr);
   const todayExpense = todaysExpenses.reduce((a, e) => a + (e.amount || 0), 0);
 
   const vouchers = (await db.collection("vouchers").find({}).toArray()) as unknown as Voucher[];
   const namedAccounts = (await db.collection("accounts").find({}).toArray()) as unknown as Account[];
 
-  const customerDue =
-    sales.reduce((a, o) => a + Math.max(0, (o.total || 0) - (o.paid || 0)), 0) +
-    customers.reduce((a, c) => a + Math.max(0, customerOpeningSigned(c)), 0) -
-    vouchers.filter((v) => v.partyType === "customer" && v.type === "receipt").reduce((a, v) => a + v.amount, 0) +
-    vouchers.filter((v) => v.partyType === "customer" && v.type === "payment").reduce((a, v) => a + v.amount, 0);
-
-  const purchaseDue = purchases.reduce((a, p) => a + Math.max(0, (p.total || 0) - (p.paid || 0)), 0);
-  const supplierPayable =
-    suppliers.reduce((a, s) => a + Math.max(0, s.openingBalance || 0), 0) + purchaseDue -
-    vouchers.filter((v) => v.partyType === "supplier" && v.type === "payment").reduce((a, v) => a + v.amount, 0) +
-    vouchers.filter((v) => v.partyType === "supplier" && v.type === "receipt").reduce((a, v) => a + v.amount, 0);
+  const { totalDue: customerDue } = computeCustomerReceivables(customers, sales, vouchers);
+  const { totalDue: supplierPayable } = computeSupplierPayables(suppliers, purchases, vouchers);
 
   const monthPrefix = todayStr.slice(0, 7);
   const monthlySales = sales
-    .filter((s) => s.date && dhakaDay(new Date(s.date)).startsWith(monthPrefix) && s.status !== "cancelled")
+    .filter((s) => s.date && dhakaDay(new Date(s.date)).startsWith(monthPrefix) && s.status !== "cancelled" && s.status !== "draft")
     .reduce((a, o) => a + (o.total || 0), 0);
 
   const stockAlerts: StockAlert[] = products

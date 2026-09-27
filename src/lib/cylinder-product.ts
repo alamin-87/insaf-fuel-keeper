@@ -1,4 +1,4 @@
-import type { Cylinder, CylinderStatus, LineItem, Product } from "@/types";
+import type { Cylinder, CylinderStatus, LineItem, Product } from "../types/index.ts";
 
 /** Serialized cylinder tracking (loan / issue / return). Gas-only products never move. */
 export function isCylinderProduct(p?: Pick<Product, "uom" | "productType"> | null) {

@@ -27,6 +27,14 @@ import { formatCurrency, formatDate } from "@/utils/formatters";
 import { useT } from "@/i18n";
 import { EMPTY_DATE_RANGE, filterByDateRange, type DateRange } from "@/lib/date-range";
 import { customerOpeningSigned } from "@/lib/customer-balance";
+import {
+  computeCustomerReceivables,
+  computeSupplierPayables,
+  computeProfitAndLoss,
+  computeBalanceSheet,
+  computeCashFlow,
+} from "@/lib/accounting-engine";
+import { inventoryService } from "@/services/inventory.service";
 import { Printer } from "lucide-react";
 
 const reports = [
@@ -58,6 +66,10 @@ export function ReportsPage() {
   const { data: assets = [] } = useQuery({ queryKey: ["assets"], queryFn: accountingService.listAssets });
   const { data: cylinders = [] } = useQuery({ queryKey: ["cylinders"], queryFn: cylinderService.list });
   const { data: cylMoves = [] } = useQuery({ queryKey: ["cylinderMovements"], queryFn: cylinderService.listMovements });
+  const { data: vouchersRaw = [] } = useQuery({ queryKey: ["vouchers"], queryFn: accountingService.listVouchers });
+  const { data: stockMovementsRaw = [] } = useQuery({ queryKey: ["stockMovements"], queryFn: inventoryService.listStockMovements });
+  const { data: costLayersRaw = [] } = useQuery({ queryKey: ["costLayers"], queryFn: inventoryService.listCostLayers });
+  const { data: accountsRaw = [] } = useQuery({ queryKey: ["accounts"], queryFn: accountingService.listAccounts });
   const [cylKind, setCylKind] = useState<"all" | "customer" | "supplier">("all");
   const [cylProductId, setCylProductId] = useState("all");
   const [cylStatus, setCylStatus] = useState<CylinderBalanceStatus>("all");
@@ -95,7 +107,7 @@ export function ReportsPage() {
 
   const productSales = useMemo(() => {
     const map = new Map<string, { productName: string; qty: number; amount: number }>();
-    for (const so of sales.filter((s) => s.status !== "cancelled")) {
+    for (const so of sales.filter((s) => s.status !== "cancelled" && s.status !== "draft")) {
       for (const it of so.items) {
         const cur = map.get(it.productId) ?? { productName: it.productName, qty: 0, amount: 0 };
         cur.qty += it.quantity;
@@ -107,32 +119,14 @@ export function ReportsPage() {
   }, [sales]);
 
   const arRows = useMemo(() => {
-    const map = new Map<string, { id: string; customerName: string; due: number; orders: { id: string; orderNo: string; date: string; due: number }[] }>();
-    for (const s of sales) {
-      if (s.total > s.paid && s.status !== "cancelled") {
-        const due = s.total - s.paid;
-        const cur = map.get(s.customerId) ?? { id: s.customerId, customerName: s.customerName, due: 0, orders: [] };
-        cur.due += due;
-        cur.orders.push({ id: s.id, orderNo: s.orderNo, date: s.date, due });
-        map.set(s.customerId, cur);
-      }
-    }
-    return [...map.values()];
-  }, [sales]);
+    const { rows } = computeCustomerReceivables(customers, sales, vouchersRaw);
+    return rows;
+  }, [customers, sales, vouchersRaw]);
 
   const apRows = useMemo(() => {
-    const map = new Map<string, { id: string; supplierName: string; due: number; orders: { id: string; orderNo: string; date: string; due: number }[] }>();
-    for (const p of purchases) {
-      if (p.total > p.paid && p.status !== "cancelled") {
-        const due = p.total - p.paid;
-        const cur = map.get(p.supplierId) ?? { id: p.supplierId, supplierName: p.supplierName, due: 0, orders: [] };
-        cur.due += due;
-        cur.orders.push({ id: p.id, orderNo: p.orderNo, date: p.date, due });
-        map.set(p.supplierId, cur);
-      }
-    }
-    return [...map.values()];
-  }, [purchases]);
+    const { rows } = computeSupplierPayables(suppliers, purchases, vouchersRaw);
+    return rows;
+  }, [suppliers, purchases, vouchersRaw]);
 
   const glRows = useMemo(() => {
     const map = new Map<string, { id: string; accountName: string; totalDebit: number; totalCredit: number; balance: number; entries: any[] }>();
@@ -162,103 +156,35 @@ export function ReportsPage() {
   }, [ledger]);
 
   const pnlData = useMemo(() => {
-    const validSales = sales.filter((s) => s.status !== "cancelled" && s.status !== "draft");
-    const revenue = validSales.reduce((sum, s) => sum + s.subtotal, 0);
-
-    let cogs = 0;
-    const productMap = new Map(products.map(p => [p.id, p]));
-    for (const s of validSales) {
-      for (const item of s.items) {
-        const p = productMap.get(item.productId);
-        const cost = p?.cost || 0;
-        cogs += item.quantity * cost;
-      }
-    }
-
-    const grossProfit = revenue - cogs;
-
-    const expCategories = new Map<string, number>();
-    for (const exp of expenses) {
-      const cat = exp.category || "General";
-      expCategories.set(cat, (expCategories.get(cat) || 0) + exp.amount);
-    }
-    const expenseList = Array.from(expCategories.entries())
-      .map(([name, amount]) => ({ name, amount }))
-      .sort((a, b) => b.amount - a.amount);
-    const totalExpenses = expenseList.reduce((sum, e) => sum + e.amount, 0);
-
-    const netProfit = grossProfit - totalExpenses;
-
-    return { revenue, cogs, grossProfit, expenseList, totalExpenses, netProfit };
-  }, [sales, products, expenses]);
+    return computeProfitAndLoss({
+      sales,
+      stockMovements: stockMovementsRaw,
+      expenses,
+      vouchers: vouchersRaw,
+      range,
+    });
+  }, [sales, stockMovementsRaw, expenses, vouchersRaw, range]);
 
   const balanceSheet = useMemo(() => {
-    let cash = 0, bank = 0;
-    for (const e of ledger) {
-      if (e.account === "cash") cash += (e.direction === "in" ? e.amount : -e.amount);
-      if (e.account === "bank") bank += (e.direction === "in" ? e.amount : -e.amount);
-    }
-    const inventoryValue = products.reduce((sum, p) => sum + (p.stock || 0) * (p.cost || 0), 0);
-    
-    let ar = customers.reduce((sum, c) => sum + customerOpeningSigned(c), 0);
-    ar += sales.reduce((sum, s) => s.status !== "cancelled" ? sum + Math.max(0, s.total - s.paid) : sum, 0);
-
-    const currentAssets = cash + bank + inventoryValue + ar;
-    const fixedAssets = assets.reduce((sum, a) => sum + (a.currentValue || 0), 0);
-    const totalAssets = currentAssets + fixedAssets;
-
-    let ap = suppliers.reduce((sum, s) => sum + (s.openingBalance || 0), 0);
-    ap += purchases.reduce((sum, p) => p.status !== "cancelled" ? sum + Math.max(0, p.total - p.paid) : sum, 0);
-
-    const totalLiabilities = ap;
-    const retainedEarnings = pnlData.netProfit;
-    const contributedCapital = totalAssets - totalLiabilities - retainedEarnings;
-    const totalEquity = contributedCapital + retainedEarnings;
-    const totalLiabilitiesAndEquity = totalLiabilities + totalEquity;
-
-    return {
-      cash, bank, inventoryValue, ar, currentAssets, fixedAssets, totalAssets,
-      ap, totalLiabilities, retainedEarnings, contributedCapital, totalEquity,
-      totalLiabilitiesAndEquity
-    };
-  }, [ledger, products, customers, sales, assets, suppliers, purchases, pnlData]);
+    return computeBalanceSheet({
+      ledger,
+      products,
+      costLayers: costLayersRaw,
+      customers,
+      suppliers,
+      sales,
+      purchases,
+      assets,
+      stockMovements: stockMovementsRaw,
+      expenses,
+      vouchers: vouchersRaw,
+      accounts: accountsRaw,
+    });
+  }, [ledger, products, costLayersRaw, customers, suppliers, sales, purchases, assets, stockMovementsRaw, expenses, vouchersRaw, accountsRaw]);
 
   const cashFlow = useMemo(() => {
-    const cashLedger = ledger.filter(e => e.account === "cash" || e.account === "bank");
-
-    let opReceipts = 0, opPayments = 0;
-    let invReceipts = 0, invPayments = 0;
-    let finReceipts = 0, finPayments = 0;
-    
-    for (const e of cashLedger) {
-      const amt = e.amount;
-      const isIn = e.direction === "in";
-
-      if (e.category === "collection" || e.category === "receipt") {
-        if (isIn) opReceipts += amt; else opPayments += amt;
-      } else if (e.category === "purchase" || e.category === "expense" || e.refType === "payroll" || e.category === "payment") {
-        if (isIn) opReceipts += amt; else opPayments += amt;
-      } else if (e.category === "opening" || e.refType === "equity") {
-        if (isIn) finReceipts += amt; else finPayments += amt;
-      } else if (e.category === "journal") {
-        if (isIn) finReceipts += amt; else finPayments += amt;
-      } else {
-        if (isIn) opReceipts += amt; else opPayments += amt;
-      }
-    }
-
-    const netOperating = opReceipts - opPayments;
-    const netInvesting = invReceipts - invPayments;
-    const netFinancing = finReceipts - finPayments;
-    const netCashFlow = netOperating + netInvesting + netFinancing;
-
-    return {
-      opReceipts, opPayments, netOperating,
-      invReceipts, invPayments, netInvesting,
-      finReceipts, finPayments, netFinancing,
-      netCashFlow
-    };
-  }, [ledger]);
+    return computeCashFlow({ ledger, accounts: accountsRaw, range });
+  }, [ledger, accountsRaw, range]);
 
   const trialBalance = useMemo(() => {
     const rows: { name: string; debit: number; credit: number }[] = [];
@@ -281,7 +207,8 @@ export function ReportsPage() {
     addRow("Property, Plant & Equipment", true, balanceSheet.fixedAssets);
     
     addRow("Accounts Payable", false, balanceSheet.ap);
-    addRow("Contributed Capital / Adjustment", false, balanceSheet.contributedCapital);
+    addRow("Output VAT Liability", false, balanceSheet.outputVat);
+    addRow("Owner Capital", false, balanceSheet.ownerCapital);
     
     addRow("Sales Revenue", false, pnlData.revenue);
     addRow("Cost of Goods Sold", true, pnlData.cogs);
@@ -695,6 +622,10 @@ export function ReportsPage() {
                     <td className="py-1.5 pl-6 text-muted-foreground">Accounts Payable</td>
                     <td className="py-1.5 text-right">{formatCurrency(balanceSheet.ap)}</td>
                   </tr>
+                  <tr>
+                    <td className="py-1.5 pl-6 text-muted-foreground">Output VAT (Tax Liability)</td>
+                    <td className="py-1.5 text-right">{formatCurrency(balanceSheet.outputVat)}</td>
+                  </tr>
                   <tr className="border-t border-muted/50">
                     <td className="py-3 font-bold uppercase">Total Liabilities</td>
                     <td className="py-3 text-right font-bold">{formatCurrency(balanceSheet.totalLiabilities)}</td>
@@ -703,8 +634,8 @@ export function ReportsPage() {
                   {/* EQUITY */}
                   <tr><td colSpan={2} className="font-bold uppercase pb-2 pt-8 border-b border-muted text-primary">Owners Equity</td></tr>
                   <tr>
-                    <td className="py-1.5 pl-6 text-muted-foreground">Contributed Capital / Adjustment</td>
-                    <td className="py-1.5 text-right">{formatCurrency(balanceSheet.contributedCapital)}</td>
+                    <td className="py-1.5 pl-6 text-muted-foreground">Owner Capital</td>
+                    <td className="py-1.5 text-right">{formatCurrency(balanceSheet.ownerCapital)}</td>
                   </tr>
                   <tr>
                     <td className="py-1.5 pl-6 text-muted-foreground">Retained Earnings (Net Profit)</td>
@@ -732,45 +663,75 @@ export function ReportsPage() {
               </div>
               <table className="w-full text-sm">
                 <tbody>
+                  {/* BEGINNING CASH */}
+                  <tr className="border-b border-muted/50">
+                    <td className="py-3 font-semibold text-muted-foreground uppercase">Beginning Cash & Bank Balance</td>
+                    <td className="py-3 text-right font-semibold">{formatCurrency(cashFlow.openingCash)}</td>
+                  </tr>
+
                   {/* OPERATING ACTIVITIES */}
-                  <tr><td colSpan={2} className="font-bold uppercase pb-2 pt-4 text-primary italic">Operating activities</td></tr>
+                  <tr><td colSpan={2} className="font-bold uppercase pb-2 pt-6 text-primary">Cash Flow from Operating Activities</td></tr>
                   <tr>
-                    <td className="py-2.5 pl-6 text-muted-foreground">Cash receipt (from customers)</td>
-                    <td className="py-2.5 text-right">{formatCurrency(cashFlow.opReceipts)}</td>
+                    <td className="py-2 pl-6 text-muted-foreground">Cash receipts from customers</td>
+                    <td className="py-2 text-right">{formatCurrency(cashFlow.customerReceipts)}</td>
                   </tr>
                   <tr>
-                    <td className="py-2.5 pl-6 text-muted-foreground">Cash paid</td>
-                    <td className="py-2.5 text-right">({formatCurrency(cashFlow.opPayments)})</td>
+                    <td className="py-2 pl-6 text-muted-foreground">Cash paid to suppliers</td>
+                    <td className="py-2 text-right">({formatCurrency(cashFlow.supplierPayments)})</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 pl-6 text-muted-foreground">Cash paid for operating expenses</td>
+                    <td className="py-2 text-right">({formatCurrency(cashFlow.operatingExpenses)})</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 pl-6 text-muted-foreground">Cash paid for salaries & payroll</td>
+                    <td className="py-2 text-right">({formatCurrency(cashFlow.payrollPayments)})</td>
+                  </tr>
+                  <tr className="border-t border-muted/30">
+                    <td className="py-2 pl-4 font-semibold text-muted-foreground">Net cash from operating activities</td>
+                    <td className={`py-2 text-right font-semibold ${cashFlow.netOperating < 0 ? "text-destructive" : ""}`}>{formatCurrency(cashFlow.netOperating)}</td>
                   </tr>
 
                   {/* INVESTING ACTIVITIES */}
-                  <tr><td colSpan={2} className="font-bold uppercase pb-2 pt-8 text-primary italic">Investing activities</td></tr>
+                  <tr><td colSpan={2} className="font-bold uppercase pb-2 pt-6 text-primary">Cash Flow from Investing Activities</td></tr>
                   <tr>
-                    <td className="py-2.5 pl-6 text-muted-foreground">Cash receipt from sales</td>
-                    <td className="py-2.5 text-right">{formatCurrency(cashFlow.invReceipts)}</td>
+                    <td className="py-2 pl-6 text-muted-foreground">Purchase of property, plant & equipment</td>
+                    <td className="py-2 text-right">({formatCurrency(cashFlow.assetPurchases)})</td>
                   </tr>
                   <tr>
-                    <td className="py-2.5 pl-6 text-muted-foreground">Equipment cost</td>
-                    <td className="py-2.5 text-right">({formatCurrency(cashFlow.invPayments)})</td>
+                    <td className="py-2 pl-6 text-muted-foreground">Proceeds from sale of assets</td>
+                    <td className="py-2 text-right">{formatCurrency(cashFlow.assetSales)}</td>
+                  </tr>
+                  <tr className="border-t border-muted/30">
+                    <td className="py-2 pl-4 font-semibold text-muted-foreground">Net cash from investing activities</td>
+                    <td className={`py-2 text-right font-semibold ${cashFlow.netInvesting < 0 ? "text-destructive" : ""}`}>{formatCurrency(cashFlow.netInvesting)}</td>
                   </tr>
 
                   {/* FINANCING ACTIVITIES */}
-                  <tr><td colSpan={2} className="font-bold uppercase pb-2 pt-8 text-primary italic">Financing activities</td></tr>
+                  <tr><td colSpan={2} className="font-bold uppercase pb-2 pt-6 text-primary">Cash Flow from Financing Activities</td></tr>
                   <tr>
-                    <td className="py-2.5 pl-6 text-muted-foreground">Cash receipt / Capital</td>
-                    <td className="py-2.5 text-right">{formatCurrency(cashFlow.finReceipts)}</td>
+                    <td className="py-2 pl-6 text-muted-foreground">Owner capital contributions</td>
+                    <td className="py-2 text-right">{formatCurrency(cashFlow.capitalContributions)}</td>
                   </tr>
                   <tr>
-                    <td className="py-2.5 pl-6 text-muted-foreground">Loan payment</td>
-                    <td className="py-2.5 text-right">({formatCurrency(cashFlow.finPayments)})</td>
+                    <td className="py-2 pl-6 text-muted-foreground">Owner drawings</td>
+                    <td className="py-2 text-right">({formatCurrency(cashFlow.ownerDrawings)})</td>
+                  </tr>
+                  <tr className="border-t border-muted/30">
+                    <td className="py-2 pl-4 font-semibold text-muted-foreground">Net cash from financing activities</td>
+                    <td className={`py-2 text-right font-semibold ${cashFlow.netFinancing < 0 ? "text-destructive" : ""}`}>{formatCurrency(cashFlow.netFinancing)}</td>
                   </tr>
 
-                  {/* NET CASH FLOW */}
-                  <tr className="border-t-2 border-primary/30 bg-primary/10 mt-6">
-                    <td className="py-5 pl-2 font-bold uppercase text-base text-primary">Net cash flow</td>
-                    <td className={`py-5 text-right font-bold text-lg ${cashFlow.netCashFlow < 0 ? 'text-destructive' : 'text-primary'}`}>
+                  {/* NET CHANGE & ENDING */}
+                  <tr className="border-t-2 border-primary/30 bg-muted/10">
+                    <td className="py-3.5 font-bold uppercase text-base text-primary">Net Increase / (Decrease) in Cash</td>
+                    <td className={`py-3.5 text-right font-bold text-base ${cashFlow.netCashFlow < 0 ? 'text-destructive' : 'text-primary'}`}>
                       {cashFlow.netCashFlow < 0 ? `(${formatCurrency(Math.abs(cashFlow.netCashFlow))})` : formatCurrency(cashFlow.netCashFlow)}
                     </td>
+                  </tr>
+                  <tr className="border-t-4 border-b-[6px] border-double border-primary/40 bg-muted/20">
+                    <td className="py-4 font-bold uppercase text-base">Ending Cash & Bank Balance</td>
+                    <td className="py-4 text-right font-bold text-lg text-emerald-600 dark:text-emerald-400">{formatCurrency(cashFlow.closingCash)}</td>
                   </tr>
                 </tbody>
               </table>

@@ -410,9 +410,12 @@ async function receiveStockInDb(
     productId: product.id,
     productName: product.name,
     type: "in",
+    movementType: "RECEIPT",
+    direction: "in",
     quantity: qty,
     balanceAfter: nextStock,
     unitCost: cost,
+    totalCost: qty * cost,
     cogsAmount: qty * cost,
     costingMethod: productMethod(product),
     refType: meta.refType,
@@ -447,16 +450,20 @@ export async function issueStockInDb(
   const nextStock = available - qty;
   await db.collection("products").updateOne({ id: productId }, { $set: { stock: nextStock } }, opt);
   const now = new Date().toISOString();
+  const unitCost = product.cost ?? 0;
   const movement: StockMovement = {
     id: newId(),
     date: now,
     productId,
     productName: product.name,
     type: "out",
+    movementType: meta.refType === "sales" ? "SALE_ISSUE" : "ADJUSTMENT_OUT",
+    direction: "out",
     quantity: qty,
     balanceAfter: nextStock,
-    unitCost: product.cost ?? 0,
-    cogsAmount: qty * (product.cost ?? 0),
+    unitCost,
+    totalCost: qty * unitCost,
+    cogsAmount: qty * unitCost,
     costingMethod: productMethod(product),
     refType: meta.refType,
     refId: meta.refId,

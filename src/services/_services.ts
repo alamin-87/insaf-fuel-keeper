@@ -2,7 +2,7 @@ import type {
   Customer, Supplier, Product, Cylinder, CylinderMovement, CylinderStatus, CylinderFillLevel,
   SalesOrder, SalesStatus, Delivery, StockAlert, DashboardStats, LineItem,
   Expense, LedgerEntry, PaymentMethod, PurchaseOrder, PurchaseStatus,
-  StockMovement, Voucher, VoucherType, Employee, PayrollRun, Account,
+  StockMovement, MovementTypeKind, Voucher, VoucherType, Employee, PayrollRun, Account,
   ChartOfAccount, BusinessAsset, CostLayer, CostingMethod, LayerConsumption,
   JournalLine, ProductCategory,
 } from "@/types";
@@ -14,6 +14,7 @@ import { genOrderNo } from "@/utils/helpers";
 import { cylinderIsEmpty, cylinderIsFullStock, isCylinderProduct, isCylinderSaleLine, isCylinderTrackedLine, pickFifo, suggestSerials } from "@/lib/cylinder-product";
 import { remainingOrderQty, buildProductInventory } from "@/lib/cylinder-inventory";
 import { issueLockIsActive } from "@/lib/cylinder-lock";
+import { reconcileQuantityWithSerials, type SerialReconciliationItem, type StockMeta } from "@/lib/inventory-engine";
 
 const call = async <T,>(op: any, coll: any, id?: string, payload?: any): Promise<T> => {
   return (await crudFn({ data: { op, coll, id, payload } })) as T;
@@ -78,8 +79,6 @@ function lastCustomerPurpose(movements: CylinderMovement[], cylinderId: string, 
     .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
     .at(-1)?.purpose;
 }
-
-type StockMeta = { refType?: StockMovement["refType"]; refId?: string; notes?: string; by?: string };
 
 async function postStockMovement(data: Omit<StockMovement, "id">) {
   return call<StockMovement>("create", "stockMovements", undefined, data);
@@ -152,25 +151,35 @@ async function receiveStock(productId: string, qty: number, unitCost: number, me
     productId: product.id,
     qtyRemaining: qty,
     unitCost: cost,
-    receivedAt: new Date().toISOString(),
+    receivedAt: meta?.date || new Date().toISOString(),
     refType: meta?.refType,
     refId: meta?.refId,
   });
   const oldStock = product.stock ?? 0;
   const oldCost = product.cost ?? cost;
   const nextStock = oldStock + qty;
-  const nextCost = nextStock > 0 ? (oldStock * oldCost + qty * cost) / nextStock : cost;
+  const method = productMethod(product);
+  let nextCost: number;
+  if (method === "average") {
+    nextCost = nextStock > 0 ? (oldStock * oldCost + qty * cost) / nextStock : cost;
+  } else {
+    const leftover = await remainingValue(product.id);
+    nextCost = leftover.avg || cost;
+  }
   await call("update", "products", product.id, { stock: nextStock, cost: nextCost });
   await postStockMovement({
-    date: new Date().toISOString(),
+    date: meta?.date || new Date().toISOString(),
     productId: product.id,
     productName: product.name,
     type: "in",
+    movementType: meta?.movementType || (meta?.refType === "purchase" ? "RECEIPT" : meta?.refType === "adjustment" ? "ADJUSTMENT_IN" : "RECEIPT"),
+    direction: "in",
     quantity: qty,
     balanceAfter: nextStock,
     unitCost: cost,
+    totalCost: qty * cost,
     cogsAmount: qty * cost,
-    costingMethod: productMethod(product),
+    costingMethod: method,
     refType: meta?.refType,
     refId: meta?.refId,
     notes: meta?.notes,
@@ -184,10 +193,10 @@ async function issueStock(productId: string, qty: number, meta?: StockMeta) {
   if (meta?.refType && meta?.refId && await hasPostedStock(meta.refType, meta.refId, productId, "out")) return;
   await ensureOpeningLayer(product);
   const available = product.stock ?? 0;
-  const take = Math.min(qty, available);
-  if (take <= 0) {
-    throw new Error(`Insufficient stock for ${product.name}`);
+  if (available < qty) {
+    throw new Error(`Insufficient stock. Available: ${available}, Requested: ${qty}.`);
   }
+  const take = qty;
   const method = productMethod(product);
   let consumptions: LayerConsumption[];
   let unitCost: number;
@@ -208,13 +217,16 @@ async function issueStock(productId: string, qty: number, meta?: StockMeta) {
     cost: method === "average" ? (nextStock > 0 ? (product.cost ?? 0) : 0) : leftover.avg,
   });
   await postStockMovement({
-    date: new Date().toISOString(),
+    date: meta?.date || new Date().toISOString(),
     productId: product.id,
     productName: product.name,
     type: "out",
+    movementType: meta?.movementType || (meta?.refType === "sales" ? "SALE_ISSUE" : meta?.refType === "adjustment" ? "ADJUSTMENT_OUT" : "SALE_ISSUE"),
+    direction: "out",
     quantity: take,
     balanceAfter: nextStock,
     unitCost,
+    totalCost: cogsAmount,
     cogsAmount,
     costingMethod: method,
     consumptions,
@@ -331,19 +343,12 @@ async function assertSalesStock(
   opts?: { sellGasOnly?: boolean; excludeOrderId?: string },
 ) {
   const products = await call<Product[]>("list", "products");
-  const cylinders = await call<Cylinder[]>("list", "cylinders");
-  const sales = (await call<SalesOrder[]>("list", "sales")).filter((s) => s.id !== opts?.excludeOrderId);
-  const deliveries = await call<Delivery[]>("list", "deliveries");
-  const movements = await call<StockMovement[]>("list", "stockMovements");
-  const rows = buildProductInventory(products, cylinders, sales, deliveries, movements);
   for (const item of items) {
     const qty = Number(item.quantity) || 0;
     if (qty <= 0) continue;
     const p = products.find((x) => x.id === item.productId);
-    const row = rows.find((r) => r.productId === item.productId);
-    const available = !opts?.sellGasOnly && isCylinderTrackedLine(item, p)
-      ? Math.max(0, row?.available ?? 0)
-      : Math.max(0, opts?.sellGasOnly || item.itemType === "product" ? (p?.stock ?? 0) : (row?.available ?? p?.stock ?? 0));
+    if (!p) throw new Error(`Product not found (${item.productId})`);
+    const available = Math.max(0, p.stock ?? 0);
     if (qty > available) {
       throw new Error(`Insufficient stock. Available: ${available}, Requested: ${qty}.`);
     }
@@ -573,18 +578,40 @@ export const productService = {
   list: () => call<Product[]>("list", "products"),
   get: (id: string) => call<Product | null>("get", "products", id),
   create: async (data: Omit<Product, "id" | "createdAt">) => {
+    const initialStock = Number(data.stock) || 0;
+    const initialCost = Number(data.cost) || 0;
     const created = await call<Product>("create", "products", undefined, {
       ...data,
+      stock: initialStock,
+      cost: initialCost,
       costingMethod: data.costingMethod || "fifo",
       createdAt: new Date().toISOString(),
     });
-    if ((created.stock ?? 0) > 0) {
+    if (initialStock > 0) {
       await call("create", "costLayers", undefined, {
         productId: created.id,
-        qtyRemaining: created.stock,
-        unitCost: created.cost ?? 0,
+        qtyRemaining: initialStock,
+        unitCost: initialCost,
         receivedAt: created.createdAt,
         refType: "adjustment",
+      });
+      await postStockMovement({
+        date: created.createdAt,
+        productId: created.id,
+        productName: created.name,
+        type: "in",
+        movementType: "ADJUSTMENT_IN",
+        direction: "in",
+        quantity: initialStock,
+        balanceAfter: initialStock,
+        unitCost: initialCost,
+        totalCost: initialStock * initialCost,
+        cogsAmount: initialStock * initialCost,
+        costingMethod: productMethod(created),
+        refType: "adjustment",
+        refId: `INIT-${created.id}`,
+        notes: "Initial opening stock",
+        by: "System",
       });
     }
     return created;
@@ -597,7 +624,7 @@ export const productService = {
   stockAlerts: async (): Promise<StockAlert[]> => {
     const list = await call<Product[]>("list", "products");
     return list
-      .filter((p) => p.stock <= p.reorderLevel)
+      .filter((p) => (p.stock ?? 0) <= (p.reorderLevel ?? 0))
       .map((p) => ({ productId: p.id, productName: p.name, stock: p.stock, reorderLevel: p.reorderLevel }));
   },
 };
@@ -648,6 +675,11 @@ export const cylinderService = {
     if (data.type === "lost" && current.status === "lost") {
       throw new Error("Cylinder is already marked lost");
     }
+    if (data.type === "returned" && data.customerId) {
+      if (current.status !== "at_customer" || (current.customerId && current.customerId !== data.customerId)) {
+        throw new Error(`Cannot return cylinder ${current.serialNumber}: it is not currently issued to this customer.`);
+      }
+    }
     const now = new Date().toISOString();
     const mv = await call<CylinderMovement>("create", "movements", undefined, { ...data, timestamp: now });
     const status = statusFromMovement(data.type);
@@ -688,10 +720,20 @@ export const salesService = {
       createdAt: data.createdAt ?? new Date().toISOString(),
     });
     if (isOpenSalesStatus(order.status)) {
-      await postReservationMoves(order, "Reserved");
+      for (const item of order.items) {
+        if (Number(item.quantity) > 0) {
+          await issueStock(item.productId, Number(item.quantity), {
+            refType: "sales",
+            refId: order.id,
+            movementType: "SALE_ISSUE",
+            notes: order.orderNo,
+            by: "Sales",
+          });
+        }
+      }
       await fulfillSalesOrder(order);
     }
-    return await call<SalesOrder | null>("get", "sales", order.id) ?? order;
+    return (await call<SalesOrder | null>("get", "sales", order.id)) ?? order;
   },
   update: async (id: string, data: Partial<SalesOrder>) => {
     const existing = await call<SalesOrder | null>("get", "sales", id);
@@ -724,6 +766,17 @@ export const salesService = {
     const { paid: _ignorePaid, ...rest } = data;
     const updated = await call<SalesOrder>("update", "sales", id, { ...rest, paid, status, tax: 0 });
     if (data.items && isOpenSalesStatus(updated.status)) {
+      for (const item of updated.items) {
+        if (Number(item.quantity) > 0 && !(await hasPostedStock("sales", updated.id, item.productId, "out"))) {
+          await issueStock(item.productId, Number(item.quantity), {
+            refType: "sales",
+            refId: updated.id,
+            movementType: "SALE_ISSUE",
+            notes: updated.orderNo,
+            by: "Sales",
+          });
+        }
+      }
       await fulfillSalesOrder(updated);
     }
     return updated;
@@ -732,9 +785,6 @@ export const salesService = {
     const existing = await call<SalesOrder | null>("get", "sales", id);
     if (!existing) throw new Error("Order not found");
     await unfulfillSalesOrder(existing);
-    if (!(await hasStockOut("sales", id)) && isOpenSalesStatus(existing.status)) {
-      await postReservationMoves(existing, "Reservation released");
-    }
     const ledger = await call<LedgerEntry[]>("list", "ledger");
     for (const entry of ledger.filter((e) => e.refType === "sales" && e.refId === id)) {
       await call("remove", "ledger", entry.id);
@@ -751,18 +801,25 @@ export const salesService = {
     if (order.status === "cancelled" || order.status === "paid") {
       throw new Error(`Cannot change status from ${order.status}`);
     }
-    if (order.status === "draft" && (status === "confirmed" || status === "invoiced")) {
+    if (order.status === "draft" && (status === "confirmed" || status === "invoiced" || status === "paid")) {
       await assertSalesStock(order.items, { sellGasOnly: order.sellGasOnly, excludeOrderId: id });
-      await postReservationMoves({ ...order, status }, "Reserved");
     }
     if ((order.status === "confirmed" || order.status === "invoiced") && status === "cancelled") {
       await unfulfillSalesOrder(order);
-      if (!(await hasStockOut("sales", id))) {
-        await postReservationMoves(order, "Reservation released");
-      }
     }
     const updated = await call<SalesOrder>("update", "sales", id, { status });
     if (order.status === "draft" && isOpenSalesStatus(status)) {
+      for (const item of order.items) {
+        if (Number(item.quantity) > 0 && !(await hasPostedStock("sales", order.id, item.productId, "out"))) {
+          await issueStock(item.productId, Number(item.quantity), {
+            refType: "sales",
+            refId: order.id,
+            movementType: "SALE_ISSUE",
+            notes: order.orderNo,
+            by: "Sales",
+          });
+        }
+      }
       await fulfillSalesOrder({ ...updated, status });
     }
     return updated;
@@ -776,7 +833,17 @@ export const salesService = {
       status: "confirmed",
       orderNo: order.orderNo.startsWith("QT") ? order.orderNo.replace(/^QT/, "SO") : order.orderNo,
     });
-    await postReservationMoves(updated, "Reserved");
+    for (const item of order.items) {
+      if (Number(item.quantity) > 0 && !(await hasPostedStock("sales", order.id, item.productId, "out"))) {
+        await issueStock(item.productId, Number(item.quantity), {
+          refType: "sales",
+          refId: order.id,
+          movementType: "SALE_ISSUE",
+          notes: updated.orderNo,
+          by: "Sales",
+        });
+      }
+    }
     await fulfillSalesOrder(updated);
     return updated;
   },
@@ -1456,22 +1523,33 @@ export const inventoryService = {
     if (!product) throw new Error("Product not found");
     const qty = Number(quantity);
     if (qty <= 0) throw new Error("Quantity must be positive");
-    const cylinders = await call<Cylinder[]>("list", "cylinders");
-    const pool = cylinders
-      .filter((c) => c.productId === productId && cylinderIsFullStock(c) && c.ownedBy !== "customer")
-      .sort((a, b) => a.lastMovementAt.localeCompare(b.lastMovementAt));
-    if (pool.length < qty) throw new Error(`Only ${pool.length} full cylinder(s) in warehouse`);
-    for (const c of pool.slice(0, qty)) {
-      await cylinderService.addMovement({
-        cylinderId: c.id,
-        type: "damaged",
-        fromLocation: "Warehouse",
-        toLocation: "Damaged",
-        notes: notes?.trim() || `Damaged · ${product.name}`,
-        by: "Warehouse",
-        purpose: "damaged",
-      });
+    const isCyl = isCylinderProduct(product);
+    if (isCyl) {
+      const cylinders = await call<Cylinder[]>("list", "cylinders");
+      const pool = cylinders
+        .filter((c) => c.productId === productId && cylinderIsFullStock(c) && c.ownedBy !== "customer")
+        .sort((a, b) => a.lastMovementAt.localeCompare(b.lastMovementAt));
+      if (pool.length < qty) throw new Error(`Only ${pool.length} full cylinder(s) in warehouse`);
+      for (const c of pool.slice(0, qty)) {
+        await cylinderService.addMovement({
+          cylinderId: c.id,
+          type: "damaged",
+          fromLocation: "Warehouse",
+          toLocation: "Damaged",
+          notes: notes?.trim() || `Damaged · ${product.name}`,
+          by: "Warehouse",
+          purpose: "damaged",
+        });
+      }
     }
+    const refId = genOrderNo("DMG");
+    await issueStock(productId, qty, {
+      refType: "adjustment",
+      refId,
+      movementType: "DAMAGE",
+      notes: `Damaged · ${product.name}${notes ? ` · ${notes}` : ""}`,
+      by: "Warehouse",
+    });
   },
   resolveDamage: async (productId: string, quantity: number, action: "repair" | "scrap" | "writeoff", notes?: string) => {
     const product = await call<Product | null>("get", "products", productId);
@@ -1506,6 +1584,16 @@ export const inventoryService = {
         });
       }
     }
+    if (action === "repair") {
+      const refId = genOrderNo("RPR");
+      await receiveStock(productId, qty, product.cost ?? 0, {
+        refType: "adjustment",
+        refId,
+        movementType: "ADJUSTMENT_IN",
+        notes: `Repaired · ${product.name}${notes ? ` · ${notes}` : ""}`,
+        by: "Warehouse",
+      });
+    }
   },
   returnEmpty: async (data: { customerId: string; productId: string; quantity: number; notes?: string }) => {
     const product = await call<Product | null>("get", "products", data.productId);
@@ -1518,6 +1606,7 @@ export const inventoryService = {
     const pool = cylinders
       .filter((c) => c.productId === data.productId && c.status === "at_customer" && c.customerId === data.customerId && c.ownedBy !== "customer" && !issueLockIsActive(c.issueLock))
       .sort((a, b) => a.lastMovementAt.localeCompare(b.lastMovementAt));
+    if (pool.length === 0) throw new Error(`Cannot return cylinder: customer has no issued cylinders for ${product.name}`);
     if (pool.length < qty) throw new Error(`Only ${pool.length} cylinder(s) with this customer`);
     const chosen = pool.slice(0, qty);
     const claimedIds = chosen.map((c) => c.id);
@@ -1714,48 +1803,31 @@ export const inventoryService = {
     if (!product) throw new Error("Product not found");
     if (!Number.isFinite(quantity) || quantity < 0) throw new Error("Quantity cannot be negative");
     if (type !== "adjust" && quantity <= 0) throw new Error("Quantity must be positive");
-    const cylinders = await call<Cylinder[]>("list", "cylinders");
-    const isCyl = isCylinderProduct(product);
-    const fullNow = cylinders.filter((c) => c.productId === productId && c.status !== "damaged" && c.status !== "lost" && !cylinderIsEmpty(c) && (c.status === "in_stock" || c.status === "in_transit")).length;
-    const current = isCyl ? fullNow : (product.stock ?? 0);
+    const current = product.stock ?? 0;
     let delta = 0;
     if (type === "in") delta = quantity;
     else if (type === "out") delta = -quantity;
     else delta = quantity - current;
     if (delta === 0) return;
-    if (current + delta < 0) throw new Error(`Insufficient stock for ${product.name} (available ${current})`);
+    if (current + delta < 0) throw new Error(`Insufficient stock for ${product.name} (available ${current}, delta ${delta})`);
     const refId = genOrderNo("ADJ");
-    const prior = await call<StockMovement[]>("list", "stockMovements");
-    if (prior.some((m) => m.refType === "adjustment" && m.refId === refId)) {
-      throw new Error("Duplicate adjustment");
-    }
-    const next = current + delta;
     const meta: StockMeta = {
       refType: "adjustment",
       refId,
-      notes: `ADJ ${refId} · ${product.name} · previous ${current} · qty ${delta > 0 ? "+" : ""}${delta} · updated ${next}${notes ? ` · ${notes}` : ""}`,
+      movementType: delta > 0 ? "ADJUSTMENT_IN" : "ADJUSTMENT_OUT",
+      notes: `ADJ ${refId} · ${product.name} · previous ${current} · qty ${delta > 0 ? "+" : ""}${delta} · updated ${current + delta}${notes ? ` · ${notes}` : ""}`,
       by: notes?.trim() || "Warehouse",
     };
-    if (delta > 0) await receiveStock(productId, delta, product.cost ?? 0, meta);
-    else if ((product.stock ?? 0) >= -delta) await issueStock(productId, -delta, meta);
-    else {
-      await call("update", "products", product.id, { stock: Math.max(0, (product.stock ?? 0) + delta) });
-      await postStockMovement({
-        date: new Date().toISOString(),
-        productId: product.id,
-        productName: product.name,
-        type: "out",
-        quantity: -delta,
-        balanceAfter: Math.max(0, (product.stock ?? 0) + delta),
-        refType: "adjustment",
-        refId,
-        notes: meta.notes,
-        by: meta.by ?? "Warehouse",
-      });
+    if (delta > 0) {
+      await receiveStock(productId, delta, product.cost ?? 0, meta);
+    } else {
+      await issueStock(productId, -delta, meta);
     }
+    const isCyl = isCylinderProduct(product);
     if (isCyl) {
+      const cylinders = await call<Cylinder[]>("list", "cylinders");
       if (delta > 0) {
-        const serials = suggestSerials(product.code, delta).map((s, i) => `${s}-${Math.random().toString(36).slice(2, 6)}`);
+        const serials = suggestSerials(product.code, delta).map((s) => `${s}-${Math.random().toString(36).slice(2, 6)}`);
         for (const serial of serials) {
           await cylinderService.create({
             serialNumber: serial,
@@ -1772,21 +1844,28 @@ export const inventoryService = {
         if (ids.length < -delta) throw new Error(`Only ${ids.length} full cylinder(s) available to decrease`);
         await claimCylinderIds(ids, ["in_stock", "in_transit"]);
         await afterCylinderClaim(ids, async () => {
-        for (const cid of ids) {
-          await cylinderService.addMovement({
-            cylinderId: cid,
-            type: "stock_out",
-            fromLocation: "Warehouse",
-            toLocation: "Stock Out",
-            notes: `Stock adjustment ${refId}`,
-            by: meta.by || "Warehouse",
-            purpose: "stock_out",
-          });
-        }
+          for (const cid of ids) {
+            await cylinderService.addMovement({
+              cylinderId: cid,
+              type: "stock_out",
+              fromLocation: "Warehouse",
+              toLocation: "Stock Out",
+              notes: `Stock adjustment ${refId}`,
+              by: meta.by || "Warehouse",
+              purpose: "stock_out",
+            });
+          }
         });
       }
     }
   },
+  reconciliationReport: async (): Promise<SerialReconciliationItem[]> => {
+    const products = await call<Product[]>("list", "products");
+    const cylinders = await call<Cylinder[]>("list", "cylinders");
+    return reconcileQuantityWithSerials(products, cylinders);
+  },
+  listStockMovements: () => call<StockMovement[]>("list", "stockMovements"),
+  listCostLayers: () => call<CostLayer[]>("list", "costLayers"),
 };
 
 export const accountingService = {
@@ -1998,6 +2077,14 @@ export const hrService = {
     const run = await call<PayrollRun | null>("get", "payroll", id);
     if (!run) throw new Error("Payroll not found");
     if (run.status !== "draft") throw new Error("Only draft payslips can be deleted");
+    const ledger = await call<LedgerEntry[]>("list", "ledger");
+    for (const entry of ledger.filter((e) => e.refType === "payroll" && e.refId === id)) {
+      await call("remove", "ledger", entry.id);
+    }
+    const vouchers = await call<Voucher[]>("list", "vouchers");
+    for (const v of vouchers.filter((x) => x.refType === "payroll" && x.refId === id)) {
+      await call("remove", "vouchers", v.id);
+    }
     return call<{ ok: true }>("remove", "payroll", id);
   },
   payPayroll: async (id: string, method: PaymentMethod = "bank") => {
@@ -2005,19 +2092,34 @@ export const hrService = {
     if (!run) throw new Error("Payroll not found");
     if (run.status === "paid") throw new Error("Already paid");
     const account = method === "cheque" || method === "mobile" ? "bank" : method;
+    const payDate = new Date().toISOString();
+    const voucher = await call<Voucher>("create", "vouchers", undefined, {
+      voucherNo: genOrderNo("PV"),
+      type: "payment",
+      date: toVoucherDate(payDate),
+      account,
+      amount: run.net,
+      partyType: "employee",
+      partyId: run.employeeId,
+      partyName: run.employeeName,
+      notes: `Salary ${run.employeeName} · ${run.month}`,
+      refType: "payroll",
+      refId: id,
+      createdAt: payDate,
+    });
     await postLedger({
-      date: new Date().toISOString(),
+      date: payDate,
       account,
       direction: "out",
       amount: run.net,
       category: "expense",
       refType: "payroll",
       refId: id,
-      notes: `Salary ${run.employeeName} · ${run.month}`,
+      notes: `Salary ${run.employeeName} · ${run.month} (${voucher.voucherNo})`,
     });
     return call<PayrollRun>("update", "payroll", id, {
       status: "paid",
-      paidAt: new Date().toISOString(),
+      paidAt: payDate,
       paymentMethod: method,
     });
   },

@@ -13,8 +13,15 @@ export function paymentStatus(total: number, paid: number): "unpaid" | "partial"
   return "partial";
 }
 
+let clientSeq = 0;
+
+export const formatDocumentNumber = (prefix: string, year: number, seq: number) => {
+  return `${prefix.toUpperCase()}-${year}-${String(seq).padStart(6, "0")}`;
+};
+
 export const genOrderNo = (prefix = "SO") => {
   const y = new Date().getFullYear();
-  const n = Math.floor(Math.random() * 9000 + 1000);
-  return `${prefix}-${y}-${n}`;
+  clientSeq += 1;
+  const randOffset = Math.floor(Math.random() * 800000 + 100000);
+  return `${prefix.toUpperCase()}-${y}-${String(randOffset + clientSeq).padStart(6, "0")}`;
 };

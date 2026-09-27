@@ -25,11 +25,11 @@ export const seedSuppliers: Supplier[] = [
 ];
 
 export const seedProducts: Product[] = [
-  { id: "p1", code: "LPG-12", name: "LPG Domestic 12kg", category: "LPG", uom: "cyl", price: 1450, cost: 1200, taxRate: 5, stock: 65, reorderLevel: 25, incomeAccountId: "coa1", expenseAccountId: "coa8", costingMethod: "fifo", createdAt: daysAgo(120) },
+  { id: "p1", code: "LPG-12", name: "LPG Domestic 12kg", category: "LPG", uom: "cyl", price: 1450, cost: 1200, taxRate: 5, stock: 59, reorderLevel: 25, incomeAccountId: "coa1", expenseAccountId: "coa8", costingMethod: "fifo", createdAt: daysAgo(120) },
   { id: "p2", code: "LPG-35", name: "LPG Commercial 35kg", category: "LPG", uom: "cyl", price: 4200, cost: 3600, taxRate: 5, stock: 12, reorderLevel: 15, incomeAccountId: "coa1", expenseAccountId: "coa8", costingMethod: "fifo", createdAt: daysAgo(120) },
   { id: "p3", code: "LPG-45", name: "LPG Commercial 45kg", category: "LPG", uom: "cyl", price: 5350, cost: 4600, taxRate: 5, stock: 28, reorderLevel: 12, incomeAccountId: "coa1", expenseAccountId: "coa8", costingMethod: "lifo", createdAt: daysAgo(120) },
   { id: "p4", code: "OXY-D", name: "Medical Oxygen D-Type", category: "Medical", uom: "cyl", price: 850, cost: 620, taxRate: 12, stock: 34, reorderLevel: 15, incomeAccountId: "coa1", expenseAccountId: "coa8", costingMethod: "average", createdAt: daysAgo(120) },
-  { id: "p5", code: "N2-B", name: "Nitrogen Industrial", category: "Industrial", uom: "cyl", price: 1150, cost: 880, taxRate: 15, stock: 6, reorderLevel: 10, incomeAccountId: "coa1", expenseAccountId: "coa8", costingMethod: "fifo", createdAt: daysAgo(120) },
+  { id: "p5", code: "N2-B", name: "Nitrogen Industrial", category: "Industrial", uom: "cyl", price: 1150, cost: 880, taxRate: 15, stock: 2, reorderLevel: 10, incomeAccountId: "coa1", expenseAccountId: "coa8", costingMethod: "fifo", createdAt: daysAgo(120) },
   { id: "p6", code: "CO2-B", name: "Carbon Dioxide", category: "Industrial", uom: "cyl", price: 980, cost: 750, taxRate: 15, stock: 22, reorderLevel: 10, incomeAccountId: "coa1", expenseAccountId: "coa8", costingMethod: "average", createdAt: daysAgo(120) },
 ];
 
@@ -138,9 +138,11 @@ export const seedPurchases: PurchaseOrder[] = [
 ];
 
 export const seedStockMovements: StockMovement[] = [
-  { id: "sm1", date: daysAgo(1), productId: "p1", productName: "LPG Domestic 12kg", type: "in", quantity: 40, balanceAfter: 65, refType: "purchase", refId: "po1", notes: "GRN-2026-0001", by: "Warehouse" },
-  { id: "sm2", date: daysAgo(0), productId: "p2", productName: "LPG Commercial 35kg", type: "out", quantity: 8, balanceAfter: 12, refType: "sales", refId: "so1", notes: "SO-2026-0001", by: "Sales" },
-  { id: "sm3", date: daysAgo(0), productId: "p4", productName: "Medical Oxygen D-Type", type: "out", quantity: 12, balanceAfter: 34, refType: "sales", refId: "so2", notes: "SO-2026-0002", by: "Sales" },
+  { id: "sm1", date: daysAgo(1), productId: "p1", productName: "LPG Domestic 12kg", type: "in", movementType: "RECEIPT", direction: "in", quantity: 40, balanceAfter: 65, unitCost: 1200, totalCost: 48000, cogsAmount: 48000, costingMethod: "fifo", refType: "purchase", refId: "po1", notes: "GRN-2026-0001", by: "Warehouse" },
+  { id: "sm2", date: daysAgo(0), productId: "p2", productName: "LPG Commercial 35kg", type: "out", movementType: "SALE_ISSUE", direction: "out", quantity: 8, balanceAfter: 12, unitCost: 3600, totalCost: 28800, cogsAmount: 28800, costingMethod: "fifo", refType: "sales", refId: "so1", notes: "SO-2026-0001", by: "Sales" },
+  { id: "sm3", date: daysAgo(0), productId: "p4", productName: "Medical Oxygen D-Type", type: "out", movementType: "SALE_ISSUE", direction: "out", quantity: 12, balanceAfter: 34, unitCost: 620, totalCost: 7440, cogsAmount: 7440, costingMethod: "average", refType: "sales", refId: "so2", notes: "SO-2026-0002", by: "Sales" },
+  { id: "sm4", date: daysAgo(0), productId: "p5", productName: "Nitrogen Industrial", type: "out", movementType: "SALE_ISSUE", direction: "out", quantity: 4, balanceAfter: 2, unitCost: 880, totalCost: 3520, cogsAmount: 3520, costingMethod: "fifo", refType: "sales", refId: "so3", notes: "SO-2026-0003", by: "Sales" },
+  { id: "sm5", date: daysAgo(0), productId: "p1", productName: "LPG Domestic 12kg", type: "out", movementType: "SALE_ISSUE", direction: "out", quantity: 6, balanceAfter: 59, unitCost: 1200, totalCost: 7200, cogsAmount: 7200, costingMethod: "fifo", refType: "sales", refId: "so4", notes: "SO-2026-0004", by: "Sales" },
 ];
 
 export const seedVouchers: Voucher[] = [
@@ -204,6 +206,12 @@ export const seedChartOfAccounts: ChartOfAccount[] = [
   { id: "coa7", name: "Bank Loan", type: "Liability", code: "LIA-01", createdAt: daysAgo(200) },
   { id: "coa8", name: "Cost of Goods Sold", type: "Expense", code: "EXP-04", createdAt: daysAgo(200) },
   { id: "coa9", name: "Inventory Asset", type: "Asset", code: "AST-02", createdAt: daysAgo(200) },
+  { id: "coa10", name: "Accounts Receivable", type: "Asset", code: "AST-03", createdAt: daysAgo(200) },
+  { id: "coa11", name: "Accounts Payable", type: "Liability", code: "LIA-02", createdAt: daysAgo(200) },
+  { id: "coa12", name: "Output VAT Liability", type: "Liability", code: "LIA-03", createdAt: daysAgo(200) },
+  { id: "coa13", name: "Owner Capital", type: "Equity", code: "EQU-01", createdAt: daysAgo(200) },
+  { id: "coa14", name: "Owner Drawings", type: "Equity", code: "EQU-02", createdAt: daysAgo(200) },
+  { id: "coa15", name: "Retained Earnings", type: "Equity", code: "EQU-03", createdAt: daysAgo(200) },
 ];
 
 export const seedAssets: BusinessAsset[] = [

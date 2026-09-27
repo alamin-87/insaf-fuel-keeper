@@ -1,5 +1,5 @@
-import type { Customer, SalesOrder, Voucher } from "@/types";
-import { parseRecordTime } from "@/lib/date-range";
+import type { Customer, SalesOrder, Voucher } from "../types/index.ts";
+import { parseRecordTime } from "./date-range.ts";
 
 /** Signed opening for customer AR: receivable +, payable −. Legacy docs without a type keep the stored sign. */
 export function customerOpeningSigned(c: Pick<Customer, "openingBalance" | "openingBalanceType">): number {
@@ -10,16 +10,26 @@ export function customerOpeningSigned(c: Pick<Customer, "openingBalance" | "open
 }
 
 export function customerOutstanding(c: Customer, sales: SalesOrder[], vouchers: Voucher[]): number {
-  const salesNet = sales
-    .filter((s) => s.customerId === c.id && s.status !== "cancelled" && s.status !== "draft")
-    .reduce((a, s) => a + (s.total || 0) - (s.paid || 0), 0);
-  let voucherAdj = 0;
-  for (const v of vouchers) {
-    if (v.partyType !== "customer" || v.partyId !== c.id || v.type === "journal") continue;
-    if (v.type === "receipt") voucherAdj -= v.amount || 0;
-    else if (v.type === "payment") voucherAdj += v.amount || 0;
+  const custSales = sales.filter((s) => s.customerId === c.id && s.status !== "cancelled" && s.status !== "draft");
+  const totalInvoiced = custSales.reduce((a, s) => a + (s.total || 0), 0);
+
+  const custVouchers = vouchers.filter((v) => v.partyType === "customer" && v.partyId === c.id && v.type !== "journal");
+  let voucherCollections = 0;
+  for (const v of custVouchers) {
+    if (v.type === "receipt") voucherCollections += (v.amount || 0);
+    else if (v.type === "payment") voucherCollections -= (v.amount || 0);
   }
-  return customerOpeningSigned(c) + salesNet + voucherAdj;
+
+  let unvoucheredPaid = 0;
+  for (const s of custSales) {
+    const vouchered = custVouchers
+      .filter((v) => v.refType === "sales" && v.refId === s.id && v.type === "receipt")
+      .reduce((sum, v) => sum + (v.amount || 0), 0);
+    unvoucheredPaid += Math.max(0, (s.paid || 0) - vouchered);
+  }
+
+  const totalCollected = voucherCollections + unvoucheredPaid;
+  return customerOpeningSigned(c) + totalInvoiced - totalCollected;
 }
 
 export type CreditReminderNotice = {

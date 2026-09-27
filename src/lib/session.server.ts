@@ -5,7 +5,7 @@ type SessionData = {
   user?: AuthUser;
 };
 
-function isProductionRuntime() {
+export function isProductionRuntime() {
   return process.env.NODE_ENV === "production";
 }
 
@@ -16,13 +16,16 @@ export function isDemoLoginEnabled() {
   return !isProductionRuntime();
 }
 
-function sessionPassword() {
-  const secret = process.env.SESSION_SECRET;
+export function validateSessionSecret(secret: string | undefined, isProd: boolean): string {
   if (secret && secret.length >= 32) return secret;
-  if (isProductionRuntime()) {
-    throw new Error("SESSION_SECRET is required in production.");
+  if (isProd) {
+    throw new Error("SESSION_SECRET is required in production and must be at least 32 characters long.");
   }
   return "insaf-gas-corp-dev-session-secret-32chars";
+}
+
+export function sessionPassword() {
+  return validateSessionSecret(process.env.SESSION_SECRET, isProductionRuntime());
 }
 
 export function useAppSession() {
