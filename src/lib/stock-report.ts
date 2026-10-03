@@ -119,29 +119,29 @@ export function buildStockReport(
         .sort((a, b) => (parseRecordTime(a.date) ?? 0) - (parseRecordTime(b.date) ?? 0));
 
       // Check if an explicit initial stock adjustment exists
-      const hasInitMovement = all.some(
+      const initMovement = all.find(
         (m) =>
           m.refType === "adjustment" &&
           (m.refId?.startsWith("INIT-") || /initial/i.test(m.notes || "")),
       );
 
-      let baseOpening = 0;
-      if (!hasInitMovement) {
-        if (all.length === 0) {
-          baseOpening = p.stock ?? 0;
-        } else {
-          // Calculate historical opening stock from (current stored stock + totalOut - totalIn)
-          const totalIn = all.reduce((sum, m) => sum + getMovementQtyIn(m), 0);
-          const totalOut = all.reduce((sum, m) => sum + getMovementQtyOut(m), 0);
-          baseOpening = Math.max(0, (p.stock ?? 0) + totalOut - totalIn);
-        }
-      }
+      const nonInitMovements = all.filter((m) => m !== initMovement);
+      const totalIn = nonInitMovements.reduce((sum, m) => sum + getMovementQtyIn(m), 0);
+      const totalOut = nonInitMovements.reduce((sum, m) => sum + getMovementQtyOut(m), 0);
+
+      const baseOpening = initMovement
+        ? Math.abs(initMovement.quantity || 0)
+        : p.initialStock != null
+          ? p.initialStock
+          : nonInitMovements.length === 0
+            ? (p.stock ?? 0)
+            : Math.max(0, (p.stock ?? 0) + totalOut - totalIn);
 
       let openingQty = baseOpening;
       let effectiveCost = p.cost ?? 0;
       const period: StockMovement[] = [];
 
-      for (const m of all) {
+      for (const m of nonInitMovements) {
         const t = parseRecordTime(m.date) ?? 0;
         const qIn = getMovementQtyIn(m);
         const qOut = getMovementQtyOut(m);

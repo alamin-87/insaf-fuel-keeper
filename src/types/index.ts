@@ -57,6 +57,8 @@ export interface Product {
   image?: string;
   taxRate?: number;
   stock: number;
+  initialStock?: number;
+  openingStock?: number;
   reorderLevel: number;
   /** Chart of Accounts — Income (sales revenue) */
   incomeAccountId?: ID;
