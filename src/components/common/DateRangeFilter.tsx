@@ -2,11 +2,7 @@ import { CalendarRange } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import {
-  applyPreset,
-  type DatePreset,
-  type DateRange,
-} from "@/lib/date-range";
+import { applyPreset, type DatePreset, type DateRange } from "@/lib/date-range";
 import { useT } from "@/i18n";
 
 const PRESETS: DatePreset[] = ["all", "today", "week", "month", "custom"];
@@ -27,11 +23,16 @@ export function DateRangeFilter({
 
   const label = (p: DatePreset) => {
     switch (p) {
-      case "all": return t("filter.all");
-      case "today": return t("filter.today");
-      case "week": return t("filter.week");
-      case "month": return t("filter.month");
-      case "custom": return t("filter.custom");
+      case "all":
+        return t("filter.all");
+      case "today":
+        return t("filter.today");
+      case "week":
+        return t("filter.week");
+      case "month":
+        return t("filter.month");
+      case "custom":
+        return t("filter.custom");
     }
   };
 

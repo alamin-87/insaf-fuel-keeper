@@ -7,7 +7,7 @@ import { hashPassword, isHashedPassword, verifyPassword } from "./password.serve
 
 export type { AppUserDoc, PublicAppUser } from "./users.types";
 
-const clean = <T,>(doc: any): T => {
+const clean = <T>(doc: any): T => {
   if (!doc) return doc;
   const { _id, ...rest } = doc;
   return rest as T;
@@ -16,15 +16,22 @@ const clean = <T,>(doc: any): T => {
 async function ensureUsers() {
   const db = await getDb();
   const coll = db.collection("appUsers");
-  try { await coll.createIndex({ id: 1 }, { unique: true }); } catch {}
-  try { await coll.createIndex({ username: 1 }, { unique: true }); } catch {}
+  try {
+    await coll.createIndex({ id: 1 }, { unique: true });
+  } catch {}
+  try {
+    await coll.createIndex({ username: 1 }, { unique: true });
+  } catch {}
   const count = await coll.estimatedDocumentCount();
   if (count === 0 && isDemoLoginEnabled()) {
     try {
-      await coll.insertMany(seedAppUsers.map((u) => ({
-        ...u,
-        password: isHashedPassword(u.password) ? u.password : hashPassword(u.password),
-      })), { ordered: false });
+      await coll.insertMany(
+        seedAppUsers.map((u) => ({
+          ...u,
+          password: isHashedPassword(u.password) ? u.password : hashPassword(u.password),
+        })),
+        { ordered: false },
+      );
     } catch {}
   }
 }
@@ -51,7 +58,10 @@ function mongoErrorMessage(e: unknown) {
   return "Could not save user";
 }
 
-export async function findUserByCredentials(username: string, password: string): Promise<AppUserDoc | null> {
+export async function findUserByCredentials(
+  username: string,
+  password: string,
+): Promise<AppUserDoc | null> {
   await ensureUsers();
   const db = await getDb();
   const doc = await db.collection("appUsers").findOne({
@@ -71,11 +81,13 @@ export async function findUserByCredentials(username: string, password: string):
   return { ...user, password: hashed };
 }
 
-export async function listLoginDirectory(): Promise<Array<{
-  username: string;
-  displayName: string;
-  role: AppRole;
-}>> {
+export async function listLoginDirectory(): Promise<
+  Array<{
+    username: string;
+    displayName: string;
+    role: AppRole;
+  }>
+> {
   await ensureUsers();
   const db = await getDb();
   const docs = await db.collection("appUsers").find({ active: true }).sort({ role: 1 }).toArray();
@@ -104,7 +116,8 @@ export async function upsertAppUser(data: {
     await ensureUsers();
     const db = await getDb();
     const username = data.username.trim().toLowerCase();
-    if (!username || !data.displayName.trim()) throw new Error("Username and display name required");
+    if (!username || !data.displayName.trim())
+      throw new Error("Username and display name required");
     if (!APP_ROLES.includes(data.role)) throw new Error("Invalid role");
 
     if (data.id) {
@@ -118,7 +131,8 @@ export async function upsertAppUser(data: {
         role: data.role,
         active: data.active ?? existing.active ?? true,
       };
-      if (data.password && data.password.trim()) patch.password = hashPassword(data.password.trim());
+      if (data.password && data.password.trim())
+        patch.password = hashPassword(data.password.trim());
       await db.collection("appUsers").updateOne({ id: data.id }, { $set: patch });
       const doc = await db.collection("appUsers").findOne({ id: data.id });
       return toPublic(clean<AppUserDoc>(doc));

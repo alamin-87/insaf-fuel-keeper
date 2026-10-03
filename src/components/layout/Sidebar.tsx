@@ -1,12 +1,33 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
-  LayoutDashboard, Users, Truck, Package, ShoppingCart, ClipboardList,
-  Receipt, Warehouse, BookOpen, UserCog, BarChart3, ShoppingBag, Settings, Cylinder,
+  LayoutDashboard,
+  Users,
+  Truck,
+  Package,
+  ShoppingCart,
+  ClipboardList,
+  Receipt,
+  Warehouse,
+  BookOpen,
+  UserCog,
+  BarChart3,
+  ShoppingBag,
+  Settings,
+  Cylinder,
 } from "lucide-react";
 import {
-  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
-  SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader,
-  SidebarMenuSub, SidebarMenuSubButton, SidebarMenuSubItem,
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarHeader,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
 import { BrandLogo } from "@/components/common/BrandLogo";
 import { useModuleAccess } from "@/hooks/useModuleAccess";
@@ -19,16 +40,23 @@ export function AppSidebar() {
   const isActive = (url: string) => {
     if (url === "/") return pathname === "/";
     if (url === "/hr") return pathname === "/hr" || pathname === "/hr/";
-    if (url === "/hr/employees") return pathname.startsWith("/hr/employees") || /^\/hr\/[^/]+/.test(pathname);
+    if (url === "/hr/employees")
+      return pathname.startsWith("/hr/employees") || /^\/hr\/[^/]+/.test(pathname);
     if (url === "/products") {
-      return pathname === "/products" || pathname === "/products/" ||
-        (pathname.startsWith("/products/") && !pathname.startsWith("/products/categories"));
+      return (
+        pathname === "/products" ||
+        pathname === "/products/" ||
+        (pathname.startsWith("/products/") && !pathname.startsWith("/products/categories"))
+      );
     }
     if (url === "/products/categories") return pathname.startsWith("/products/categories");
     return pathname.startsWith(url);
   };
 
-  const groups: { labelKey: MessageKey; items: { titleKey: MessageKey; url: string; icon: typeof LayoutDashboard }[] }[] = [
+  const groups: {
+    labelKey: MessageKey;
+    items: { titleKey: MessageKey; url: string; icon: typeof LayoutDashboard }[];
+  }[] = [
     {
       labelKey: "nav.overview",
       items: [
@@ -65,9 +93,7 @@ export function AppSidebar() {
     },
     {
       labelKey: "nav.system",
-      items: [
-        { titleKey: "nav.settings", url: "/settings", icon: Settings },
-      ],
+      items: [{ titleKey: "nav.settings", url: "/settings", icon: Settings }],
     },
   ];
 
@@ -84,8 +110,12 @@ export function AppSidebar() {
         <div className="flex items-center gap-2 px-2 py-3">
           <BrandLogo size="md" />
           <div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
-            <span className="font-display text-sm font-semibold tracking-tight">{t("brand.name")}</span>
-            <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">{t("brand.erp")}</span>
+            <span className="font-display text-sm font-semibold tracking-tight">
+              {t("brand.name")}
+            </span>
+            <span className="text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+              {t("brand.erp")}
+            </span>
           </div>
         </div>
       </SidebarHeader>
@@ -106,7 +136,11 @@ export function AppSidebar() {
                     {item.url === "/products" && canAccessUrl("/products/categories") && (
                       <SidebarMenuSub>
                         <SidebarMenuSubItem>
-                          <SidebarMenuSubButton asChild isActive={isActive("/products/categories")} size="sm">
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={isActive("/products/categories")}
+                            size="sm"
+                          >
                             <Link to="/products/categories">
                               <span>{t("nav.categories")}</span>
                             </Link>

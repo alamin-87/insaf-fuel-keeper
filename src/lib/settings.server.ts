@@ -18,11 +18,15 @@ function sanitizeMatrix(raw: unknown): PowerMatrix {
   const input = raw as Record<string, Record<string, boolean>>;
   for (const role of APP_ROLES) {
     const row = input[role];
-    base[role] = Object.fromEntries(
-      APP_MODULES.map((m) => [m.id, Boolean(row?.[m.id])]),
-    ) as Record<AppModule, boolean>;
+    base[role] = Object.fromEntries(APP_MODULES.map((m) => [m.id, Boolean(row?.[m.id])])) as Record<
+      AppModule,
+      boolean
+    >;
     if (role === "Administrator") {
-      base[role] = Object.fromEntries(APP_MODULES.map((m) => [m.id, true])) as Record<AppModule, boolean>;
+      base[role] = Object.fromEntries(APP_MODULES.map((m) => [m.id, true])) as Record<
+        AppModule,
+        boolean
+      >;
     }
   }
   return base;
@@ -31,7 +35,9 @@ function sanitizeMatrix(raw: unknown): PowerMatrix {
 async function ensureSettingsColl() {
   const db = await getDb();
   const coll = db.collection("appSettings");
-  try { await coll.createIndex({ id: 1 }, { unique: true }); } catch {}
+  try {
+    await coll.createIndex({ id: 1 }, { unique: true });
+  } catch {}
   return coll;
 }
 
@@ -72,7 +78,9 @@ export async function getCylinderTracking(): Promise<CylinderTrackingMethod> {
   return "serial";
 }
 
-export async function saveCylinderTracking(method: CylinderTrackingMethod): Promise<CylinderTrackingMethod> {
+export async function saveCylinderTracking(
+  method: CylinderTrackingMethod,
+): Promise<CylinderTrackingMethod> {
   const next = method === "quantity" || method === "lot" || method === "serial" ? method : "serial";
   const coll = await ensureSettingsColl();
   await coll.updateOne(
@@ -83,7 +91,10 @@ export async function saveCylinderTracking(method: CylinderTrackingMethod): Prom
   return next;
 }
 
-export async function roleCanAccess(role: string | undefined, moduleId: AppModule): Promise<boolean> {
+export async function roleCanAccess(
+  role: string | undefined,
+  moduleId: AppModule,
+): Promise<boolean> {
   if (!role) return false;
   if (role === "Administrator") return true;
   if (!APP_ROLES.includes(role as AppRole)) return false;

@@ -33,7 +33,13 @@ export function ProductList() {
       <PageHeader
         title={t("products.title")}
         description={t("products.desc")}
-        actions={<Button asChild><Link to="/products/new"><Plus className="mr-1 h-4 w-4" /> {t("products.new")}</Link></Button>}
+        actions={
+          <Button asChild>
+            <Link to="/products/new">
+              <Plus className="mr-1 h-4 w-4" /> {t("products.new")}
+            </Link>
+          </Button>
+        }
       />
       <DataTable<Product>
         rows={data}
@@ -41,21 +47,74 @@ export function ProductList() {
         dateKey="createdAt"
         onRowClick={(r) => navigate({ to: "/products/$id", params: { id: r.id } })}
         columns={[
-          { key: "img", header: "", render: (r) => <ProductImage src={r.image} alt={r.name} size="sm" /> },
-          { key: "code", header: t("products.code"), sortable: true, sortValue: (r) => r.code, render: (r) => <span className="font-mono text-xs">{r.code}</span> },
-          { key: "name", header: t("common.name"), sortable: true, sortValue: (r) => r.name, render: (r) => <span className="font-medium">{r.name}</span> },
-          { key: "cat", header: t("common.category"), sortable: true, sortValue: (r) => r.category, render: (r) => <Badge variant="secondary">{r.category}</Badge> },
+          {
+            key: "img",
+            header: "",
+            render: (r) => <ProductImage src={r.image} alt={r.name} size="sm" />,
+          },
+          {
+            key: "code",
+            header: t("products.code"),
+            sortable: true,
+            sortValue: (r) => r.code,
+            render: (r) => <span className="font-mono text-xs">{r.code}</span>,
+          },
+          {
+            key: "name",
+            header: t("common.name"),
+            sortable: true,
+            sortValue: (r) => r.name,
+            render: (r) => <span className="font-medium">{r.name}</span>,
+          },
+          {
+            key: "cat",
+            header: t("common.category"),
+            sortable: true,
+            sortValue: (r) => r.category,
+            render: (r) => <Badge variant="secondary">{r.category}</Badge>,
+          },
           { key: "uom", header: t("products.uom"), render: (r) => r.uom },
-          { key: "price", header: t("products.salesPrice"), sortable: true, sortValue: (r) => r.price, render: (r) => formatCurrency(r.price), className: "text-right" },
-          { key: "cost", header: t("products.costPrice"), sortable: true, sortValue: (r) => r.cost ?? 0, render: (r) => formatCurrency(r.cost ?? 0), className: "text-right" },
-          { key: "costing", header: t("products.costingMethod"), render: (r) => (
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">
-              {r.costingMethod === "lifo" ? t("products.costing.lifo") : r.costingMethod === "average" ? t("products.costing.average") : t("products.costing.fifo")}
-            </span>
-          ) },
-          { key: "stock", header: t("products.stock"), sortable: true, sortValue: (r) => r.stock, render: (r) => (
-            <Badge variant={r.stock <= r.reorderLevel ? "destructive" : "outline"}>{r.stock}</Badge>
-          ), className: "text-right" },
+          {
+            key: "price",
+            header: t("products.salesPrice"),
+            sortable: true,
+            sortValue: (r) => r.price,
+            render: (r) => formatCurrency(r.price),
+            className: "text-right",
+          },
+          {
+            key: "cost",
+            header: t("products.costPrice"),
+            sortable: true,
+            sortValue: (r) => r.cost ?? 0,
+            render: (r) => formatCurrency(r.cost ?? 0),
+            className: "text-right",
+          },
+          {
+            key: "costing",
+            header: t("products.costingMethod"),
+            render: (r) => (
+              <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                {r.costingMethod === "lifo"
+                  ? t("products.costing.lifo")
+                  : r.costingMethod === "average"
+                    ? t("products.costing.average")
+                    : t("products.costing.fifo")}
+              </span>
+            ),
+          },
+          {
+            key: "stock",
+            header: t("products.stock"),
+            sortable: true,
+            sortValue: (r) => r.stock,
+            render: (r) => (
+              <Badge variant={r.stock <= r.reorderLevel ? "destructive" : "outline"}>
+                {r.stock}
+              </Badge>
+            ),
+            className: "text-right",
+          },
           {
             key: "actions",
             header: t("common.actions"),

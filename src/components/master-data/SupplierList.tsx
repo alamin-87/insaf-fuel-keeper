@@ -38,7 +38,9 @@ export function SupplierList() {
               <Link to="/suppliers/report">{t("suppliers.report")}</Link>
             </Button>
             <Button asChild>
-              <Link to="/suppliers/new"><Plus className="mr-1 h-4 w-4" /> {t("suppliers.new")}</Link>
+              <Link to="/suppliers/new">
+                <Plus className="mr-1 h-4 w-4" /> {t("suppliers.new")}
+              </Link>
             </Button>
           </>
         }
@@ -49,11 +51,44 @@ export function SupplierList() {
         dateKey="createdAt"
         onRowClick={(r) => navigate({ to: "/suppliers/$id", params: { id: r.id } })}
         columns={[
-          { key: "since", header: t("common.date"), sortable: true, sortValue: (r) => r.createdAt, render: (r) => <span className="whitespace-nowrap text-xs text-muted-foreground">{formatOpenedOn(r.createdAt)}</span> },
-          { key: "name", header: t("common.name"), sortable: true, sortValue: (r) => r.name, render: (r) => <PartyNameLink kind="supplier" id={r.id} name={r.name} /> },
-          { key: "phone", header: t("common.phone"), sortable: true, sortValue: (r) => r.phone, render: (r) => r.phone },
-          { key: "address", header: t("common.address"), render: (r) => <span className="text-muted-foreground">{r.address}</span> },
-          { key: "bal", header: t("suppliers.payable"), sortable: true, sortValue: (r) => r.openingBalance, render: (r) => formatCurrency(r.openingBalance), className: "text-right" },
+          {
+            key: "since",
+            header: t("common.date"),
+            sortable: true,
+            sortValue: (r) => r.createdAt,
+            render: (r) => (
+              <span className="whitespace-nowrap text-xs text-muted-foreground">
+                {formatOpenedOn(r.createdAt)}
+              </span>
+            ),
+          },
+          {
+            key: "name",
+            header: t("common.name"),
+            sortable: true,
+            sortValue: (r) => r.name,
+            render: (r) => <PartyNameLink kind="supplier" id={r.id} name={r.name} />,
+          },
+          {
+            key: "phone",
+            header: t("common.phone"),
+            sortable: true,
+            sortValue: (r) => r.phone,
+            render: (r) => r.phone,
+          },
+          {
+            key: "address",
+            header: t("common.address"),
+            render: (r) => <span className="text-muted-foreground">{r.address}</span>,
+          },
+          {
+            key: "bal",
+            header: t("suppliers.payable"),
+            sortable: true,
+            sortValue: (r) => r.openingBalance,
+            render: (r) => formatCurrency(r.openingBalance),
+            className: "text-right",
+          },
           {
             key: "actions",
             header: t("common.actions"),
@@ -62,11 +97,14 @@ export function SupplierList() {
               <RowActions
                 onView={() => navigate({ to: "/suppliers/$id", params: { id: r.id } })}
                 onEdit={() => navigate({ to: "/suppliers/$id/edit", params: { id: r.id } })}
-                extras={[{
-                  label: t("suppliers.statement"),
-                  icon: <FileText className="h-3.5 w-3.5" />,
-                  onClick: () => navigate({ to: "/suppliers/$id/statement", params: { id: r.id } }),
-                }]}
+                extras={[
+                  {
+                    label: t("suppliers.statement"),
+                    icon: <FileText className="h-3.5 w-3.5" />,
+                    onClick: () =>
+                      navigate({ to: "/suppliers/$id/statement", params: { id: r.id } }),
+                  },
+                ]}
                 onDelete={() => {
                   if (confirm(`${t("common.delete")} ${r.name}?`)) remove.mutate(r.id);
                 }}

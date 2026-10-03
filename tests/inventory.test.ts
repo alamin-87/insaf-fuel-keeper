@@ -1,6 +1,14 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import type { CostLayer, Customer, Cylinder, LineItem, Product, SalesOrder, StockMovement } from "../src/types/index.ts";
+import type {
+  CostLayer,
+  Customer,
+  Cylinder,
+  LineItem,
+  Product,
+  SalesOrder,
+  StockMovement,
+} from "../src/types/index.ts";
 import {
   computeWeightedAverageOnReceipt,
   consumeCostLayers,
@@ -60,7 +68,13 @@ describe("Inventory, Costing, Stock Movements & Cylinder Tests", () => {
     };
 
     const layers: CostLayer[] = [
-      { id: "l1", productId: p.id, qtyRemaining: 20, unitCost: 1000, receivedAt: "2026-01-01T00:00:00Z" },
+      {
+        id: "l1",
+        productId: p.id,
+        qtyRemaining: 20,
+        unitCost: 1000,
+        receivedAt: "2026-01-01T00:00:00Z",
+      },
     ];
 
     const requestedQty = 5;
@@ -142,7 +156,13 @@ describe("Inventory, Costing, Stock Movements & Cylinder Tests", () => {
   it("4. Confirmed sale creates exactly one stock issue", () => {
     const movements: StockMovement[] = [];
     const recordSaleIssue = (saleId: string, productId: string, qty: number) => {
-      const exists = movements.some((m) => m.refType === "sales" && m.refId === saleId && m.productId === productId && m.type === "out");
+      const exists = movements.some(
+        (m) =>
+          m.refType === "sales" &&
+          m.refId === saleId &&
+          m.productId === productId &&
+          m.type === "out",
+      );
       if (exists) return false;
       movements.push({
         id: `sm-${movements.length + 1}`,
@@ -189,7 +209,13 @@ describe("Inventory, Costing, Stock Movements & Cylinder Tests", () => {
     ];
 
     const hasStockOut = (refType: string, refId: string, productId: string) =>
-      movements.some((m) => m.refType === refType && m.refId === refId && m.productId === productId && m.type === "out");
+      movements.some(
+        (m) =>
+          m.refType === refType &&
+          m.refId === refId &&
+          m.productId === productId &&
+          m.type === "out",
+      );
 
     assert.strictEqual(hasStockOut("sales", "so-123", "p1"), true);
   });
@@ -240,8 +266,20 @@ describe("Inventory, Costing, Stock Movements & Cylinder Tests", () => {
   // Test 8: FIFO costing
   it("8. FIFO costing consumes oldest layers first and calculates accurate COGS", () => {
     const layers: CostLayer[] = [
-      { id: "l1", productId: "p-fifo", qtyRemaining: 10, unitCost: 100, receivedAt: "2026-01-01T00:00:00Z" },
-      { id: "l2", productId: "p-fifo", qtyRemaining: 10, unitCost: 300, receivedAt: "2026-01-02T00:00:00Z" },
+      {
+        id: "l1",
+        productId: "p-fifo",
+        qtyRemaining: 10,
+        unitCost: 100,
+        receivedAt: "2026-01-01T00:00:00Z",
+      },
+      {
+        id: "l2",
+        productId: "p-fifo",
+        qtyRemaining: 10,
+        unitCost: 300,
+        receivedAt: "2026-01-02T00:00:00Z",
+      },
     ];
 
     const result = consumeCostLayers(layers, 10, "fifo");
@@ -252,8 +290,20 @@ describe("Inventory, Costing, Stock Movements & Cylinder Tests", () => {
 
     // Next 5 consumed should come from l2 @ 300
     const remainingLayers: CostLayer[] = [
-      { id: "l1", productId: "p-fifo", qtyRemaining: 0, unitCost: 100, receivedAt: "2026-01-01T00:00:00Z" },
-      { id: "l2", productId: "p-fifo", qtyRemaining: 10, unitCost: 300, receivedAt: "2026-01-02T00:00:00Z" },
+      {
+        id: "l1",
+        productId: "p-fifo",
+        qtyRemaining: 0,
+        unitCost: 100,
+        receivedAt: "2026-01-01T00:00:00Z",
+      },
+      {
+        id: "l2",
+        productId: "p-fifo",
+        qtyRemaining: 10,
+        unitCost: 300,
+        receivedAt: "2026-01-02T00:00:00Z",
+      },
     ];
     const secondResult = consumeCostLayers(remainingLayers, 5, "fifo");
     assert.strictEqual(secondResult.cogsAmount, 1500);
@@ -282,15 +332,39 @@ describe("Inventory, Costing, Stock Movements & Cylinder Tests", () => {
   // Test 10: Inventory valuation
   it("10. Inventory valuation never simply multiplies stock by last movement cost", () => {
     const layers: CostLayer[] = [
-      { id: "l1", productId: "p-val", qtyRemaining: 10, unitCost: 100, receivedAt: "2026-01-01T00:00:00Z" },
-      { id: "l2", productId: "p-val", qtyRemaining: 10, unitCost: 300, receivedAt: "2026-01-02T00:00:00Z" },
+      {
+        id: "l1",
+        productId: "p-val",
+        qtyRemaining: 10,
+        unitCost: 100,
+        receivedAt: "2026-01-01T00:00:00Z",
+      },
+      {
+        id: "l2",
+        productId: "p-val",
+        qtyRemaining: 10,
+        unitCost: 300,
+        receivedAt: "2026-01-02T00:00:00Z",
+      },
     ];
 
     // Issue 10
     const { updatedLayers } = consumeCostLayers(layers, 10, "fifo");
     const activeLayers: CostLayer[] = [
-      { id: "l1", productId: "p-val", qtyRemaining: updatedLayers.find((u) => u.id === "l1")?.qtyRemaining ?? 0, unitCost: 100, receivedAt: "2026-01-01T00:00:00Z" },
-      { id: "l2", productId: "p-val", qtyRemaining: 10, unitCost: 300, receivedAt: "2026-01-02T00:00:00Z" },
+      {
+        id: "l1",
+        productId: "p-val",
+        qtyRemaining: updatedLayers.find((u) => u.id === "l1")?.qtyRemaining ?? 0,
+        unitCost: 100,
+        receivedAt: "2026-01-01T00:00:00Z",
+      },
+      {
+        id: "l2",
+        productId: "p-val",
+        qtyRemaining: 10,
+        unitCost: 300,
+        receivedAt: "2026-01-02T00:00:00Z",
+      },
     ];
 
     const val = computeLayerValuation(activeLayers);
@@ -494,7 +568,9 @@ describe("Inventory, Costing, Stock Movements & Cylinder Tests", () => {
 
     const returnCylinder = (c: Cylinder, customerId: string) => {
       if (c.status !== "at_customer" || c.customerId !== customerId) {
-        throw new Error(`Cannot return cylinder ${c.serialNumber}: it is not currently issued to this customer.`);
+        throw new Error(
+          `Cannot return cylinder ${c.serialNumber}: it is not currently issued to this customer.`,
+        );
       }
     };
 
@@ -517,13 +593,47 @@ describe("Inventory, Costing, Stock Movements & Cylinder Tests", () => {
     };
 
     const movements: StockMovement[] = [
-      { id: "m1", date: "2026-01-01T10:00:00Z", productId: "p-rep", productName: "LPG 12kg", type: "in", direction: "in", quantity: 50, balanceAfter: 50, by: "Warehouse" },
-      { id: "m2", date: "2026-01-05T10:00:00Z", productId: "p-rep", productName: "LPG 12kg", type: "out", direction: "out", quantity: 10, balanceAfter: 40, by: "Sales" },
-      { id: "m3", date: "2026-01-15T10:00:00Z", productId: "p-rep", productName: "LPG 12kg", type: "out", direction: "out", quantity: 5, balanceAfter: 35, by: "Sales" },
+      {
+        id: "m1",
+        date: "2026-01-01T10:00:00Z",
+        productId: "p-rep",
+        productName: "LPG 12kg",
+        type: "in",
+        direction: "in",
+        quantity: 50,
+        balanceAfter: 50,
+        by: "Warehouse",
+      },
+      {
+        id: "m2",
+        date: "2026-01-05T10:00:00Z",
+        productId: "p-rep",
+        productName: "LPG 12kg",
+        type: "out",
+        direction: "out",
+        quantity: 10,
+        balanceAfter: 40,
+        by: "Sales",
+      },
+      {
+        id: "m3",
+        date: "2026-01-15T10:00:00Z",
+        productId: "p-rep",
+        productName: "LPG 12kg",
+        type: "out",
+        direction: "out",
+        quantity: 5,
+        balanceAfter: 35,
+        by: "Sales",
+      },
     ];
 
     // Report for range: 2026-01-10 to 2026-01-20
-    const report = buildStockReport([p], movements, { preset: "custom", from: "2026-01-10", to: "2026-01-20" });
+    const report = buildStockReport([p], movements, {
+      preset: "custom",
+      from: "2026-01-10",
+      to: "2026-01-20",
+    });
     const productReport = report[0];
 
     // Opening should be movements before 2026-01-10: 50 in - 10 out = 40
@@ -551,12 +661,46 @@ describe("Inventory, Costing, Stock Movements & Cylinder Tests", () => {
     };
 
     const movements: StockMovement[] = [
-      { id: "m1", date: "2026-02-01T10:00:00Z", productId: "p-close", productName: "Nitrogen", type: "in", direction: "in", quantity: 20, balanceAfter: 20, by: "Warehouse" },
-      { id: "m2", date: "2026-02-10T10:00:00Z", productId: "p-close", productName: "Nitrogen", type: "in", direction: "in", quantity: 10, balanceAfter: 30, by: "Warehouse" },
-      { id: "m3", date: "2026-02-15T10:00:00Z", productId: "p-close", productName: "Nitrogen", type: "out", direction: "out", quantity: 8, balanceAfter: 22, by: "Sales" },
+      {
+        id: "m1",
+        date: "2026-02-01T10:00:00Z",
+        productId: "p-close",
+        productName: "Nitrogen",
+        type: "in",
+        direction: "in",
+        quantity: 20,
+        balanceAfter: 20,
+        by: "Warehouse",
+      },
+      {
+        id: "m2",
+        date: "2026-02-10T10:00:00Z",
+        productId: "p-close",
+        productName: "Nitrogen",
+        type: "in",
+        direction: "in",
+        quantity: 10,
+        balanceAfter: 30,
+        by: "Warehouse",
+      },
+      {
+        id: "m3",
+        date: "2026-02-15T10:00:00Z",
+        productId: "p-close",
+        productName: "Nitrogen",
+        type: "out",
+        direction: "out",
+        quantity: 8,
+        balanceAfter: 22,
+        by: "Sales",
+      },
     ];
 
-    const report = buildStockReport([p], movements, { preset: "custom", from: "2026-02-05", to: "2026-02-28" });
+    const report = buildStockReport([p], movements, {
+      preset: "custom",
+      from: "2026-02-05",
+      to: "2026-02-28",
+    });
     const res = report[0];
 
     assert.strictEqual(res.openingQty, 20);
@@ -569,12 +713,44 @@ describe("Inventory, Costing, Stock Movements & Cylinder Tests", () => {
   // Test 21: Serial/quantity reconciliation
   it("21. Serial / quantity reconciliation detects discrepancies", () => {
     const products: Product[] = [
-      { id: "p1", code: "LPG-12", name: "LPG 12kg", category: "LPG", uom: "cyl", price: 1450, cost: 1200, stock: 59, reorderLevel: 25, createdAt: "2026-01-01" },
-      { id: "p2", code: "GAS-BULK", name: "Bulk Gas", category: "LPG", uom: "kg", price: 100, cost: 80, stock: 500, reorderLevel: 50, createdAt: "2026-01-01" },
+      {
+        id: "p1",
+        code: "LPG-12",
+        name: "LPG 12kg",
+        category: "LPG",
+        uom: "cyl",
+        price: 1450,
+        cost: 1200,
+        stock: 59,
+        reorderLevel: 25,
+        createdAt: "2026-01-01",
+      },
+      {
+        id: "p2",
+        code: "GAS-BULK",
+        name: "Bulk Gas",
+        category: "LPG",
+        uom: "kg",
+        price: 100,
+        cost: 80,
+        stock: 500,
+        reorderLevel: 50,
+        createdAt: "2026-01-01",
+      },
     ];
 
     const cylinders: Cylinder[] = [
-      { id: "c1", serialNumber: "INS-001", productId: "p1", capacity: 12, status: "in_stock", fillLevel: "full", location: "Warehouse", lastMovementAt: "2026-01-01", createdAt: "2026-01-01" },
+      {
+        id: "c1",
+        serialNumber: "INS-001",
+        productId: "p1",
+        capacity: 12,
+        status: "in_stock",
+        fillLevel: "full",
+        location: "Warehouse",
+        lastMovementAt: "2026-01-01",
+        createdAt: "2026-01-01",
+      },
     ];
 
     const reconciliation = reconcileQuantityWithSerials(products, cylinders);

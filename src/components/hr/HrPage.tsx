@@ -16,7 +16,11 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { formatCurrency, formatDate } from "@/utils/formatters";
 import type { Employee, PayrollRun } from "@/types";
@@ -32,8 +36,14 @@ type EmpForm = z.infer<typeof employeeSchema>;
 export function HrPage() {
   const t = useT();
   const qc = useQueryClient();
-  const { data: employees = [] } = useQuery({ queryKey: ["employees"], queryFn: hrService.listEmployees });
-  const { data: payroll = [] } = useQuery({ queryKey: ["payroll"], queryFn: hrService.listPayroll });
+  const { data: employees = [] } = useQuery({
+    queryKey: ["employees"],
+    queryFn: hrService.listEmployees,
+  });
+  const { data: payroll = [] } = useQuery({
+    queryKey: ["payroll"],
+    queryFn: hrService.listPayroll,
+  });
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [status, setStatus] = useState<"active" | "inactive">("active");
@@ -64,7 +74,14 @@ export function HrPage() {
     setDeduction("0");
   };
 
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<EmpForm>({
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<EmpForm>({
     resolver: zodResolver(employeeSchema),
     defaultValues: {
       joiningDate: new Date().toISOString().slice(0, 10),
@@ -135,7 +152,7 @@ export function HrPage() {
     mutationFn: async () => {
       const emp = employees.find((e) => e.id === payEmpId);
       if (!emp) throw new Error(t("common.select"));
-      
+
       const payload = {
         basic: Number(basic) || emp.salary,
         bonus: Number(bonus) || 0,
@@ -189,10 +206,15 @@ export function HrPage() {
         title={t("hr.title")}
         description={t("hr.desc")}
         actions={
-          <Button onClick={() => {
-            if (open) closeForm();
-            else { setEditingId(null); setOpen(true); }
-          }}>
+          <Button
+            onClick={() => {
+              if (open) closeForm();
+              else {
+                setEditingId(null);
+                setOpen(true);
+              }
+            }}
+          >
             {open ? t("common.close") : t("hr.addEmployee")}
           </Button>
         }
@@ -201,35 +223,78 @@ export function HrPage() {
       {open && (
         <Card>
           <CardContent className="pt-6">
-            <h3 className="mb-4 text-sm font-semibold">{editingId ? t("hr.editEmployee") : t("hr.addEmployee")}</h3>
-            <form onSubmit={handleSubmit((v) => saveEmp.mutate(v))} className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-1.5"><Label>{t("common.name")}</Label><Input {...register("name")} />{errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}</div>
-              <div className="space-y-1.5"><Label>{t("common.phone")}</Label><Input {...register("phone")} />{errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}</div>
+            <h3 className="mb-4 text-sm font-semibold">
+              {editingId ? t("hr.editEmployee") : t("hr.addEmployee")}
+            </h3>
+            <form
+              onSubmit={handleSubmit((v) => saveEmp.mutate(v))}
+              className="grid gap-4 md:grid-cols-2"
+            >
+              <div className="space-y-1.5">
+                <Label>{t("common.name")}</Label>
+                <Input {...register("name")} />
+                {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t("common.phone")}</Label>
+                <Input {...register("phone")} />
+                {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
+              </div>
               <div className="space-y-1.5">
                 <Label>{t("hr.designation")}</Label>
-                <Select value={watch("designation") || undefined} onValueChange={(v) => setValue("designation", v, { shouldValidate: true })}>
-                  <SelectTrigger><SelectValue placeholder={t("common.select")} /></SelectTrigger>
+                <Select
+                  value={watch("designation") || undefined}
+                  onValueChange={(v) => setValue("designation", v, { shouldValidate: true })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("common.select")} />
+                  </SelectTrigger>
                   <SelectContent>
-                    {Array.from(new Set([
-                      ...DESIGNATION_PRESETS,
-                      ...employees.map((e) => e.designation).filter(Boolean),
-                      watch("designation") || "",
-                    ].filter(Boolean))).map((d) => (
-                      <SelectItem key={d} value={d}>{d === DELIVERY_MAN || d === "Deliveryman" ? t("hr.deliveryMan") : d}</SelectItem>
+                    {Array.from(
+                      new Set(
+                        [
+                          ...DESIGNATION_PRESETS,
+                          ...employees.map((e) => e.designation).filter(Boolean),
+                          watch("designation") || "",
+                        ].filter(Boolean),
+                      ),
+                    ).map((d) => (
+                      <SelectItem key={d} value={d}>
+                        {d === DELIVERY_MAN || d === "Deliveryman" ? t("hr.deliveryMan") : d}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {errors.designation && <p className="text-xs text-destructive">{errors.designation.message}</p>}
+                {errors.designation && (
+                  <p className="text-xs text-destructive">{errors.designation.message}</p>
+                )}
               </div>
-              <div className="space-y-1.5"><Label>{t("hr.department")}</Label><Input {...register("department")} /></div>
-              <div className="space-y-1.5"><Label>{t("hr.joiningDate")}</Label><Input type="date" {...register("joiningDate")} /></div>
-              <div className="space-y-1.5"><Label>{t("hr.basicSalary")}</Label><Input type="number" {...register("salary")} /></div>
-              <div className="space-y-1.5"><Label>{t("hr.perDelivery")}</Label><Input type="number" {...register("perDeliveryCommission")} /></div>
+              <div className="space-y-1.5">
+                <Label>{t("hr.department")}</Label>
+                <Input {...register("department")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t("hr.joiningDate")}</Label>
+                <Input type="date" {...register("joiningDate")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t("hr.basicSalary")}</Label>
+                <Input type="number" {...register("salary")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t("hr.perDelivery")}</Label>
+                <Input type="number" {...register("perDeliveryCommission")} />
+              </div>
               {editingId && (
                 <div className="space-y-1.5">
                   <Label>{t("common.status")}</Label>
-                  <Select value={status} onValueChange={(v) => setStatus(v as "active" | "inactive")}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Select
+                    value={status}
+                    onValueChange={(v) => setStatus(v as "active" | "inactive")}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="active">{t("common.active")}</SelectItem>
                       <SelectItem value="inactive">{t("common.inactive")}</SelectItem>
@@ -238,7 +303,9 @@ export function HrPage() {
                 </div>
               )}
               <div className="md:col-span-2 flex justify-end gap-2">
-                <Button type="button" variant="ghost" onClick={closeForm}>{t("common.cancel")}</Button>
+                <Button type="button" variant="ghost" onClick={closeForm}>
+                  {t("common.cancel")}
+                </Button>
                 <Button type="submit" disabled={isSubmitting || saveEmp.isPending}>
                   {editingId ? t("common.save") : t("hr.saveEmployee")}
                 </Button>
@@ -272,21 +339,50 @@ export function HrPage() {
                   }}
                 >
                   <option value="">{t("common.select")}</option>
-                  {employees.filter((e) => e.status === "active").map((e) => (
-                    <option key={e.id} value={e.id}>{e.name}</option>
-                  ))}
+                  {employees
+                    .filter((e) => e.status === "active")
+                    .map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.name}
+                      </option>
+                    ))}
                 </select>
               </div>
               <div className="space-y-1.5">
                 <Label>{t("hr.basicSalary")}</Label>
-                <Input type="number" min={0} step="0.01" value={basic} onChange={(e) => setBasic(e.target.value)} />
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={basic}
+                  onChange={(e) => setBasic(e.target.value)}
+                />
               </div>
-              <div className="space-y-1.5"><Label>{t("hr.bonus")}</Label><Input type="number" value={bonus} onChange={(e) => setBonus(e.target.value)} /></div>
-              <div className="space-y-1.5"><Label>{t("hr.allowance")}</Label><Input type="number" value={allowance} onChange={(e) => setAllowance(e.target.value)} /></div>
-              <div className="space-y-1.5"><Label>{t("hr.deduction")}</Label><Input type="number" value={deduction} onChange={(e) => setDeduction(e.target.value)} /></div>
+              <div className="space-y-1.5">
+                <Label>{t("hr.bonus")}</Label>
+                <Input type="number" value={bonus} onChange={(e) => setBonus(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t("hr.allowance")}</Label>
+                <Input
+                  type="number"
+                  value={allowance}
+                  onChange={(e) => setAllowance(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t("hr.deduction")}</Label>
+                <Input
+                  type="number"
+                  value={deduction}
+                  onChange={(e) => setDeduction(e.target.value)}
+                />
+              </div>
               <div className="md:col-span-6 flex justify-end gap-2">
                 {editingPayId && (
-                  <Button variant="ghost" onClick={cancelEditPay}>{t("common.cancel")}</Button>
+                  <Button variant="ghost" onClick={cancelEditPay}>
+                    {t("common.cancel")}
+                  </Button>
                 )}
                 <Button disabled={!payEmpId || savePay.isPending} onClick={() => savePay.mutate()}>
                   {editingPayId ? t("common.save") : t("hr.createPayslip")}
@@ -299,15 +395,47 @@ export function HrPage() {
             searchKeys={["employeeName", "month"]}
             dateKey={(r) => r.paidAt ?? `${r.month}-01`}
             columns={[
-              { key: "month", header: t("hr.month"), sortable: true, sortValue: (r) => r.month, render: (r) => r.month },
-              { key: "name", header: t("hr.employee"), sortable: true, sortValue: (r) => r.employeeName, render: (r) => <PartyNameLink kind="employee" id={r.employeeId} name={r.employeeName} /> },
-              { key: "basic", header: t("hr.basicSalary"), sortable: true, sortValue: (r) => r.basic, render: (r) => formatCurrency(r.basic), className: "text-right" },
-              { key: "net", header: t("hr.net"), sortable: true, sortValue: (r) => r.net, render: (r) => formatCurrency(r.net), className: "text-right" },
-              { key: "st", header: t("common.status"), render: (r) => (
-                <Badge variant={r.status === "paid" ? "default" : "secondary"}>
-                  {t(`status.${r.status}` as any)}
-                </Badge>
-              ) },
+              {
+                key: "month",
+                header: t("hr.month"),
+                sortable: true,
+                sortValue: (r) => r.month,
+                render: (r) => r.month,
+              },
+              {
+                key: "name",
+                header: t("hr.employee"),
+                sortable: true,
+                sortValue: (r) => r.employeeName,
+                render: (r) => (
+                  <PartyNameLink kind="employee" id={r.employeeId} name={r.employeeName} />
+                ),
+              },
+              {
+                key: "basic",
+                header: t("hr.basicSalary"),
+                sortable: true,
+                sortValue: (r) => r.basic,
+                render: (r) => formatCurrency(r.basic),
+                className: "text-right",
+              },
+              {
+                key: "net",
+                header: t("hr.net"),
+                sortable: true,
+                sortValue: (r) => r.net,
+                render: (r) => formatCurrency(r.net),
+                className: "text-right",
+              },
+              {
+                key: "st",
+                header: t("common.status"),
+                render: (r) => (
+                  <Badge variant={r.status === "paid" ? "default" : "secondary"}>
+                    {t(`status.${r.status}` as any)}
+                  </Badge>
+                ),
+              },
               {
                 key: "actions",
                 header: t("common.actions"),
@@ -316,7 +444,13 @@ export function HrPage() {
                   <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                     {r.status === "draft" ? (
                       <>
-                        <Button size="sm" disabled={payRun.isPending} onClick={() => payRun.mutate(r.id)}>{t("hr.pay")}</Button>
+                        <Button
+                          size="sm"
+                          disabled={payRun.isPending}
+                          onClick={() => payRun.mutate(r.id)}
+                        >
+                          {t("hr.pay")}
+                        </Button>
                         <Button size="sm" variant="ghost" onClick={() => startEditPay(r)}>
                           {t("common.edit")}
                         </Button>
@@ -332,8 +466,20 @@ export function HrPage() {
                           {t("common.delete")}
                         </Button>
                       </>
-                    ) : <span className="text-xs text-muted-foreground px-2">{r.paidAt ? formatDate(r.paidAt) : "—"}</span>}
-                    <Button size="sm" variant="outline" onClick={() => { setPrintRun(r); setPrintOpen(true); }} className="ml-2">
+                    ) : (
+                      <span className="text-xs text-muted-foreground px-2">
+                        {r.paidAt ? formatDate(r.paidAt) : "—"}
+                      </span>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setPrintRun(r);
+                        setPrintOpen(true);
+                      }}
+                      className="ml-2"
+                    >
                       <Printer className="h-4 w-4" />
                     </Button>
                   </div>

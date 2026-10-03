@@ -18,7 +18,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/common/PageHeader";
 import { PrintDocHeader } from "@/components/common/PrintDocHeader";
@@ -26,7 +30,12 @@ import { PrintMeta, PrintSignatures } from "@/components/common/PrintParts";
 import { PartyNameLink } from "@/components/common/PartyNameLink";
 import { formatDate, formatDateTime } from "@/utils/formatters";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { useT } from "@/i18n";
 
@@ -35,12 +44,22 @@ export function DeliveryChallan({ id }: { id: string }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [assignOpen, setAssignOpen] = useState(false);
-  const { data: d, isLoading, isFetched } = useQuery({
+  const {
+    data: d,
+    isLoading,
+    isFetched,
+  } = useQuery({
     queryKey: ["deliveries", id],
     queryFn: () => deliveryService.get(id),
   });
-  const { data: products = [] } = useQuery({ queryKey: ["products"], queryFn: productService.list });
-  const { data: cylinders = [] } = useQuery({ queryKey: ["cylinders"], queryFn: cylinderService.list });
+  const { data: products = [] } = useQuery({
+    queryKey: ["products"],
+    queryFn: productService.list,
+  });
+  const { data: cylinders = [] } = useQuery({
+    queryKey: ["cylinders"],
+    queryFn: cylinderService.list,
+  });
   const { data: customer } = useQuery({
     queryKey: ["customers", d?.customerId],
     queryFn: () => customerService.get(d!.customerId),
@@ -51,12 +70,24 @@ export function DeliveryChallan({ id }: { id: string }) {
     queryFn: () => salesService.get(d!.salesOrderId!),
     enabled: !!d?.salesOrderId,
   });
-  const { data: employees = [] } = useQuery({ queryKey: ["employees"], queryFn: hrService.listEmployees });
-  const { data: tracking = "serial" } = useQuery({ queryKey: ["cylinderTracking"], queryFn: () => getCylinderTrackingFn() });
+  const { data: employees = [] } = useQuery({
+    queryKey: ["employees"],
+    queryFn: hrService.listEmployees,
+  });
+  const { data: tracking = "serial" } = useQuery({
+    queryKey: ["cylinderTracking"],
+    queryFn: () => getCylinderTrackingFn(),
+  });
 
   const confirm = useMutation({
-    mutationFn: (payload?: { issuedIdsByItem?: string[][]; returnedIds?: string[]; lotNumber?: string; expectedReturnAt?: string; skipCylinders?: boolean; asExchange?: boolean }) =>
-      deliveryService.confirm(id, payload),
+    mutationFn: (payload?: {
+      issuedIdsByItem?: string[][];
+      returnedIds?: string[];
+      lotNumber?: string;
+      expectedReturnAt?: string;
+      skipCylinders?: boolean;
+      asExchange?: boolean;
+    }) => deliveryService.confirm(id, payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["deliveries"] });
       qc.invalidateQueries({ queryKey: ["deliveries", id] });
@@ -94,7 +125,10 @@ export function DeliveryChallan({ id }: { id: string }) {
   });
 
   const needsCylinders = (d?.items || []).some((it) =>
-    isCylinderTrackedLine(it, products.find((p) => p.id === it.productId)),
+    isCylinderTrackedLine(
+      it,
+      products.find((p) => p.id === it.productId),
+    ),
   );
   const canConfirm = d && (d.status === "pending" || d.status === "in_transit");
   const canDelete = d?.status === "pending";
@@ -103,10 +137,13 @@ export function DeliveryChallan({ id }: { id: string }) {
     else confirm.mutate({ skipCylinders: true });
   };
   const serialsOf = (ids?: string[]) =>
-    (ids || []).map((cid) => cylinders.find((c) => c.id === cid)?.serialNumber || cid).join(", ") || "—";
+    (ids || []).map((cid) => cylinders.find((c) => c.id === cid)?.serialNumber || cid).join(", ") ||
+    "—";
 
-  if (isLoading) return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
-  if (isFetched && !d) return <div className="p-6 text-sm text-destructive">{t("deliveries.notFound")}</div>;
+  if (isLoading)
+    return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
+  if (isFetched && !d)
+    return <div className="p-6 text-sm text-destructive">{t("deliveries.notFound")}</div>;
   if (!d) return null;
 
   const soNo = salesOrder?.orderNo || "—";
@@ -125,14 +162,23 @@ export function DeliveryChallan({ id }: { id: string }) {
           <div className="flex items-center gap-2">
             {d.status === "pending" && (
               <Button variant="outline" asChild>
-                <Link to="/deliveries/$id/edit" params={{ id: d.id }}>{t("common.edit")}</Link>
+                <Link to="/deliveries/$id/edit" params={{ id: d.id }}>
+                  {t("common.edit")}
+                </Link>
               </Button>
             )}
             {canConfirm && (
               <>
-                <Button disabled={busy} data-testid="delivery-confirm" onClick={startConfirm}>{t("deliveries.confirm")}</Button>
+                <Button disabled={busy} data-testid="delivery-confirm" onClick={startConfirm}>
+                  {t("deliveries.confirm")}
+                </Button>
                 {needsCylinders && (
-                  <Button variant="outline" disabled={busy} data-testid="delivery-confirm-gas-only" onClick={() => confirm.mutate({ skipCylinders: true })}>
+                  <Button
+                    variant="outline"
+                    disabled={busy}
+                    data-testid="delivery-confirm-gas-only"
+                    onClick={() => confirm.mutate({ skipCylinders: true })}
+                  >
                     {t("deliveries.sellGasOnly")}
                   </Button>
                 )}
@@ -181,7 +227,9 @@ export function DeliveryChallan({ id }: { id: string }) {
                 <PartyNameLink kind="customer" id={d.customerId} name={d.customerName} />
               </p>
               {customer?.phone && <p className="text-muted-foreground">{customer.phone}</p>}
-              {customer?.address && <p className="max-w-sm text-muted-foreground">{customer.address}</p>}
+              {customer?.address && (
+                <p className="max-w-sm text-muted-foreground">{customer.address}</p>
+              )}
             </div>
             <PrintMeta
               className="lg:grid-cols-2"
@@ -196,11 +244,16 @@ export function DeliveryChallan({ id }: { id: string }) {
                     >
                       {soNo}
                     </Link>
-                  ) : "—",
+                  ) : (
+                    "—"
+                  ),
                 },
                 { label: t("deliveries.deliveryman"), value: d.driverName },
                 { label: t("deliveries.vehicle"), value: d.vehicleNo },
-                { label: t("deliveries.receiver"), value: d.receiverName || salesOrder?.receiverName || "—" },
+                {
+                  label: t("deliveries.receiver"),
+                  value: d.receiverName || salesOrder?.receiverName || "—",
+                },
                 { label: t("deliveries.emptyReceived"), value: String(d.emptyReturned ?? 0) },
                 { label: t("doc.dispatchDate"), value: dispatchDate },
               ]}
@@ -214,10 +267,14 @@ export function DeliveryChallan({ id }: { id: string }) {
                 onValueChange={(v) => assignDriver.mutate(v)}
                 disabled={assignDriver.isPending}
               >
-                <SelectTrigger><SelectValue placeholder={t("common.select")} /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder={t("common.select")} />
+                </SelectTrigger>
                 <SelectContent>
                   {deliveryStaff.map((e) => (
-                    <SelectItem key={e.id} value={e.name}>{e.name} · {e.designation}</SelectItem>
+                    <SelectItem key={e.id} value={e.name}>
+                      {e.name} · {e.designation}
+                    </SelectItem>
                   ))}
                   {d.driverName && !deliveryStaff.some((e) => e.name === d.driverName) && (
                     <SelectItem value={d.driverName}>{d.driverName}</SelectItem>
@@ -254,7 +311,11 @@ export function DeliveryChallan({ id }: { id: string }) {
           <p className="text-center text-[10px] text-muted-foreground">{t("doc.pageFooter")}</p>
 
           <div className="no-print flex justify-end">
-            <Button onClick={startConfirm} disabled={!canConfirm || confirm.isPending} data-testid="delivery-confirm">
+            <Button
+              onClick={startConfirm}
+              disabled={!canConfirm || confirm.isPending}
+              data-testid="delivery-confirm"
+            >
               {canConfirm ? t("deliveries.confirm") : t(`status.${d.status}` as any)}
             </Button>
           </div>

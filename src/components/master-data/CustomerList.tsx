@@ -40,7 +40,9 @@ export function CustomerList() {
               <Link to="/customers/report">{t("customers.report")}</Link>
             </Button>
             <Button asChild>
-              <Link to="/customers/new"><Plus className="mr-1 h-4 w-4" /> {t("customers.new")}</Link>
+              <Link to="/customers/new">
+                <Plus className="mr-1 h-4 w-4" /> {t("customers.new")}
+              </Link>
             </Button>
           </>
         }
@@ -51,12 +53,65 @@ export function CustomerList() {
         dateKey="createdAt"
         onRowClick={(r) => navigate({ to: "/customers/$id", params: { id: r.id } })}
         columns={[
-          { key: "since", header: t("customers.since"), sortable: true, sortValue: (r) => r.createdAt, render: (r) => <span className="whitespace-nowrap text-xs text-muted-foreground">{formatOpenedOn(r.createdAt)}</span>, className: "min-w-[9.5rem] whitespace-nowrap" },
-          { key: "name", header: t("common.name"), sortable: true, sortValue: (r) => r.name, render: (r) => <PartyNameLink kind="customer" id={r.id} name={r.name} className="whitespace-normal break-words" />, className: "min-w-[8rem] max-w-[14rem] align-top" },
-          { key: "phone", header: t("common.phone"), sortable: true, sortValue: (r) => r.phone, render: (r) => r.phone, className: "min-w-[7.5rem] whitespace-nowrap" },
-          { key: "whatsapp", header: t("customers.whatsapp"), render: (r) => r.whatsapp || "—", className: "min-w-[7.5rem] whitespace-nowrap" },
-          { key: "address", header: t("common.address"), render: (r) => <span className="whitespace-normal break-words text-muted-foreground">{r.address}</span>, className: "min-w-[10rem] max-w-[16rem] align-top" },
-          { key: "bal", header: t("customers.openingBalance"), sortable: true, sortValue: (r) => customerOpeningSigned(r), render: (r) => formatCurrency(customerOpeningSigned(r)), className: "min-w-[8.75rem] whitespace-nowrap text-right tabular-nums" },
+          {
+            key: "since",
+            header: t("customers.since"),
+            sortable: true,
+            sortValue: (r) => r.createdAt,
+            render: (r) => (
+              <span className="whitespace-nowrap text-xs text-muted-foreground">
+                {formatOpenedOn(r.createdAt)}
+              </span>
+            ),
+            className: "min-w-[9.5rem] whitespace-nowrap",
+          },
+          {
+            key: "name",
+            header: t("common.name"),
+            sortable: true,
+            sortValue: (r) => r.name,
+            render: (r) => (
+              <PartyNameLink
+                kind="customer"
+                id={r.id}
+                name={r.name}
+                className="whitespace-normal break-words"
+              />
+            ),
+            className: "min-w-[8rem] max-w-[14rem] align-top",
+          },
+          {
+            key: "phone",
+            header: t("common.phone"),
+            sortable: true,
+            sortValue: (r) => r.phone,
+            render: (r) => r.phone,
+            className: "min-w-[7.5rem] whitespace-nowrap",
+          },
+          {
+            key: "whatsapp",
+            header: t("customers.whatsapp"),
+            render: (r) => r.whatsapp || "—",
+            className: "min-w-[7.5rem] whitespace-nowrap",
+          },
+          {
+            key: "address",
+            header: t("common.address"),
+            render: (r) => (
+              <span className="whitespace-normal break-words text-muted-foreground">
+                {r.address}
+              </span>
+            ),
+            className: "min-w-[10rem] max-w-[16rem] align-top",
+          },
+          {
+            key: "bal",
+            header: t("customers.openingBalance"),
+            sortable: true,
+            sortValue: (r) => customerOpeningSigned(r),
+            render: (r) => formatCurrency(customerOpeningSigned(r)),
+            className: "min-w-[8.75rem] whitespace-nowrap text-right tabular-nums",
+          },
           {
             key: "actions",
             header: t("common.actions"),
@@ -65,11 +120,14 @@ export function CustomerList() {
               <RowActions
                 onView={() => navigate({ to: "/customers/$id", params: { id: r.id } })}
                 onEdit={() => navigate({ to: "/customers/$id/edit", params: { id: r.id } })}
-                extras={[{
-                  label: t("customers.statement"),
-                  icon: <FileText className="h-3.5 w-3.5" />,
-                  onClick: () => navigate({ to: "/customers/$id/statement", params: { id: r.id } }),
-                }]}
+                extras={[
+                  {
+                    label: t("customers.statement"),
+                    icon: <FileText className="h-3.5 w-3.5" />,
+                    onClick: () =>
+                      navigate({ to: "/customers/$id/statement", params: { id: r.id } }),
+                  },
+                ]}
                 onDelete={() => {
                   if (confirm(`${t("common.delete")} ${r.name}?`)) remove.mutate(r.id);
                 }}

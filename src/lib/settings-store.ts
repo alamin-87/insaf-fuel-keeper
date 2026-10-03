@@ -1,12 +1,5 @@
 export type AppRole =
-  | "Administrator"
-  | "Manager"
-  | "Sales"
-  | "Warehouse"
-  | "Accounts"
-  | "HR"
-  | "Delivery"
-  | "Auditor";
+  "Administrator" | "Manager" | "Sales" | "Warehouse" | "Accounts" | "HR" | "Delivery" | "Auditor";
 
 export type AppModule =
   | "dashboard"
@@ -33,7 +26,14 @@ export type AppUserRecord = {
 };
 
 export const APP_ROLES: AppRole[] = [
-  "Administrator", "Manager", "Sales", "Warehouse", "Accounts", "HR", "Delivery", "Auditor",
+  "Administrator",
+  "Manager",
+  "Sales",
+  "Warehouse",
+  "Accounts",
+  "HR",
+  "Delivery",
+  "Auditor",
 ];
 
 export const APP_MODULES: { id: AppModule; label: string }[] = [
@@ -59,8 +59,20 @@ const MATRIX_KEY = "insaf-power-matrix";
 const defaultUsers: AppUserRecord[] = [
   { id: "u1", username: "operator", displayName: "Operator", role: "Administrator", active: true },
   { id: "u2", username: "sales1", displayName: "Sales Desk", role: "Sales", active: true },
-  { id: "u3", username: "warehouse", displayName: "Warehouse Lead", role: "Warehouse", active: true },
-  { id: "u4", username: "accounts", displayName: "Accounts Officer", role: "Accounts", active: true },
+  {
+    id: "u3",
+    username: "warehouse",
+    displayName: "Warehouse Lead",
+    role: "Warehouse",
+    active: true,
+  },
+  {
+    id: "u4",
+    username: "accounts",
+    displayName: "Accounts Officer",
+    role: "Accounts",
+    active: true,
+  },
 ];
 
 function blankAccess(value: boolean): Record<AppModule, boolean> {
@@ -87,27 +99,57 @@ export function defaultMatrix(): Record<AppRole, Record<AppModule, boolean>> {
     Manager: blankAccess(true),
     Sales: {
       ...blankAccess(false),
-      dashboard: true, customers: true, products: true, sales: true, deliveries: true, reports: true,
+      dashboard: true,
+      customers: true,
+      products: true,
+      sales: true,
+      deliveries: true,
+      reports: true,
     },
     Warehouse: {
       ...blankAccess(false),
-      dashboard: true, suppliers: true, products: true, inventory: true, cylinders: true, deliveries: true, purchases: true,
+      dashboard: true,
+      suppliers: true,
+      products: true,
+      inventory: true,
+      cylinders: true,
+      deliveries: true,
+      purchases: true,
     },
     Accounts: {
       ...blankAccess(false),
-      dashboard: true, customers: true, suppliers: true, accounting: true, expenses: true, reports: true, sales: true, purchases: true,
+      dashboard: true,
+      customers: true,
+      suppliers: true,
+      accounting: true,
+      expenses: true,
+      reports: true,
+      sales: true,
+      purchases: true,
     },
     HR: {
       ...blankAccess(false),
-      dashboard: true, hr: true, reports: true,
+      dashboard: true,
+      hr: true,
+      reports: true,
     },
     Delivery: {
       ...blankAccess(false),
-      dashboard: true, customers: true, deliveries: true, cylinders: true,
+      dashboard: true,
+      customers: true,
+      deliveries: true,
+      cylinders: true,
     },
     Auditor: {
       ...blankAccess(false),
-      dashboard: true, customers: true, suppliers: true, products: true, reports: true, accounting: true, sales: true, purchases: true,
+      dashboard: true,
+      customers: true,
+      suppliers: true,
+      products: true,
+      reports: true,
+      accounting: true,
+      sales: true,
+      purchases: true,
     },
   };
 }
@@ -116,9 +158,10 @@ function sanitizeMatrix(raw: Record<string, Record<string, boolean>>) {
   const base = defaultMatrix();
   for (const role of APP_ROLES) {
     const row = raw[role] ?? base[role];
-    base[role] = Object.fromEntries(
-      APP_MODULES.map((m) => [m.id, Boolean(row[m.id])]),
-    ) as Record<AppModule, boolean>;
+    base[role] = Object.fromEntries(APP_MODULES.map((m) => [m.id, Boolean(row[m.id])])) as Record<
+      AppModule,
+      boolean
+    >;
   }
   return base;
 }

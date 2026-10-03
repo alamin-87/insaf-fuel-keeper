@@ -13,7 +13,12 @@ export function PrintSignatures({
 }) {
   const t = useT();
   return (
-    <div className={cn("print-signatures mt-12 flex justify-between gap-8 px-2 pt-4 print:mt-4 print:gap-4 print:pt-2", className)}>
+    <div
+      className={cn(
+        "print-signatures mt-12 flex justify-between gap-8 px-2 pt-4 print:mt-4 print:gap-4 print:pt-2",
+        className,
+      )}
+    >
       <div className="w-40 border-t border-foreground/40 pt-2 text-center text-xs">
         {left ?? t("doc.authorizedSign")}
       </div>
@@ -35,7 +40,9 @@ export function PrintMeta({
     <div className={cn("grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3", className)}>
       {items.map((item) => (
         <div key={item.label} className="print-avoid-break">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{item.label}</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {item.label}
+          </p>
           <div className="mt-0.5 font-medium">{item.value || "—"}</div>
         </div>
       ))}

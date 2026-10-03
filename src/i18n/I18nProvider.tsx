@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { bn, type BnMessages, type MessageKey } from "./bn";
 import { en } from "./en";
 import type { Locale } from "./types";
@@ -67,11 +75,13 @@ function fallbackT(key: MessageKey, vars?: Vars) {
 
 export function useI18n() {
   const ctx = useContext(I18nContext);
-  return ctx ?? {
-    locale: "bn" as Locale,
-    setLocale: () => {},
-    t: fallbackT,
-  };
+  return (
+    ctx ?? {
+      locale: "bn" as Locale,
+      setLocale: () => {},
+      t: fallbackT,
+    }
+  );
 }
 
 export function useT() {

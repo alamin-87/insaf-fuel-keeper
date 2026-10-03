@@ -1,7 +1,12 @@
 import { useMemo, useState, type ReactNode, Fragment } from "react";
 import { Input } from "@/components/ui/input";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { ArrowDown, ArrowUp, ArrowUpDown, Search, ChevronRight, ChevronDown } from "lucide-react";
@@ -24,7 +29,15 @@ type SortDir = "asc" | "desc";
 type DateKey<T> = keyof T | ((row: T) => string | number | Date | null | undefined);
 
 export function DataTable<T extends { id: string }>({
-  rows, columns, searchKeys, onRowClick, empty, dateKey, dateRange, onDateRangeChange, renderSubComponent,
+  rows,
+  columns,
+  searchKeys,
+  onRowClick,
+  empty,
+  dateKey,
+  dateRange,
+  onDateRangeChange,
+  renderSubComponent,
 }: {
   rows: T[];
   columns: Column<T>[];
@@ -59,11 +72,16 @@ export function DataTable<T extends { id: string }>({
   const filtered = useMemo(() => {
     const dated = dateKey ? filterByDateRange(rows, range, getDate) : rows;
 
-    const base = q && searchKeys
-      ? dated.filter((r) =>
-          searchKeys.some((k) => String(r[k] ?? "").toLowerCase().includes(q.toLowerCase())),
-        )
-      : dated;
+    const base =
+      q && searchKeys
+        ? dated.filter((r) =>
+            searchKeys.some((k) =>
+              String(r[k] ?? "")
+                .toLowerCase()
+                .includes(q.toLowerCase()),
+            ),
+          )
+        : dated;
 
     if (!sortKey) {
       if (!dateKey) return base;
@@ -91,7 +109,11 @@ export function DataTable<T extends { id: string }>({
       if (bv == null) return -1;
       let cmp = 0;
       if (typeof av === "number" && typeof bv === "number") cmp = av - bv;
-      else cmp = String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: "base" });
+      else
+        cmp = String(av).localeCompare(String(bv), undefined, {
+          numeric: true,
+          sensitivity: "base",
+        });
       return sortDir === "asc" ? cmp : -cmp;
     });
   }, [rows, q, searchKeys, sortKey, sortDir, columns, dateKey, range]);
@@ -106,7 +128,7 @@ export function DataTable<T extends { id: string }>({
 
   const toggleExpand = (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
+    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
   const showToolbar = Boolean(searchKeys) || Boolean(dateKey);
@@ -128,9 +150,7 @@ export function DataTable<T extends { id: string }>({
           ) : (
             <div />
           )}
-          {dateKey && (
-            <DateRangeFilter value={range} onChange={setRange} compact />
-          )}
+          {dateKey && <DateRangeFilter value={range} onChange={setRange} compact />}
         </div>
       )}
       <div className="overflow-x-auto">
@@ -150,7 +170,11 @@ export function DataTable<T extends { id: string }>({
                     >
                       {c.header}
                       {sortKey === c.key ? (
-                        sortDir === "asc" ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />
+                        sortDir === "asc" ? (
+                          <ArrowUp className="h-3.5 w-3.5" />
+                        ) : (
+                          <ArrowDown className="h-3.5 w-3.5" />
+                        )
                       ) : (
                         <ArrowUpDown className="h-3.5 w-3.5 opacity-50" />
                       )}
@@ -165,7 +189,10 @@ export function DataTable<T extends { id: string }>({
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length} className="py-12 text-center text-sm text-muted-foreground">
+                <TableCell
+                  colSpan={columns.length}
+                  className="py-12 text-center text-sm text-muted-foreground"
+                >
                   {emptyLabel}
                 </TableCell>
               </TableRow>
@@ -193,7 +220,11 @@ export function DataTable<T extends { id: string }>({
                               className="text-muted-foreground hover:text-foreground focus:outline-none"
                               onClick={(e) => toggleExpand(row.id, e)}
                             >
-                              {expanded[row.id] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                              {expanded[row.id] ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
                             </button>
                             {c.render(row)}
                           </div>

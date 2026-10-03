@@ -281,20 +281,9 @@
   "pageErrors": [],
   "httpFails": [],
   "created": {
-    "products": [
-      "ohmigpwv",
-      "ycxw9h8z"
-    ],
-    "purchases": [
-      "g4rnrgsc",
-      "r0psi1xk",
-      "wktob1vb"
-    ],
-    "sales": [
-      "gv94jmgp"
-    ],
-    "deliveries": [
-      "2n6ox23w"
-    ]
+    "products": ["ohmigpwv", "ycxw9h8z"],
+    "purchases": ["g4rnrgsc", "r0psi1xk", "wktob1vb"],
+    "sales": ["gv94jmgp"],
+    "deliveries": ["2n6ox23w"]
   }
 }

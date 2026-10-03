@@ -1,6 +1,7 @@
 import type { LineItem } from "@/types";
 
-export const lineAmount = (item: LineItem) => (Number(item.price) || 0) * (Number(item.quantity) || 0);
+export const lineAmount = (item: LineItem) =>
+  (Number(item.price) || 0) * (Number(item.quantity) || 0);
 
 export const computeTotals = (items: LineItem[]) => {
   const subtotal = items.reduce((s, i) => s + lineAmount(i), 0);

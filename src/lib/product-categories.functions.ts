@@ -4,7 +4,7 @@ import type { ProductCategoryRecord } from "@/types";
 const DEFAULT_CATEGORY_NAMES = ["LPG", "Industrial", "Medical", "Other"];
 const IN_USE_MSG = "This category is currently used by products and cannot be deleted.";
 
-const clean = <T,>(doc: any): T => {
+const clean = <T>(doc: any): T => {
   if (!doc) return doc;
   const { _id, ...rest } = doc;
   return rest as T;
@@ -37,10 +37,21 @@ async function ensureProductCategories() {
   const { getDb } = await import("./mongo.server");
   const db = await getDb();
   const coll = db.collection("productCategories");
-  try { await coll.createIndex({ id: 1 }, { unique: true }); } catch { /* index may already exist */ }
-  try { await coll.createIndex({ nameKey: 1 }, { unique: true }); } catch { /* index may already exist */ }
+  try {
+    await coll.createIndex({ id: 1 }, { unique: true });
+  } catch {
+    /* index may already exist */
+  }
+  try {
+    await coll.createIndex({ nameKey: 1 }, { unique: true });
+  } catch {
+    /* index may already exist */
+  }
 
-  const products = await db.collection("products").find({}, { projection: { category: 1 } }).toArray();
+  const products = await db
+    .collection("products")
+    .find({}, { projection: { category: 1 } })
+    .toArray();
   const names = new Set<string>(DEFAULT_CATEGORY_NAMES);
   for (const p of products) {
     const n = String(p.category || "").trim();
@@ -74,14 +85,16 @@ async function ensureProductCategories() {
   }
 }
 
-export const listProductCategoriesFn = createServerFn({ method: "POST" }).handler(async (): Promise<ProductCategoryRecord[]> => {
-  await requireProductsAccess();
-  const { getDb } = await import("./mongo.server");
-  await ensureProductCategories();
-  const db = await getDb();
-  const docs = await db.collection("productCategories").find({}).sort({ name: 1 }).toArray();
-  return docs.map((d) => clean<ProductCategoryRecord>(d));
-});
+export const listProductCategoriesFn = createServerFn({ method: "POST" }).handler(
+  async (): Promise<ProductCategoryRecord[]> => {
+    await requireProductsAccess();
+    const { getDb } = await import("./mongo.server");
+    await ensureProductCategories();
+    const db = await getDb();
+    const docs = await db.collection("productCategories").find({}).sort({ name: 1 }).toArray();
+    return docs.map((d) => clean<ProductCategoryRecord>(d));
+  },
+);
 
 export const createProductCategoryFn = createServerFn({ method: "POST" })
   .inputValidator((d: { name: string }) => d)
@@ -120,17 +133,18 @@ export const updateProductCategoryFn = createServerFn({ method: "POST" })
     const nameKey = nameKeyOf(name);
     const now = new Date().toISOString();
     try {
-      const result = await db.collection("productCategories").updateOne(
-        { id },
-        { $set: { name, nameKey, updatedAt: now } },
-      );
+      const result = await db
+        .collection("productCategories")
+        .updateOne({ id }, { $set: { name, nameKey, updatedAt: now } });
       if (result.matchedCount === 0) throw new Error("Category not found");
     } catch (e) {
       if (isDuplicateKeyError(e)) throw new Error("A category with this name already exists");
       throw e;
     }
     if (oldName && oldName !== name) {
-      await db.collection("products").updateMany({ category: oldName }, { $set: { category: name } });
+      await db
+        .collection("products")
+        .updateMany({ category: oldName }, { $set: { category: name } });
     }
     const doc = await db.collection("productCategories").findOne({ id });
     if (!doc) throw new Error("Category not found");
@@ -148,9 +162,7 @@ export const removeProductCategoryFn = createServerFn({ method: "POST" })
     const existing = await db.collection("productCategories").findOne({ id });
     if (!existing) throw new Error("Category not found");
     const name = String(existing.name || "");
-    const used = name
-      ? await db.collection("products").countDocuments({ category: name })
-      : 0;
+    const used = name ? await db.collection("products").countDocuments({ category: name }) : 0;
     if (used > 0) throw new Error(IN_USE_MSG);
     const result = await db.collection("productCategories").deleteOne({ id });
     if (result.deletedCount === 0) throw new Error("Category not found");

@@ -1,6 +1,12 @@
 import type {
-  CostLayer, CostingMethod, Cylinder, LayerConsumption, MovementTypeKind, Product,
-  StockMovement, StockMovementType,
+  CostLayer,
+  CostingMethod,
+  Cylinder,
+  LayerConsumption,
+  MovementTypeKind,
+  Product,
+  StockMovement,
+  StockMovementType,
 } from "../types/index.ts";
 import { cylinderIsFullStock, isCylinderProduct } from "./cylinder-product.ts";
 
@@ -24,7 +30,8 @@ export function computeWeightedAverageOnReceipt(
   receiptCost: number,
 ): number {
   const safeStock = Math.max(0, currentStock);
-  const safeCurrentCost = Number.isFinite(currentCost) && currentCost >= 0 ? currentCost : receiptCost;
+  const safeCurrentCost =
+    Number.isFinite(currentCost) && currentCost >= 0 ? currentCost : receiptCost;
   const totalQty = safeStock + receiptQty;
   if (totalQty <= 0) return receiptCost;
   const totalValue = safeStock * safeCurrentCost + receiptQty * receiptCost;
@@ -41,7 +48,11 @@ export function sortLayersForConsumption(layers: CostLayer[], method: CostingMet
   return copy;
 }
 
-export function computeLayerValuation(layers: CostLayer[]): { totalQty: number; totalValue: number; avgCost: number } {
+export function computeLayerValuation(layers: CostLayer[]): {
+  totalQty: number;
+  totalValue: number;
+  avgCost: number;
+} {
   const open = layers.filter((l) => (l.qtyRemaining || 0) > 0);
   const totalQty = open.reduce((sum, l) => sum + (l.qtyRemaining || 0), 0);
   const totalValue = open.reduce((sum, l) => sum + (l.qtyRemaining || 0) * (l.unitCost || 0), 0);
@@ -135,10 +146,7 @@ export function reconcileQuantityWithSerials(
     const productStock = p.stock ?? 0;
     const warehouseFullSerials = isSerialized
       ? cylinders.filter(
-          (c) =>
-            c.productId === p.id &&
-            cylinderIsFullStock(c) &&
-            c.ownedBy !== "customer",
+          (c) => c.productId === p.id && cylinderIsFullStock(c) && c.ownedBy !== "customer",
         ).length
       : 0;
 

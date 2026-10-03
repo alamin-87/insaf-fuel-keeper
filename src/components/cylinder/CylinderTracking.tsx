@@ -12,19 +12,35 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/common/PageHeader";
 import { formatDateTime } from "@/utils/formatters";
 import type { CylinderMovementType } from "@/types";
 import { useT } from "@/i18n";
 
-const types: CylinderMovementType[] = ["received", "issued", "returned", "refilled", "transferred", "damaged", "lost"];
+const types: CylinderMovementType[] = [
+  "received",
+  "issued",
+  "returned",
+  "refilled",
+  "transferred",
+  "damaged",
+  "lost",
+];
 
 export function CylinderTracking({ id }: { id: string }) {
   const t = useT();
   const qc = useQueryClient();
-  const { data: cylinder, isLoading, isFetched } = useQuery({
+  const {
+    data: cylinder,
+    isLoading,
+    isFetched,
+  } = useQuery({
     queryKey: ["cylinders", id],
     queryFn: () => cylinderService.get(id),
   });
@@ -33,8 +49,14 @@ export function CylinderTracking({ id }: { id: string }) {
     queryFn: () => cylinderService.getMovements(id),
     enabled: !!cylinder,
   });
-  const { data: customers = [] } = useQuery({ queryKey: ["customers"], queryFn: customerService.list });
-  const { data: products = [] } = useQuery({ queryKey: ["products"], queryFn: productService.list });
+  const { data: customers = [] } = useQuery({
+    queryKey: ["customers"],
+    queryFn: customerService.list,
+  });
+  const { data: products = [] } = useQuery({
+    queryKey: ["products"],
+    queryFn: productService.list,
+  });
 
   const [type, setType] = useState<CylinderMovementType>("issued");
   const [toLocation, setToLocation] = useState("");
@@ -45,8 +67,13 @@ export function CylinderTracking({ id }: { id: string }) {
     mutationFn: () => {
       if (type === "issued" && !customerId) throw new Error(t("common.select"));
       return cylinderService.addMovement({
-        cylinderId: id, type, fromLocation: cylinder?.location, toLocation: toLocation || undefined,
-        customerId: customerId || undefined, notes, by: "Operator",
+        cylinderId: id,
+        type,
+        fromLocation: cylinder?.location,
+        toLocation: toLocation || undefined,
+        customerId: customerId || undefined,
+        notes,
+        by: "Operator",
       });
     },
     onSuccess: () => {
@@ -54,21 +81,29 @@ export function CylinderTracking({ id }: { id: string }) {
       qc.invalidateQueries({ queryKey: ["cylinders", id] });
       qc.invalidateQueries({ queryKey: ["cylinders", id, "movements"] });
       toast.success(t("cylinders.recorded"));
-      setToLocation(""); setCustomerId(""); setNotes("");
+      setToLocation("");
+      setCustomerId("");
+      setNotes("");
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (isLoading) return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
-  if (isFetched && !cylinder) return <div className="p-6 text-sm text-destructive">{t("cylinders.notFound")}</div>;
+  if (isLoading)
+    return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
+  if (isFetched && !cylinder)
+    return <div className="p-6 text-sm text-destructive">{t("cylinders.notFound")}</div>;
   if (!cylinder) return null;
-  const gasCategory = cylinder.gasCategory || products.find((p) => p.id === cylinder.productId)?.category;
+  const gasCategory =
+    cylinder.gasCategory || products.find((p) => p.id === cylinder.productId)?.category;
 
   return (
     <div>
       <PageHeader
         title={t("cylinders.tracking", { serial: cylinder.serialNumber })}
-        description={t("cylinders.capacityAt", { capacity: String(cylinder.capacity), location: cylinder.location })}
+        description={t("cylinders.capacityAt", {
+          capacity: String(cylinder.capacity),
+          location: cylinder.location,
+        })}
         backTo="/cylinders"
         backLabel={t("cylinders.title")}
         actions={
@@ -85,7 +120,9 @@ export function CylinderTracking({ id }: { id: string }) {
       />
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <CardHeader><CardTitle className="text-base">{t("cylinders.history")}</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">{t("cylinders.history")}</CardTitle>
+          </CardHeader>
           <CardContent>
             {movements.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t("cylinders.noMovements")}</p>
@@ -96,14 +133,23 @@ export function CylinderTracking({ id }: { id: string }) {
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <Badge variant="outline">{m.type}</Badge>
-                        <span className="text-xs text-muted-foreground">{formatDateTime(m.timestamp)}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatDateTime(m.timestamp)}
+                        </span>
                       </div>
                       <p className="mt-1 text-sm">
                         {m.fromLocation && <span>{m.fromLocation}</span>}
-                        {m.toLocation && <span> → <b>{m.toLocation}</b></span>}
+                        {m.toLocation && (
+                          <span>
+                            {" "}
+                            → <b>{m.toLocation}</b>
+                          </span>
+                        )}
                       </p>
                       {m.notes && <p className="text-xs text-muted-foreground">{m.notes}</p>}
-                      <p className="text-xs text-muted-foreground">{t("cylinders.by", { name: m.by })}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t("cylinders.by", { name: m.by })}
+                      </p>
                     </div>
                   </li>
                 ))}
@@ -113,14 +159,22 @@ export function CylinderTracking({ id }: { id: string }) {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle className="text-base">{t("cylinders.record")}</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">{t("cylinders.record")}</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-1.5">
               <Label>{t("common.type")}</Label>
               <Select value={type} onValueChange={(v) => setType(v as CylinderMovementType)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  {types.map((mv) => <SelectItem key={mv} value={mv}>{mv}</SelectItem>)}
+                  {types.map((mv) => (
+                    <SelectItem key={mv} value={mv}>
+                      {mv}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -131,9 +185,15 @@ export function CylinderTracking({ id }: { id: string }) {
             <div className="space-y-1.5">
               <Label>{t("cylinders.customerIf")}</Label>
               <Select value={customerId} onValueChange={setCustomerId}>
-                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="—" />
+                </SelectTrigger>
                 <SelectContent>
-                  {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  {customers.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -141,7 +201,9 @@ export function CylinderTracking({ id }: { id: string }) {
               <Label>{t("common.notes")}</Label>
               <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>
-            <Button className="w-full" onClick={() => addMv.mutate()} disabled={addMv.isPending}>{t("cylinders.addMovement")}</Button>
+            <Button className="w-full" onClick={() => addMv.mutate()} disabled={addMv.isPending}>
+              {t("cylinders.addMovement")}
+            </Button>
           </CardContent>
         </Card>
       </div>

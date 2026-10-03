@@ -23,9 +23,17 @@ test("SEC-02: Password Security & Hashing", async (t) => {
     const hashed = hashPassword(plain);
 
     assert.equal(verifyPassword(plain, hashed), true, "Valid password must verify");
-    assert.equal(verifyPassword("WrongPassword", hashed), false, "Invalid password must be rejected");
+    assert.equal(
+      verifyPassword("WrongPassword", hashed),
+      false,
+      "Invalid password must be rejected",
+    );
     assert.equal(verifyPassword("", hashed), false, "Empty password must be rejected");
-    assert.equal(verifyPassword(plain, "plainTextUnHashed"), false, "Plaintext stored must not verify without hash");
+    assert.equal(
+      verifyPassword(plain, "plainTextUnHashed"),
+      false,
+      "Plaintext stored must not verify without hash",
+    );
   });
 
   await t.test("produces distinct salts and hashes for identical plaintext", () => {
@@ -61,15 +69,15 @@ test("SEC-01: Server-Side RBAC & Direct API Protection", async (t) => {
     // Direct assertion throws ForbiddenError (HTTP 403)
     assert.throws(
       () => assertPermission(salesUser, "accounting.create"),
-      (err: any) => err instanceof ForbiddenError && err.status === 403
+      (err: any) => err instanceof ForbiddenError && err.status === 403,
     );
     assert.throws(
       () => assertPermission(salesUser, "payroll.create"),
-      (err: any) => err instanceof ForbiddenError && err.status === 403
+      (err: any) => err instanceof ForbiddenError && err.status === 403,
     );
     assert.throws(
       () => assertPermission(salesUser, "users.delete"),
-      (err: any) => err instanceof ForbiddenError && err.status === 403
+      (err: any) => err instanceof ForbiddenError && err.status === 403,
     );
   });
 
@@ -89,7 +97,7 @@ test("SEC-01: Server-Side RBAC & Direct API Protection", async (t) => {
 
     assert.throws(
       () => assertPermission(accountsUser, "users.create"),
-      (err: any) => err instanceof ForbiddenError && err.status === 403
+      (err: any) => err instanceof ForbiddenError && err.status === 403,
     );
   });
 
@@ -130,11 +138,11 @@ test("SEC-02: Session Secret & Startup Validation", async (t) => {
   await t.test("fails in production when SESSION_SECRET is missing or short", () => {
     assert.throws(
       () => validateSessionSecret(undefined, true),
-      /SESSION_SECRET is required in production/
+      /SESSION_SECRET is required in production/,
     );
     assert.throws(
       () => validateSessionSecret("short-secret-12345", true),
-      /SESSION_SECRET is required in production/
+      /SESSION_SECRET is required in production/,
     );
   });
 
@@ -169,7 +177,11 @@ test("ACC-11: Collision-Safe Document Sequence Numbering", async (t) => {
     const results = await Promise.all(promises);
 
     const unique = new Set(results);
-    assert.equal(unique.size, count, "All concurrently generated PO numbers must be strictly unique");
+    assert.equal(
+      unique.size,
+      count,
+      "All concurrently generated PO numbers must be strictly unique",
+    );
     assert.ok(results.includes("PO-2026-000001"));
     assert.ok(results.includes("PO-2026-000100"));
   });

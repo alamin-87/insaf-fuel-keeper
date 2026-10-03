@@ -4,39 +4,56 @@ function phoneDigits(value: string) {
   return value.replace(/\D/g, "");
 }
 
-const phoneSchema = z.string().min(6, "Phone required").refine((value) => {
-  const digits = phoneDigits(value);
-  return digits.length >= 6 && digits.length <= 15;
-}, "Enter a valid phone number");
+const phoneSchema = z
+  .string()
+  .min(6, "Phone required")
+  .refine((value) => {
+    const digits = phoneDigits(value);
+    return digits.length >= 6 && digits.length <= 15;
+  }, "Enter a valid phone number");
 
-export const customerSchema = z.object({
-  name: z.string().min(2, "Name required"),
-  phone: phoneSchema,
-  whatsapp: z.string().optional(),
-  address: z.string().min(2, "Address required"),
-  creditLimit: z.coerce.number().min(0, "Cannot be negative"),
-  openingBalance: z.coerce.number().min(0),
-  openingBalanceType: z.enum(["receivable", "payable"]),
-  creditReminderEnabled: z.boolean(),
-  creditReminderDays: z.coerce.number().optional(),
-}).superRefine((val, ctx) => {
-  const whatsapp = (val.whatsapp || "").trim();
-  if (whatsapp) {
-    const digits = phoneDigits(whatsapp);
-    if (digits.length < 6 || digits.length > 15) {
-      ctx.addIssue({ code: "custom", message: "Enter a valid WhatsApp number", path: ["whatsapp"] });
+export const customerSchema = z
+  .object({
+    name: z.string().min(2, "Name required"),
+    phone: phoneSchema,
+    whatsapp: z.string().optional(),
+    address: z.string().min(2, "Address required"),
+    creditLimit: z.coerce.number().min(0, "Cannot be negative"),
+    openingBalance: z.coerce.number().min(0),
+    openingBalanceType: z.enum(["receivable", "payable"]),
+    creditReminderEnabled: z.boolean(),
+    creditReminderDays: z.coerce.number().optional(),
+  })
+  .superRefine((val, ctx) => {
+    const whatsapp = (val.whatsapp || "").trim();
+    if (whatsapp) {
+      const digits = phoneDigits(whatsapp);
+      if (digits.length < 6 || digits.length > 15) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Enter a valid WhatsApp number",
+          path: ["whatsapp"],
+        });
+      }
     }
-  }
-  if ((Number(val.openingBalance) || 0) > 0 && !val.openingBalanceType) {
-    ctx.addIssue({ code: "custom", message: "Select opening balance type", path: ["openingBalanceType"] });
-  }
-  if (val.creditReminderEnabled) {
-    const days = Number(val.creditReminderDays);
-    if (!Number.isInteger(days) || days < 1) {
-      ctx.addIssue({ code: "custom", message: "Enter a positive number of days", path: ["creditReminderDays"] });
+    if ((Number(val.openingBalance) || 0) > 0 && !val.openingBalanceType) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Select opening balance type",
+        path: ["openingBalanceType"],
+      });
     }
-  }
-});
+    if (val.creditReminderEnabled) {
+      const days = Number(val.creditReminderDays);
+      if (!Number.isInteger(days) || days < 1) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Enter a positive number of days",
+          path: ["creditReminderDays"],
+        });
+      }
+    }
+  });
 
 export const supplierSchema = z.object({
   name: z.string().min(2, "Name required"),
@@ -68,7 +85,17 @@ export const cylinderSchema = z.object({
   serialNumber: z.string().min(1),
   productId: z.string().min(1),
   capacity: z.coerce.number().min(0),
-  status: z.enum(["in_stock", "at_customer", "in_transit", "refilling", "damaged", "lost", "scrapped", "written_off", "stock_out"]),
+  status: z.enum([
+    "in_stock",
+    "at_customer",
+    "in_transit",
+    "refilling",
+    "damaged",
+    "lost",
+    "scrapped",
+    "written_off",
+    "stock_out",
+  ]),
   location: z.string().min(1),
   gasCategory: z.enum(["LPG", "Industrial", "Medical", "Other"]).optional(),
   customerId: z.string().optional(),
@@ -140,27 +167,37 @@ export const journalLineSchema = z.object({
   notes: z.string().optional(),
 });
 
-export const journalEntrySchema = z.object({
-  date: z.string().min(1, "Date required"),
-  notes: z.string().optional(),
-  lines: z.array(journalLineSchema).min(2, "Add at least two lines"),
-}).superRefine((val, ctx) => {
-  let debit = 0;
-  let credit = 0;
-  val.lines.forEach((line, i) => {
-    if (line.debit > 0 && line.credit > 0) {
-      ctx.addIssue({ code: "custom", message: "Enter debit or credit, not both", path: ["lines", i, "debit"] });
+export const journalEntrySchema = z
+  .object({
+    date: z.string().min(1, "Date required"),
+    notes: z.string().optional(),
+    lines: z.array(journalLineSchema).min(2, "Add at least two lines"),
+  })
+  .superRefine((val, ctx) => {
+    let debit = 0;
+    let credit = 0;
+    val.lines.forEach((line, i) => {
+      if (line.debit > 0 && line.credit > 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Enter debit or credit, not both",
+          path: ["lines", i, "debit"],
+        });
+      }
+      if (line.debit <= 0 && line.credit <= 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Enter a debit or credit",
+          path: ["lines", i, "debit"],
+        });
+      }
+      debit += line.debit;
+      credit += line.credit;
+    });
+    if (debit <= 0) {
+      ctx.addIssue({ code: "custom", message: "Amount must be positive", path: ["lines"] });
     }
-    if (line.debit <= 0 && line.credit <= 0) {
-      ctx.addIssue({ code: "custom", message: "Enter a debit or credit", path: ["lines", i, "debit"] });
+    if (Math.abs(debit - credit) > 0.009) {
+      ctx.addIssue({ code: "custom", message: "Debit and credit must be equal", path: ["lines"] });
     }
-    debit += line.debit;
-    credit += line.credit;
   });
-  if (debit <= 0) {
-    ctx.addIssue({ code: "custom", message: "Amount must be positive", path: ["lines"] });
-  }
-  if (Math.abs(debit - credit) > 0.009) {
-    ctx.addIssue({ code: "custom", message: "Debit and credit must be equal", path: ["lines"] });
-  }
-});

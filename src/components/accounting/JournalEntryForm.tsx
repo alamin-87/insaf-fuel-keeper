@@ -11,7 +11,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { useT } from "@/i18n";
 
@@ -33,7 +37,10 @@ export function JournalEntryForm({ onPosted }: { onPosted?: () => void }) {
   const t = useT();
   const qc = useQueryClient();
   const { data: coa = [] } = useQuery({ queryKey: ["coa"], queryFn: accountingService.listCoa });
-  const { data: accounts = [] } = useQuery({ queryKey: ["accounts"], queryFn: accountingService.listAccounts });
+  const { data: accounts = [] } = useQuery({
+    queryKey: ["accounts"],
+    queryFn: accountingService.listAccounts,
+  });
   const opts = useMemo<AccountOpt[]>(() => {
     const core: AccountOpt[] = [
       { id: "cash", name: "cash", label: t("common.cash") },
@@ -98,7 +105,11 @@ export function JournalEntryForm({ onPosted }: { onPosted?: () => void }) {
         notes: l.notes.trim() || undefined,
       };
     });
-    const parsed = journalEntrySchema.safeParse({ date, notes: notes.trim() || undefined, lines: mapped });
+    const parsed = journalEntrySchema.safeParse({
+      date,
+      notes: notes.trim() || undefined,
+      lines: mapped,
+    });
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message || t("accounting.unbalanced"));
       return;
@@ -116,7 +127,11 @@ export function JournalEntryForm({ onPosted }: { onPosted?: () => void }) {
         </div>
         <div className="space-y-1.5">
           <Label>{t("accounting.narration")}</Label>
-          <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder={t("common.notes")} />
+          <Input
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder={t("common.notes")}
+          />
         </div>
       </div>
 
@@ -135,11 +150,18 @@ export function JournalEntryForm({ onPosted }: { onPosted?: () => void }) {
             {lines.map((line) => (
               <tr key={line.key} className="border-b last:border-0">
                 <td className="px-2 py-2">
-                  <Select value={line.accountId || undefined} onValueChange={(v) => patch(line.key, { accountId: v })}>
-                    <SelectTrigger><SelectValue placeholder={t("accounting.selectAccount")} /></SelectTrigger>
+                  <Select
+                    value={line.accountId || undefined}
+                    onValueChange={(v) => patch(line.key, { accountId: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t("accounting.selectAccount")} />
+                    </SelectTrigger>
                     <SelectContent>
                       {opts.map((o) => (
-                        <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>
+                        <SelectItem key={o.id} value={o.id}>
+                          {o.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -151,7 +173,12 @@ export function JournalEntryForm({ onPosted }: { onPosted?: () => void }) {
                     step="0.01"
                     className="text-right"
                     value={line.debit}
-                    onChange={(e) => patch(line.key, { debit: e.target.value, credit: e.target.value ? "" : line.credit })}
+                    onChange={(e) =>
+                      patch(line.key, {
+                        debit: e.target.value,
+                        credit: e.target.value ? "" : line.credit,
+                      })
+                    }
                   />
                 </td>
                 <td className="px-2 py-2">
@@ -161,11 +188,19 @@ export function JournalEntryForm({ onPosted }: { onPosted?: () => void }) {
                     step="0.01"
                     className="text-right"
                     value={line.credit}
-                    onChange={(e) => patch(line.key, { credit: e.target.value, debit: e.target.value ? "" : line.debit })}
+                    onChange={(e) =>
+                      patch(line.key, {
+                        credit: e.target.value,
+                        debit: e.target.value ? "" : line.debit,
+                      })
+                    }
                   />
                 </td>
                 <td className="px-2 py-2">
-                  <Input value={line.notes} onChange={(e) => patch(line.key, { notes: e.target.value })} />
+                  <Input
+                    value={line.notes}
+                    onChange={(e) => patch(line.key, { notes: e.target.value })}
+                  />
                 </td>
                 <td className="px-1 py-2">
                   <Button
@@ -186,7 +221,10 @@ export function JournalEntryForm({ onPosted }: { onPosted?: () => void }) {
               <td className="px-3 py-2">{t("common.total")}</td>
               <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(totals.debit)}</td>
               <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(totals.credit)}</td>
-              <td colSpan={2} className={`px-3 py-2 text-xs ${balanced ? "text-emerald-600" : "text-destructive"}`}>
+              <td
+                colSpan={2}
+                className={`px-3 py-2 text-xs ${balanced ? "text-emerald-600" : "text-destructive"}`}
+              >
                 {t("accounting.difference")}: {formatCurrency(Math.abs(diff))}
               </td>
             </tr>
@@ -195,7 +233,12 @@ export function JournalEntryForm({ onPosted }: { onPosted?: () => void }) {
       </div>
 
       <div className="flex flex-wrap justify-between gap-2">
-        <Button type="button" size="sm" variant="outline" onClick={() => setLines((prev) => [...prev, newLine()])}>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => setLines((prev) => [...prev, newLine()])}
+        >
           <Plus className="mr-1 h-3 w-3" /> {t("accounting.addLine")}
         </Button>
         <Button type="button" onClick={submit} disabled={!balanced || post.isPending}>

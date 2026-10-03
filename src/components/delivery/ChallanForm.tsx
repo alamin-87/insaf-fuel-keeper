@@ -18,10 +18,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/common/PageHeader";
 import { useT } from "@/i18n";
@@ -37,11 +46,23 @@ export function ChallanForm({
   const navigate = useNavigate();
   const qc = useQueryClient();
   const editing = Boolean(id);
-  const { data: customers = [] } = useQuery({ queryKey: ["customers"], queryFn: customerService.list });
-  const { data: products = [] } = useQuery({ queryKey: ["products"], queryFn: productService.list });
+  const { data: customers = [] } = useQuery({
+    queryKey: ["customers"],
+    queryFn: customerService.list,
+  });
+  const { data: products = [] } = useQuery({
+    queryKey: ["products"],
+    queryFn: productService.list,
+  });
   const { data: sales = [] } = useQuery({ queryKey: ["sales"], queryFn: salesService.list });
-  const { data: deliveries = [] } = useQuery({ queryKey: ["deliveries"], queryFn: deliveryService.list });
-  const { data: employees = [] } = useQuery({ queryKey: ["employees"], queryFn: hrService.listEmployees });
+  const { data: deliveries = [] } = useQuery({
+    queryKey: ["deliveries"],
+    queryFn: deliveryService.list,
+  });
+  const { data: employees = [] } = useQuery({
+    queryKey: ["employees"],
+    queryFn: hrService.listEmployees,
+  });
   const { data: existing, isLoading } = useQuery({
     queryKey: ["deliveries", id],
     queryFn: () => deliveryService.get(id!),
@@ -129,23 +150,31 @@ export function ChallanForm({
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (editing && isLoading) return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
-  if (editing && !existing) return <div className="p-6 text-sm text-destructive">{t("deliveries.notFound")}</div>;
+  if (editing && isLoading)
+    return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
+  if (editing && !existing)
+    return <div className="p-6 text-sm text-destructive">{t("deliveries.notFound")}</div>;
   if (editing && existing && existing.status !== "pending") {
     return <div className="p-6 text-sm text-destructive">{t("deliveries.cannotEdit")}</div>;
   }
-  if (!hydrated) return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
+  if (!hydrated)
+    return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
 
   const lockItems = !!salesOrderId;
   const recentDocs = sales
     .filter((s) => s.status === "confirmed" || s.status === "invoiced" || s.status === "paid")
     .slice(0, 8);
   const selectedSo = sales.find((s) => s.id === salesOrderId);
-  const prevDeliveries = deliveries.filter((d) => d.salesOrderId && d.salesOrderId === salesOrderId);
+  const prevDeliveries = deliveries.filter(
+    (d) => d.salesOrderId && d.salesOrderId === salesOrderId,
+  );
 
   return (
     <div>
-      <PageHeader title={editing ? t("deliveries.editTitle") : t("deliveries.new")} backTo={editing ? { to: "/deliveries/$id", params: { id: id! } } : "/deliveries"} />
+      <PageHeader
+        title={editing ? t("deliveries.editTitle") : t("deliveries.new")}
+        backTo={editing ? { to: "/deliveries/$id", params: { id: id! } } : "/deliveries"}
+      />
       {!editing && recentDocs.length > 0 && (
         <Card className="mb-4">
           <CardContent className="pt-6">
@@ -166,142 +195,204 @@ export function ChallanForm({
           </CardContent>
         </Card>
       )}
-      <Card><CardContent className="pt-6 space-y-6">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <div className="space-y-1.5">
-            <Label>{t("sales.orderNo")}</Label>
-            <Select
-              value={salesOrderId || "__none"}
-              onValueChange={(v) => {
-                if (v === "__none") {
-                  setSalesOrderId("");
-                  return;
-                }
-                setSalesOrderId(v);
-              }}
-            >
-              <SelectTrigger><SelectValue placeholder={t("common.select")} /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none">—</SelectItem>
-                {openOrders.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>{s.orderNo} · {s.customerName}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>{t("common.customer")}</Label>
-            <Select value={customerId} onValueChange={setCustomerId} disabled={lockItems}>
-              <SelectTrigger><SelectValue placeholder={t("common.select")} /></SelectTrigger>
-              <SelectContent>
-                {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>{t("deliveries.deliveryman")}</Label>
-            {deliveryStaff.length > 0 ? (
-              <Select value={driverName} onValueChange={setDriverName}>
-                <SelectTrigger><SelectValue placeholder={t("common.select")} /></SelectTrigger>
+      <Card>
+        <CardContent className="pt-6 space-y-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="space-y-1.5">
+              <Label>{t("sales.orderNo")}</Label>
+              <Select
+                value={salesOrderId || "__none"}
+                onValueChange={(v) => {
+                  if (v === "__none") {
+                    setSalesOrderId("");
+                    return;
+                  }
+                  setSalesOrderId(v);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t("common.select")} />
+                </SelectTrigger>
                 <SelectContent>
-                  {deliveryStaff.map((e) => (
-                    <SelectItem key={e.id} value={e.name}>{e.name} · {e.designation}</SelectItem>
+                  <SelectItem value="__none">—</SelectItem>
+                  {openOrders.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.orderNo} · {s.customerName}
+                    </SelectItem>
                   ))}
-                  {driverName && !deliveryStaff.some((e) => e.name === driverName) && (
-                    <SelectItem value={driverName}>{driverName}</SelectItem>
-                  )}
                 </SelectContent>
               </Select>
-            ) : (
-              <Input value={driverName} onChange={(e) => setDriverName(e.target.value)} />
-            )}
-          </div>
-          <div className="space-y-1.5">
-            <Label>{t("deliveries.vehicle")}</Label>
-            <Input value={vehicleNo} onChange={(e) => setVehicleNo(e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>{t("deliveries.receiver")}</Label>
-            <Input value={receiverName} onChange={(e) => setReceiverName(e.target.value)} />
-          </div>
-        </div>
-        {selectedSo && (
-          <p className="text-xs text-muted-foreground">
-            {t("sales.invoice")} {selectedSo.orderNo}
-            {selectedSo.receiverName ? ` · ${t("sales.receiver")}: ${selectedSo.receiverName}` : ""}
-            {prevDeliveries.length > 0 ? ` · ${t("deliveries.prevDelivery")}: ${prevDeliveries.map((d) => d.challanNo).join(", ")}` : ""}
-          </p>
-        )}
-
-        <div>
-          <div className="mb-2">
-            <h3 className="text-sm font-semibold">{t("sales.item")}</h3>
-          </div>
-          <div className="overflow-hidden rounded-md border">
-            <div className="overflow-x-auto">
-            <Table>
-              <TableHeader><TableRow>
-                <TableHead>{t("common.product")}</TableHead>
-                <TableHead className="w-24 text-right">{t("common.quantity")}</TableHead>
-                <TableHead className="w-24 text-right">{t("deliveries.remaining")}</TableHead>
-                <TableHead className="w-10" />
-              </TableRow></TableHeader>
-              <TableBody>
-                {items.length === 0 && (
-                  <TableRow><TableCell colSpan={4} className="py-8 text-center text-sm text-muted-foreground">{t("common.noItems")}</TableCell></TableRow>
-                )}
-                {items.map((it, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell>
-                      <Select
-                        value={it.productId}
-                        disabled={lockItems}
-                        onValueChange={(v) => {
-                          const p = products.find((x) => x.id === v);
-                          if (p) setItems(items.map((x, i) => i === idx ? { ...x, productId: p.id, productName: p.name, price: p.price, taxRate: 0 } : x));
-                        }}
-                      >
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {products.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        min={1}
-                        value={it.quantity}
-                        disabled={lockItems}
-                        onChange={(e) => setItems(items.map((x, i) => i === idx ? { ...x, quantity: Number(e.target.value) } : x))}
-                        className="text-right"
-                      />
-                    </TableCell>
-                    <TableCell className="text-right text-xs text-muted-foreground">
-                      {selectedSo ? remainingOrderQty(selectedSo, deliveries, it.productId) : "—"}
-                    </TableCell>
-                    <TableCell>
-                      {!lockItems && (
-                        <Button size="icon" variant="ghost" onClick={() => setItems(items.filter((_, i) => i !== idx))}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t("common.customer")}</Label>
+              <Select value={customerId} onValueChange={setCustomerId} disabled={lockItems}>
+                <SelectTrigger>
+                  <SelectValue placeholder={t("common.select")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {customers.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t("deliveries.deliveryman")}</Label>
+              {deliveryStaff.length > 0 ? (
+                <Select value={driverName} onValueChange={setDriverName}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("common.select")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {deliveryStaff.map((e) => (
+                      <SelectItem key={e.id} value={e.name}>
+                        {e.name} · {e.designation}
+                      </SelectItem>
+                    ))}
+                    {driverName && !deliveryStaff.some((e) => e.name === driverName) && (
+                      <SelectItem value={driverName}>{driverName}</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input value={driverName} onChange={(e) => setDriverName(e.target.value)} />
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t("deliveries.vehicle")}</Label>
+              <Input value={vehicleNo} onChange={(e) => setVehicleNo(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>{t("deliveries.receiver")}</Label>
+              <Input value={receiverName} onChange={(e) => setReceiverName(e.target.value)} />
             </div>
           </div>
-        </div>
+          {selectedSo && (
+            <p className="text-xs text-muted-foreground">
+              {t("sales.invoice")} {selectedSo.orderNo}
+              {selectedSo.receiverName
+                ? ` · ${t("sales.receiver")}: ${selectedSo.receiverName}`
+                : ""}
+              {prevDeliveries.length > 0
+                ? ` · ${t("deliveries.prevDelivery")}: ${prevDeliveries.map((d) => d.challanNo).join(", ")}`
+                : ""}
+            </p>
+          )}
 
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => navigate({ to: "/deliveries" })}>{t("common.cancel")}</Button>
-          <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
-            {editing ? t("common.save") : t("common.create")}
-          </Button>
-        </div>
-      </CardContent></Card>
+          <div>
+            <div className="mb-2">
+              <h3 className="text-sm font-semibold">{t("sales.item")}</h3>
+            </div>
+            <div className="overflow-hidden rounded-md border">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t("common.product")}</TableHead>
+                      <TableHead className="w-24 text-right">{t("common.quantity")}</TableHead>
+                      <TableHead className="w-24 text-right">{t("deliveries.remaining")}</TableHead>
+                      <TableHead className="w-10" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items.length === 0 && (
+                      <TableRow>
+                        <TableCell
+                          colSpan={4}
+                          className="py-8 text-center text-sm text-muted-foreground"
+                        >
+                          {t("common.noItems")}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {items.map((it, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell>
+                          <Select
+                            value={it.productId}
+                            disabled={lockItems}
+                            onValueChange={(v) => {
+                              const p = products.find((x) => x.id === v);
+                              if (p)
+                                setItems(
+                                  items.map((x, i) =>
+                                    i === idx
+                                      ? {
+                                          ...x,
+                                          productId: p.id,
+                                          productName: p.name,
+                                          price: p.price,
+                                          taxRate: 0,
+                                        }
+                                      : x,
+                                  ),
+                                );
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {products.map((p) => (
+                                <SelectItem key={p.id} value={p.id}>
+                                  {p.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            min={1}
+                            value={it.quantity}
+                            disabled={lockItems}
+                            onChange={(e) =>
+                              setItems(
+                                items.map((x, i) =>
+                                  i === idx ? { ...x, quantity: Number(e.target.value) } : x,
+                                ),
+                              )
+                            }
+                            className="text-right"
+                          />
+                        </TableCell>
+                        <TableCell className="text-right text-xs text-muted-foreground">
+                          {selectedSo
+                            ? remainingOrderQty(selectedSo, deliveries, it.productId)
+                            : "—"}
+                        </TableCell>
+                        <TableCell>
+                          {!lockItems && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setItems(items.filter((_, i) => i !== idx))}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => navigate({ to: "/deliveries" })}>
+              {t("common.cancel")}
+            </Button>
+            <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
+              {editing ? t("common.save") : t("common.create")}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

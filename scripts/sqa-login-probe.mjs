@@ -7,7 +7,10 @@ const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 await page.goto(`${BASE}/login`, { waitUntil: "domcontentloaded" });
 await page.locator("[data-login-card]").first().click();
-await page.waitForURL((u) => !String(u.pathname).includes("/login"), { waitUntil: "commit", timeout: 60000 });
+await page.waitForURL((u) => !String(u.pathname).includes("/login"), {
+  waitUntil: "commit",
+  timeout: 60000,
+});
 await page.goto(`${BASE}/products/new`, { waitUntil: "networkidle" });
 const tag = `PRB${Date.now().toString(36)}`;
 await page.locator("form input:not([type=file])").nth(0).fill(tag);
@@ -16,7 +19,10 @@ await page.locator("[role=combobox]").nth(0).click();
 await page.getByRole("option", { name: "LPG" }).first().click();
 await page.keyboard.press("Escape");
 await page.locator("[role=combobox]").nth(1).click();
-await page.getByRole("option", { name: /Gas|গ্যাস/ }).first().click();
+await page
+  .getByRole("option", { name: /Gas|গ্যাস/ })
+  .first()
+  .click();
 await page.keyboard.press("Escape");
 await page.locator("[role=combobox]").nth(2).click();
 await page.getByRole("option", { name: "kg" }).click();

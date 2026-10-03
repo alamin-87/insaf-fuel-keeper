@@ -4,12 +4,14 @@ import type { PowerMatrix } from "./settings-store";
 export type { PowerMatrix };
 export type CylinderTrackingMethod = "quantity" | "lot" | "serial";
 
-export const getCylinderTrackingFn = createServerFn({ method: "POST" }).handler(async (): Promise<CylinderTrackingMethod> => {
-  const { requireUser } = await import("./session.server");
-  const { getCylinderTracking } = await import("./settings.server");
-  await requireUser();
-  return getCylinderTracking();
-});
+export const getCylinderTrackingFn = createServerFn({ method: "POST" }).handler(
+  async (): Promise<CylinderTrackingMethod> => {
+    const { requireUser } = await import("./session.server");
+    const { getCylinderTracking } = await import("./settings.server");
+    await requireUser();
+    return getCylinderTracking();
+  },
+);
 
 export const saveCylinderTrackingFn = createServerFn({ method: "POST" })
   .inputValidator((d: { method: CylinderTrackingMethod }) => d)
@@ -22,12 +24,14 @@ export const saveCylinderTrackingFn = createServerFn({ method: "POST" })
     return saveCylinderTracking(data.method);
   });
 
-export const getPowerMatrixFn = createServerFn({ method: "POST" }).handler(async (): Promise<PowerMatrix> => {
-  const { requireUser } = await import("./session.server");
-  const { getPowerMatrix } = await import("./settings.server");
-  await requireUser();
-  return getPowerMatrix();
-});
+export const getPowerMatrixFn = createServerFn({ method: "POST" }).handler(
+  async (): Promise<PowerMatrix> => {
+    const { requireUser } = await import("./session.server");
+    const { getPowerMatrix } = await import("./settings.server");
+    await requireUser();
+    return getPowerMatrix();
+  },
+);
 
 export const savePowerMatrixFn = createServerFn({ method: "POST" })
   .inputValidator((d: { matrix: PowerMatrix }) => d)
@@ -44,11 +48,13 @@ export const savePowerMatrixFn = createServerFn({ method: "POST" })
     }
   });
 
-export const resetPowerMatrixFn = createServerFn({ method: "POST" }).handler(async (): Promise<PowerMatrix> => {
-  const { requireUser } = await import("./session.server");
-  const { savePowerMatrixDoc } = await import("./settings.server");
-  const { defaultMatrix } = await import("./settings-store");
-  const user = await requireUser();
-  if (user.role !== "Administrator") throw new Error("Only Administrator can reset permissions");
-  return savePowerMatrixDoc(defaultMatrix());
-});
+export const resetPowerMatrixFn = createServerFn({ method: "POST" }).handler(
+  async (): Promise<PowerMatrix> => {
+    const { requireUser } = await import("./session.server");
+    const { savePowerMatrixDoc } = await import("./settings.server");
+    const { defaultMatrix } = await import("./settings-store");
+    const user = await requireUser();
+    if (user.role !== "Administrator") throw new Error("Only Administrator can reset permissions");
+    return savePowerMatrixDoc(defaultMatrix());
+  },
+);

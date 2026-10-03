@@ -1,8 +1,19 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type {
-  Account, BusinessAsset, CostLayer, Customer, Expense, LedgerEntry,
-  PayrollRun, Product, PurchaseOrder, SalesOrder, StockMovement, Supplier, Voucher,
+  Account,
+  BusinessAsset,
+  CostLayer,
+  Customer,
+  Expense,
+  LedgerEntry,
+  PayrollRun,
+  Product,
+  PurchaseOrder,
+  SalesOrder,
+  StockMovement,
+  Supplier,
+  Voucher,
 } from "../src/types/index.ts";
 import {
   allocatePaymentAcrossInvoices,
@@ -55,7 +66,11 @@ describe("Phase 2 Accounting, AR, AP, VAT, COGS, GL, Equity & Balance Sheet Test
       status: "invoiced",
     };
 
-    const { rows, totalDue, totalInvoiced } = computeCustomerReceivables([mockCustomer], [sale], []);
+    const { rows, totalDue, totalInvoiced } = computeCustomerReceivables(
+      [mockCustomer],
+      [sale],
+      [],
+    );
     assert.strictEqual(rows.length, 1);
     assert.strictEqual(totalInvoiced, 14700);
     // Opening 10000 + Invoiced 14700 = 24700
@@ -95,7 +110,11 @@ describe("Phase 2 Accounting, AR, AP, VAT, COGS, GL, Equity & Balance Sheet Test
       createdAt: "2026-02-01T11:00:00.000Z",
     };
 
-    const { rows, totalDue, totalCollected } = computeCustomerReceivables([mockCustomer], [sale], [voucher]);
+    const { rows, totalDue, totalCollected } = computeCustomerReceivables(
+      [mockCustomer],
+      [sale],
+      [voucher],
+    );
     assert.strictEqual(totalCollected, 14700);
     // Opening 10000 + Invoiced 14700 - Collected 14700 = 10000 (opening remains due)
     assert.strictEqual(totalDue, 10000);
@@ -183,7 +202,11 @@ describe("Phase 2 Accounting, AR, AP, VAT, COGS, GL, Equity & Balance Sheet Test
       status: "cancelled",
     };
 
-    const { totalDue, totalInvoiced } = computeCustomerReceivables([mockCustomer], [cancelledSale], []);
+    const { totalDue, totalInvoiced } = computeCustomerReceivables(
+      [mockCustomer],
+      [cancelledSale],
+      [],
+    );
     assert.strictEqual(totalInvoiced, 0);
     assert.strictEqual(totalDue, 10000);
   });
@@ -219,7 +242,11 @@ describe("Phase 2 Accounting, AR, AP, VAT, COGS, GL, Equity & Balance Sheet Test
       createdAt: "2026-02-01",
     };
 
-    const { rows, totalDue, totalBilled, totalPaid } = computeSupplierPayables([mockSupplier], [po], [voucher]);
+    const { rows, totalDue, totalBilled, totalPaid } = computeSupplierPayables(
+      [mockSupplier],
+      [po],
+      [voucher],
+    );
     assert.strictEqual(totalBilled, 50400);
     assert.strictEqual(totalPaid, 50000);
     // Opening 50000 + Billed 50400 - Paid 50000 = 50400
@@ -230,10 +257,58 @@ describe("Phase 2 Accounting, AR, AP, VAT, COGS, GL, Equity & Balance Sheet Test
   // Test 7: VAT creates liability
   it("7. Output VAT is recorded as liability and separated from net revenue", () => {
     const sales: SalesOrder[] = [
-      { id: "s1", orderNo: "SO-1", customerId: "c1", customerName: "C1", date: "2026-02-01", items: [], subtotal: 33600, tax: 1680, total: 35280, paid: 35280, status: "paid" },
-      { id: "s2", orderNo: "SO-2", customerId: "c2", customerName: "C2", date: "2026-02-01", items: [], subtotal: 10200, tax: 1224, total: 11424, paid: 0, status: "invoiced" },
-      { id: "s3", orderNo: "SO-3", customerId: "c3", customerName: "C3", date: "2026-02-01", items: [], subtotal: 4600, tax: 690, total: 5290, paid: 5290, status: "paid" },
-      { id: "s4", orderNo: "SO-4", customerId: "c4", customerName: "C4", date: "2026-02-01", items: [], subtotal: 8700, tax: 435, total: 9135, paid: 0, status: "confirmed" },
+      {
+        id: "s1",
+        orderNo: "SO-1",
+        customerId: "c1",
+        customerName: "C1",
+        date: "2026-02-01",
+        items: [],
+        subtotal: 33600,
+        tax: 1680,
+        total: 35280,
+        paid: 35280,
+        status: "paid",
+      },
+      {
+        id: "s2",
+        orderNo: "SO-2",
+        customerId: "c2",
+        customerName: "C2",
+        date: "2026-02-01",
+        items: [],
+        subtotal: 10200,
+        tax: 1224,
+        total: 11424,
+        paid: 0,
+        status: "invoiced",
+      },
+      {
+        id: "s3",
+        orderNo: "SO-3",
+        customerId: "c3",
+        customerName: "C3",
+        date: "2026-02-01",
+        items: [],
+        subtotal: 4600,
+        tax: 690,
+        total: 5290,
+        paid: 5290,
+        status: "paid",
+      },
+      {
+        id: "s4",
+        orderNo: "SO-4",
+        customerId: "c4",
+        customerName: "C4",
+        date: "2026-02-01",
+        items: [],
+        subtotal: 8700,
+        tax: 435,
+        total: 9135,
+        paid: 0,
+        status: "confirmed",
+      },
     ];
 
     const { totalOutputTax, netSales, grossSales } = computeOutputVatLiability(sales);
@@ -262,7 +337,10 @@ describe("Phase 2 Accounting, AR, AP, VAT, COGS, GL, Equity & Balance Sheet Test
       { id: "l1", productId: "p1", qtyRemaining: 10, unitCost: 100, receivedAt: "2026-01-01" },
       { id: "l2", productId: "p1", qtyRemaining: 10, unitCost: 300, receivedAt: "2026-01-02" },
     ];
-    const initialValuation = initialLayers.reduce((s, l) => s + (l.qtyRemaining || 0) * (l.unitCost || 0), 0); // 1000 + 3000 = 4000
+    const initialValuation = initialLayers.reduce(
+      (s, l) => s + (l.qtyRemaining || 0) * (l.unitCost || 0),
+      0,
+    ); // 1000 + 3000 = 4000
     assert.strictEqual(initialValuation, 4000);
 
     const { cogsAmount, updatedLayers } = consumeCostLayers(initialLayers, 10, "fifo"); // 10 @ 100 = 1000
@@ -273,19 +351,50 @@ describe("Phase 2 Accounting, AR, AP, VAT, COGS, GL, Equity & Balance Sheet Test
       const u = updatedLayers.find((x) => x.id === l.id);
       return u ? { ...l, qtyRemaining: u.qtyRemaining } : l;
     });
-    const remainingValuation = finalLayers.reduce((s, l) => s + (l.qtyRemaining || 0) * (l.unitCost || 0), 0);
+    const remainingValuation = finalLayers.reduce(
+      (s, l) => s + (l.qtyRemaining || 0) * (l.unitCost || 0),
+      0,
+    );
     assert.strictEqual(remainingValuation, 3000);
     assert.strictEqual(initialValuation - cogsAmount, remainingValuation);
   });
 
   // Test 10: Capital comes from real equity ledger
   it("10. Capital is derived from real equity accounts rather than residual plug", () => {
-    const p1: Product = { id: "p1", code: "P1", name: "LPG 12kg", category: "LPG", uom: "cyl", price: 1400, cost: 1200, stock: 10, reorderLevel: 5, createdAt: "2026-01-01" };
-    const layers: CostLayer[] = [{ id: "cl-1", productId: "p1", qtyRemaining: 10, unitCost: 1200, receivedAt: "2026-01-01" }];
-    const asset: BusinessAsset = { id: "a1", name: "Truck", category: "Vehicles", purchaseDate: "2026-01-01", purchaseCost: 100000, currentValue: 100000, createdAt: "2026-01-01" };
+    const p1: Product = {
+      id: "p1",
+      code: "P1",
+      name: "LPG 12kg",
+      category: "LPG",
+      uom: "cyl",
+      price: 1400,
+      cost: 1200,
+      stock: 10,
+      reorderLevel: 5,
+      createdAt: "2026-01-01",
+    };
+    const layers: CostLayer[] = [
+      { id: "cl-1", productId: "p1", qtyRemaining: 10, unitCost: 1200, receivedAt: "2026-01-01" },
+    ];
+    const asset: BusinessAsset = {
+      id: "a1",
+      name: "Truck",
+      category: "Vehicles",
+      purchaseDate: "2026-01-01",
+      purchaseCost: 100000,
+      currentValue: 100000,
+      createdAt: "2026-01-01",
+    };
 
     const ledger: LedgerEntry[] = [
-      { id: "l1", date: "2026-01-01", account: "cash", direction: "in", amount: 50000, category: "opening" },
+      {
+        id: "l1",
+        date: "2026-01-01",
+        account: "cash",
+        direction: "in",
+        amount: 50000,
+        category: "opening",
+      },
     ];
 
     const bs = computeBalanceSheet({
@@ -310,16 +419,66 @@ describe("Phase 2 Accounting, AR, AP, VAT, COGS, GL, Equity & Balance Sheet Test
 
   // Test 11: Balance sheet balances without a plug
   it("11. Balance Sheet satisfies Assets = Liabilities + Equity exactly", () => {
-    const p: Product = { id: "p1", code: "P1", name: "LPG", category: "LPG", uom: "cyl", price: 1400, cost: 1000, stock: 20, reorderLevel: 5, createdAt: "2026-01-01" };
-    const layers: CostLayer[] = [{ id: "cl-1", productId: "p1", qtyRemaining: 20, unitCost: 1000, receivedAt: "2026-01-01" }];
-    const asset: BusinessAsset = { id: "a1", name: "Van", category: "Vehicles", purchaseDate: "2026-01-01", purchaseCost: 50000, currentValue: 50000, createdAt: "2026-01-01" };
+    const p: Product = {
+      id: "p1",
+      code: "P1",
+      name: "LPG",
+      category: "LPG",
+      uom: "cyl",
+      price: 1400,
+      cost: 1000,
+      stock: 20,
+      reorderLevel: 5,
+      createdAt: "2026-01-01",
+    };
+    const layers: CostLayer[] = [
+      { id: "cl-1", productId: "p1", qtyRemaining: 20, unitCost: 1000, receivedAt: "2026-01-01" },
+    ];
+    const asset: BusinessAsset = {
+      id: "a1",
+      name: "Van",
+      category: "Vehicles",
+      purchaseDate: "2026-01-01",
+      purchaseCost: 50000,
+      currentValue: 50000,
+      createdAt: "2026-01-01",
+    };
 
-    const cust: Customer = { id: "c1", name: "C1", phone: "", address: "", openingBalance: 15000, openingBalanceType: "receivable", createdAt: "2026-01-01" };
-    const supp: Supplier = { id: "s1", name: "S1", phone: "", address: "", openingBalance: 25000, createdAt: "2026-01-01" };
+    const cust: Customer = {
+      id: "c1",
+      name: "C1",
+      phone: "",
+      address: "",
+      openingBalance: 15000,
+      openingBalanceType: "receivable",
+      createdAt: "2026-01-01",
+    };
+    const supp: Supplier = {
+      id: "s1",
+      name: "S1",
+      phone: "",
+      address: "",
+      openingBalance: 25000,
+      createdAt: "2026-01-01",
+    };
 
     const ledger: LedgerEntry[] = [
-      { id: "l1", date: "2026-01-01", account: "cash", direction: "in", amount: 40000, category: "opening" },
-      { id: "l2", date: "2026-01-01", account: "bank", direction: "in", amount: 60000, category: "opening" },
+      {
+        id: "l1",
+        date: "2026-01-01",
+        account: "cash",
+        direction: "in",
+        amount: 40000,
+        category: "opening",
+      },
+      {
+        id: "l2",
+        date: "2026-01-01",
+        account: "bank",
+        direction: "in",
+        amount: 60000,
+        category: "opening",
+      },
     ];
 
     // Total Assets = Cash 40000 + Bank 60000 + AR 15000 + Inv 20000 + Fixed 50000 = 185000
@@ -407,8 +566,32 @@ describe("Phase 2 Accounting, AR, AP, VAT, COGS, GL, Equity & Balance Sheet Test
 
   // Test 13: Date filters are correct
   it("13. Date filters properly separate period activity from outside transactions", () => {
-    const saleOld: SalesOrder = { id: "s-old", orderNo: "SO-OLD", customerId: "c1", customerName: "C1", date: "2026-01-10", items: [], subtotal: 10000, tax: 0, total: 10000, paid: 10000, status: "paid" };
-    const saleCurrent: SalesOrder = { id: "s-cur", orderNo: "SO-CUR", customerId: "c1", customerName: "C1", date: "2026-02-15", items: [], subtotal: 20000, tax: 0, total: 20000, paid: 20000, status: "paid" };
+    const saleOld: SalesOrder = {
+      id: "s-old",
+      orderNo: "SO-OLD",
+      customerId: "c1",
+      customerName: "C1",
+      date: "2026-01-10",
+      items: [],
+      subtotal: 10000,
+      tax: 0,
+      total: 10000,
+      paid: 10000,
+      status: "paid",
+    };
+    const saleCurrent: SalesOrder = {
+      id: "s-cur",
+      orderNo: "SO-CUR",
+      customerId: "c1",
+      customerName: "C1",
+      date: "2026-02-15",
+      items: [],
+      subtotal: 20000,
+      tax: 0,
+      total: 20000,
+      paid: 20000,
+      status: "paid",
+    };
 
     const pnlFeb = computeProfitAndLoss({
       sales: [saleOld, saleCurrent],
@@ -423,8 +606,20 @@ describe("Phase 2 Accounting, AR, AP, VAT, COGS, GL, Equity & Balance Sheet Test
   // Test 14: Cash/bank balances reconcile
   it("14. Cash and bank accounts accurately classify and balance", () => {
     const namedAccounts: Account[] = [
-      { id: "acc1", name: "Dutch Bangla Bank", type: "bank", accountNo: "123", createdAt: "2026-01-01" },
-      { id: "acc2", name: "bKash Merchant", type: "mobile", accountNo: "017", createdAt: "2026-01-01" },
+      {
+        id: "acc1",
+        name: "Dutch Bangla Bank",
+        type: "bank",
+        accountNo: "123",
+        createdAt: "2026-01-01",
+      },
+      {
+        id: "acc2",
+        name: "bKash Merchant",
+        type: "mobile",
+        accountNo: "017",
+        createdAt: "2026-01-01",
+      },
     ];
 
     assert.strictEqual(isBankBookAccount("bank", namedAccounts), true);
@@ -442,7 +637,7 @@ describe("Phase 2 Accounting, AR, AP, VAT, COGS, GL, Equity & Balance Sheet Test
     const val2 = roundMoney(1234.567);
     assert.strictEqual(val2, 1234.57);
 
-    const val3 = roundMoney(57100.25 + 4029.50);
+    const val3 = roundMoney(57100.25 + 4029.5);
     assert.strictEqual(val3, 61129.75);
   });
 });

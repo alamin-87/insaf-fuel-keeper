@@ -11,24 +11,43 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { useT, type MessageKey } from "@/i18n";
 import { BG_THEMES, useThemeSettings } from "@/lib/theme";
 import {
-  APP_MODULES, APP_ROLES, defaultMatrix,
-  type AppModule, type AppRole,
+  APP_MODULES,
+  APP_ROLES,
+  defaultMatrix,
+  type AppModule,
+  type AppRole,
 } from "@/lib/settings-store";
 import {
-  getCylinderTrackingFn, resetPowerMatrixFn, saveCylinderTrackingFn, savePowerMatrixFn,
-  type CylinderTrackingMethod, type PowerMatrix,
+  getCylinderTrackingFn,
+  resetPowerMatrixFn,
+  saveCylinderTrackingFn,
+  savePowerMatrixFn,
+  type CylinderTrackingMethod,
+  type PowerMatrix,
 } from "@/lib/settings.functions";
 import { usePowerMatrix } from "@/hooks/useModuleAccess";
 import {
-  listAppUsersFn, removeAppUserFn, upsertAppUserFn, type PublicAppUser,
+  listAppUsersFn,
+  removeAppUserFn,
+  upsertAppUserFn,
+  type PublicAppUser,
 } from "@/lib/users.functions";
 import { savePowerMatrix as cachePowerMatrix } from "@/lib/settings-store";
 import { cn } from "@/lib/utils";
@@ -73,14 +92,8 @@ export function SettingsPage() {
     }
   }, [serverMatrix]);
 
-  const savedBaseline = useMemo(
-    () => serverMatrix ?? defaultMatrix(),
-    [serverMatrix],
-  );
-  const dirty = useMemo(
-    () => !matricesEqual(matrix, savedBaseline),
-    [matrix, savedBaseline],
-  );
+  const savedBaseline = useMemo(() => serverMatrix ?? defaultMatrix(), [serverMatrix]);
+  const dirty = useMemo(() => !matricesEqual(matrix, savedBaseline), [matrix, savedBaseline]);
 
   const saveMatrix = useMutation({
     mutationFn: () => savePowerMatrixFn({ data: { matrix } }),
@@ -203,7 +216,9 @@ export function SettingsPage() {
                     }}
                     className={cn(
                       "overflow-hidden rounded-xl border text-left transition",
-                      theme.bgTheme === item.id ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-primary/40",
+                      theme.bgTheme === item.id
+                        ? "border-primary ring-2 ring-primary/30"
+                        : "border-border hover:border-primary/40",
                     )}
                   >
                     <div className={cn("h-16 bg-gradient-to-br", item.preview)} />
@@ -232,7 +247,9 @@ export function SettingsPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <Label className="text-sm font-semibold">{t("settings.transparent")}</Label>
-                    <p className="mt-1 text-xs text-muted-foreground">{t("settings.transparentHint")}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {t("settings.transparentHint")}
+                    </p>
                   </div>
                   <Switch
                     checked={theme.transparentPanels}
@@ -261,14 +278,20 @@ export function SettingsPage() {
           <Card>
             <CardContent className="space-y-3 pt-6">
               <div>
-                <h3 className="font-display text-base font-semibold">{t("settings.cylTracking")}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{t("settings.cylTrackingHint")}</p>
+                <h3 className="font-display text-base font-semibold">
+                  {t("settings.cylTracking")}
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {t("settings.cylTrackingHint")}
+                </p>
               </div>
               <Select
                 value={tracking}
                 onValueChange={(v) => saveTracking.mutate(v as CylinderTrackingMethod)}
               >
-                <SelectTrigger className="max-w-sm"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="max-w-sm">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="quantity">{t("settings.track.quantity")}</SelectItem>
                   <SelectItem value="lot">{t("settings.track.lot")}</SelectItem>
@@ -299,7 +322,11 @@ export function SettingsPage() {
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-1.5">
                   <Label>{t("settings.username")}</Label>
-                  <Input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="off" />
+                  <Input
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    autoComplete="off"
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label>{t("settings.displayName")}</Label>
@@ -308,14 +335,23 @@ export function SettingsPage() {
                 <div className="space-y-1.5">
                   <Label>{t("settings.role")}</Label>
                   <Select value={role} onValueChange={(v) => setRole(v as AppRole)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
-                      {APP_ROLES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                      {APP_ROLES.map((r) => (
+                        <SelectItem key={r} value={r}>
+                          {r}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>{t("settings.password")}{editingId ? ` (${t("settings.passwordKeep")})` : ""}</Label>
+                  <Label>
+                    {t("settings.password")}
+                    {editingId ? ` (${t("settings.passwordKeep")})` : ""}
+                  </Label>
                   <Input
                     type="password"
                     value={password}
@@ -327,7 +363,9 @@ export function SettingsPage() {
                 <div className="flex items-end gap-3">
                   <div className="flex items-center gap-2 pb-2">
                     <Switch checked={active} onCheckedChange={setActive} id="user-active" />
-                    <Label htmlFor="user-active">{active ? t("common.active") : t("common.inactive")}</Label>
+                    <Label htmlFor="user-active">
+                      {active ? t("common.active") : t("common.inactive")}
+                    </Label>
                   </div>
                 </div>
                 <div className="flex items-end">
@@ -366,22 +404,33 @@ export function SettingsPage() {
                   <TableBody>
                     {usersLoading ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
+                        <TableCell
+                          colSpan={5}
+                          className="py-8 text-center text-sm text-muted-foreground"
+                        >
                           {t("common.loading")}
                         </TableCell>
                       </TableRow>
                     ) : users.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
+                        <TableCell
+                          colSpan={5}
+                          className="py-8 text-center text-sm text-muted-foreground"
+                        >
                           {t("common.noRecords")}
                         </TableCell>
                       </TableRow>
                     ) : (
                       users.map((u) => (
-                        <TableRow key={u.id} className={editingId === u.id ? "bg-primary/5" : undefined}>
+                        <TableRow
+                          key={u.id}
+                          className={editingId === u.id ? "bg-primary/5" : undefined}
+                        >
                           <TableCell className="font-mono text-xs">{u.username}</TableCell>
                           <TableCell className="font-medium">{u.displayName}</TableCell>
-                          <TableCell><Badge variant="secondary">{u.role}</Badge></TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{u.role}</Badge>
+                          </TableCell>
                           <TableCell>
                             <Badge variant={u.active ? "default" : "outline"}>
                               {u.active ? t("common.active") : t("common.inactive")}
@@ -429,7 +478,9 @@ export function SettingsPage() {
             <CardContent className="space-y-4 pt-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <h3 className="font-display text-base font-semibold">{t("settings.powerTitle")}</h3>
+                  <h3 className="font-display text-base font-semibold">
+                    {t("settings.powerTitle")}
+                  </h3>
                   <p className="mt-1 text-sm text-muted-foreground">{t("settings.powerHint")}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -463,22 +514,30 @@ export function SettingsPage() {
               </div>
 
               {matrixLoading ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">{t("common.loading")}</p>
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  {t("common.loading")}
+                </p>
               ) : (
                 <div className="overflow-x-auto rounded-lg border">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="sticky left-0 z-10 bg-card min-w-36">{t("settings.module")}</TableHead>
+                        <TableHead className="sticky left-0 z-10 bg-card min-w-36">
+                          {t("settings.module")}
+                        </TableHead>
                         {APP_ROLES.map((r) => (
-                          <TableHead key={r} className="min-w-24 text-center text-[11px]">{r}</TableHead>
+                          <TableHead key={r} className="min-w-24 text-center text-[11px]">
+                            {r}
+                          </TableHead>
                         ))}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {APP_MODULES.map((mod) => (
                         <TableRow key={mod.id}>
-                          <TableCell className="sticky left-0 z-10 bg-card font-medium">{mod.label}</TableCell>
+                          <TableCell className="sticky left-0 z-10 bg-card font-medium">
+                            {mod.label}
+                          </TableCell>
                           {APP_ROLES.map((r) => (
                             <TableCell key={r} className="text-center">
                               <input
@@ -498,7 +557,9 @@ export function SettingsPage() {
                 </div>
               )}
               {dirty && (
-                <p className="text-xs text-amber-700 dark:text-amber-400">{t("settings.matrixDirty")}</p>
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  {t("settings.matrixDirty")}
+                </p>
               )}
             </CardContent>
           </Card>

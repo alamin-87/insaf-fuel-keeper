@@ -3,7 +3,7 @@ const inMemoryCounters: Record<string, number> = {};
 export async function getNextSequence(
   dbOrNull: any,
   prefix: string,
-  year?: number
+  year?: number,
 ): Promise<string> {
   const currentYear = year || new Date().getFullYear();
   const counterKey = `${prefix.toUpperCase()}-${currentYear}`;
@@ -14,7 +14,7 @@ export async function getNextSequence(
       const result = await counters.findOneAndUpdate(
         { _id: counterKey },
         { $inc: { seq: 1 } },
-        { upsert: true, returnDocument: "after" }
+        { upsert: true, returnDocument: "after" },
       );
       const doc = (result as { value?: { seq: number } } | null)?.value ?? result;
       const seq = doc?.seq || 1;

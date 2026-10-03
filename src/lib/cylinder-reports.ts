@@ -53,7 +53,8 @@ function purposeOf(m: CylinderMovement) {
   if (m.type === "lost") return "lost";
   if (m.type === "damaged") return "damaged";
   if (m.type === "transferred" && m.supplierId) return "refill_sent";
-  if ((m.type === "refilled" || m.type === "received" || m.type === "returned") && m.supplierId) return "refill_return";
+  if ((m.type === "refilled" || m.type === "received" || m.type === "returned") && m.supplierId)
+    return "refill_return";
   if (m.type === "returned") return "return";
   if (m.type === "issued") return "sent";
   return m.type;
@@ -114,23 +115,37 @@ export function buildCylinderOverdueRows(opts: {
   const rows: CylinderOverdueRow[] = [];
 
   for (const c of cylinders) {
-    if (c.status === "lost" || c.status === "damaged" || c.status === "scrapped" || c.status === "written_off" || c.status === "stock_out" || c.ownedBy === "customer") continue;
+    if (
+      c.status === "lost" ||
+      c.status === "damaged" ||
+      c.status === "scrapped" ||
+      c.status === "written_off" ||
+      c.status === "stock_out" ||
+      c.ownedBy === "customer"
+    )
+      continue;
     const heldCustomer = c.status === "at_customer" && c.customerId;
     const heldSupplier = c.supplierId && c.status !== "at_customer";
     if (!heldCustomer && !heldSupplier) continue;
     const kind: PartyCylinderKind = heldCustomer ? "customer" : "supplier";
     const partyId = heldCustomer ? c.customerId! : c.supplierId!;
     const last = movements
-      .filter((m) => m.cylinderId === c.id && m.expectedReturnAt && (kind === "customer" ? m.customerId === partyId : m.supplierId === partyId))
+      .filter(
+        (m) =>
+          m.cylinderId === c.id &&
+          m.expectedReturnAt &&
+          (kind === "customer" ? m.customerId === partyId : m.supplierId === partyId),
+      )
       .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
       .at(-1);
     if (!last?.expectedReturnAt) continue;
     const due = new Date(last.expectedReturnAt).getTime();
     if (Number.isNaN(due) || due >= now) continue;
     const days = Math.floor((now - due) / 86_400_000);
-    const party = kind === "customer"
-      ? customers.find((x) => x.id === partyId)?.name || "Customer"
-      : suppliers.find((x) => x.id === partyId)?.name || "Supplier";
+    const party =
+      kind === "customer"
+        ? customers.find((x) => x.id === partyId)?.name || "Customer"
+        : suppliers.find((x) => x.id === partyId)?.name || "Supplier";
     rows.push({
       id: `${c.id}-${last.id}`,
       party,

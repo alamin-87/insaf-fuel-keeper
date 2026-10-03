@@ -12,10 +12,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { formatCurrency } from "@/utils/formatters";
 import type { Employee, PayrollRun } from "@/types";
@@ -39,8 +47,14 @@ export function EmployeeRoster() {
   const t = useT();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { data: employees = [] } = useQuery({ queryKey: ["employees"], queryFn: hrService.listEmployees });
-  const { data: payroll = [] } = useQuery({ queryKey: ["payroll"], queryFn: hrService.listPayroll });
+  const { data: employees = [] } = useQuery({
+    queryKey: ["employees"],
+    queryFn: hrService.listEmployees,
+  });
+  const { data: payroll = [] } = useQuery({
+    queryKey: ["payroll"],
+    queryFn: hrService.listPayroll,
+  });
   const [open, setOpen] = useState(false);
   const [emp, setEmp] = useState<Employee | null>(null);
   const [name, setName] = useState("");
@@ -52,7 +66,10 @@ export function EmployeeRoster() {
   const [payStatus, setPayStatus] = useState<"paid" | "pending">("pending");
 
   const roles = useMemo(
-    () => Array.from(new Set([...DESIGNATION_PRESETS, ...employees.map((e) => e.designation).filter(Boolean)])),
+    () =>
+      Array.from(
+        new Set([...DESIGNATION_PRESETS, ...employees.map((e) => e.designation).filter(Boolean)]),
+      ),
     [employees],
   );
 
@@ -127,9 +144,28 @@ export function EmployeeRoster() {
         dateKey="createdAt"
         onRowClick={(r) => navigate({ to: "/hr/$id", params: { id: r.id } })}
         columns={[
-          { key: "name", header: t("common.name"), sortable: true, sortValue: (r) => r.name, render: (r) => <PartyNameLink kind="employee" id={r.id} name={r.name} /> },
-          { key: "role", header: t("hr.role"), sortable: true, sortValue: (r) => r.designation, render: (r) => r.designation },
-          { key: "sal", header: t("hr.basicSalary"), sortable: true, sortValue: (r) => r.salary, render: (r) => formatCurrency(r.salary), className: "text-right" },
+          {
+            key: "name",
+            header: t("common.name"),
+            sortable: true,
+            sortValue: (r) => r.name,
+            render: (r) => <PartyNameLink kind="employee" id={r.id} name={r.name} />,
+          },
+          {
+            key: "role",
+            header: t("hr.role"),
+            sortable: true,
+            sortValue: (r) => r.designation,
+            render: (r) => r.designation,
+          },
+          {
+            key: "sal",
+            header: t("hr.basicSalary"),
+            sortable: true,
+            sortValue: (r) => r.salary,
+            render: (r) => formatCurrency(r.salary),
+            className: "text-right",
+          },
           {
             key: "comm",
             header: t("hr.perDelivery"),
@@ -167,7 +203,11 @@ export function EmployeeRoster() {
             header: t("hr.payStatus"),
             render: (r) => {
               const paid = paySnapshot(r, payroll).payStatus === "paid";
-              return <Badge variant={paid ? "default" : "secondary"}>{paid ? t("status.paid") : t("status.pending")}</Badge>;
+              return (
+                <Badge variant={paid ? "default" : "secondary"}>
+                  {paid ? t("status.paid") : t("status.pending")}
+                </Badge>
+              );
             },
           },
           {
@@ -178,11 +218,13 @@ export function EmployeeRoster() {
               <RowActions
                 onView={() => navigate({ to: "/hr/$id", params: { id: r.id } })}
                 onEdit={() => startEdit(r)}
-                extras={[{
-                  label: t("hr.statement"),
-                  icon: <FileText className="h-3.5 w-3.5" />,
-                  onClick: () => navigate({ to: "/hr/$id/statement", params: { id: r.id } }),
-                }]}
+                extras={[
+                  {
+                    label: t("hr.statement"),
+                    icon: <FileText className="h-3.5 w-3.5" />,
+                    onClick: () => navigate({ to: "/hr/$id/statement", params: { id: r.id } }),
+                  },
+                ]}
               />
             ),
           },
@@ -202,16 +244,28 @@ export function EmployeeRoster() {
             <div className="space-y-1.5">
               <Label>{t("hr.role")}</Label>
               <Select value={role} onValueChange={setRole}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  {roles.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                  {roles.map((d) => (
+                    <SelectItem key={d} value={d}>
+                      {d}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
               <Label>{t("hr.payStatus")}</Label>
-              <Select value={payStatus} onValueChange={(v) => setPayStatus(v as "paid" | "pending")} disabled={emp ? paySnapshot(emp, payroll).payStatus === "paid" : false}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select
+                value={payStatus}
+                onValueChange={(v) => setPayStatus(v as "paid" | "pending")}
+                disabled={emp ? paySnapshot(emp, payroll).payStatus === "paid" : false}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="pending">{t("status.pending")}</SelectItem>
                   <SelectItem value="paid">{t("status.paid")}</SelectItem>
@@ -220,24 +274,50 @@ export function EmployeeRoster() {
             </div>
             <div className="space-y-1.5">
               <Label>{t("hr.basicSalary")}</Label>
-              <Input type="number" min={0} value={salary} onChange={(e) => setSalary(e.target.value)} />
+              <Input
+                type="number"
+                min={0}
+                value={salary}
+                onChange={(e) => setSalary(e.target.value)}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>{t("hr.perDelivery")}</Label>
-              <Input type="number" min={0} value={commission} onChange={(e) => setCommission(e.target.value)} />
+              <Input
+                type="number"
+                min={0}
+                value={commission}
+                onChange={(e) => setCommission(e.target.value)}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>{t("hr.bonus")}</Label>
-              <Input type="number" min={0} value={bonus} onChange={(e) => setBonus(e.target.value)} disabled={emp ? paySnapshot(emp, payroll).payStatus === "paid" : false} />
+              <Input
+                type="number"
+                min={0}
+                value={bonus}
+                onChange={(e) => setBonus(e.target.value)}
+                disabled={emp ? paySnapshot(emp, payroll).payStatus === "paid" : false}
+              />
             </div>
             <div className="space-y-1.5 sm:col-span-2">
               <Label>{t("hr.deduction")}</Label>
-              <Input type="number" min={0} value={deduction} onChange={(e) => setDeduction(e.target.value)} disabled={emp ? paySnapshot(emp, payroll).payStatus === "paid" : false} />
+              <Input
+                type="number"
+                min={0}
+                value={deduction}
+                onChange={(e) => setDeduction(e.target.value)}
+                disabled={emp ? paySnapshot(emp, payroll).payStatus === "paid" : false}
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>{t("common.cancel")}</Button>
-            <Button type="button" disabled={save.isPending} onClick={() => save.mutate()}>{t("common.save")}</Button>
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button type="button" disabled={save.isPending} onClick={() => save.mutate()}>
+              {t("common.save")}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

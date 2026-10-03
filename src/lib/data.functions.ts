@@ -5,8 +5,20 @@ import { issueLockExpiredBefore } from "./cylinder-lock";
 import { isKnownCrudCollection, modulesForCrud } from "./crud-access";
 import { normalizeSerialKey, trackingEnforcesSerialUnique } from "./cylinder-serial";
 import type {
-  Customer, Supplier, Product, SalesOrder, DashboardStats, StockAlert,
-  Expense, LedgerEntry, Cylinder, PurchaseOrder, Voucher, Account, Delivery,
+  Customer,
+  Supplier,
+  Product,
+  SalesOrder,
+  DashboardStats,
+  StockAlert,
+  Expense,
+  LedgerEntry,
+  Cylinder,
+  PurchaseOrder,
+  Voucher,
+  Account,
+  Delivery,
+  StockMovement,
 } from "@/types";
 import { isBankBookAccount, isCashBookAccount } from "@/lib/money-accounts";
 import { creditReminderNotice, customerOpeningSigned } from "@/lib/customer-balance";
@@ -18,13 +30,28 @@ async function getDb() {
 }
 
 type CollName =
-  | "customers" | "suppliers" | "products" | "cylinders" | "movements"
-  | "sales" | "deliveries" | "expenses" | "ledger"
-  | "purchases" | "stockMovements" | "vouchers" | "employees" | "payroll"
-  | "appUsers" | "accounts" | "chartOfAccounts" | "assets" | "costLayers";
+  | "customers"
+  | "suppliers"
+  | "products"
+  | "cylinders"
+  | "movements"
+  | "sales"
+  | "deliveries"
+  | "expenses"
+  | "ledger"
+  | "purchases"
+  | "stockMovements"
+  | "vouchers"
+  | "employees"
+  | "payroll"
+  | "appUsers"
+  | "accounts"
+  | "chartOfAccounts"
+  | "assets"
+  | "costLayers";
 
 // Strip Mongo's _id so returned docs are plain and serializable.
-const clean = <T,>(doc: any): T => {
+const clean = <T>(doc: any): T => {
   if (!doc) return doc;
   const { _id, ...rest } = doc;
   return rest as T;
@@ -40,7 +67,9 @@ async function ensureSeeded() {
       if (name === "appUsers" && !isDemoLoginEnabled()) continue;
       const coll = db.collection(name);
       // Unique index on business `id` prevents duplicate seed rows across races.
-      try { await coll.createIndex({ id: 1 }, { unique: true }); } catch {}
+      try {
+        await coll.createIndex({ id: 1 }, { unique: true });
+      } catch {}
       if (name === "cylinders") await ensureCylinderSerialIndex(db);
       if (name === "stockMovements") {
         try {
@@ -48,94 +77,71 @@ async function ensureSeeded() {
         } catch {}
       }
       if (name === "sales") {
-        try { await coll.createIndex({ orderNo: 1 }, { unique: true, sparse: true }); } catch {}
+        try {
+          await coll.createIndex({ orderNo: 1 }, { unique: true, sparse: true });
+        } catch {}
       }
       if (name === "purchases") {
-        try { await coll.createIndex({ orderNo: 1 }, { unique: true, sparse: true }); } catch {}
+        try {
+          await coll.createIndex({ orderNo: 1 }, { unique: true, sparse: true });
+        } catch {}
       }
       if (name === "vouchers") {
-        try { await coll.createIndex({ voucherNo: 1 }, { unique: true, sparse: true }); } catch {}
+        try {
+          await coll.createIndex({ voucherNo: 1 }, { unique: true, sparse: true });
+        } catch {}
       }
       if (name === "deliveries") {
-        try { await coll.createIndex({ challanNo: 1 }, { unique: true, sparse: true }); } catch {}
+        try {
+          await coll.createIndex({ challanNo: 1 }, { unique: true, sparse: true });
+        } catch {}
       }
       const count = await coll.estimatedDocumentCount();
       if (count === 0) {
         const docs = (allSeed as any)[name] as any[];
         if (docs.length > 0) {
-          try { await coll.insertMany(docs.map((d) => ({ ...d })), { ordered: false }); } catch {}
+          try {
+            await coll.insertMany(
+              docs.map((d) => ({ ...d })),
+              { ordered: false },
+            );
+          } catch {}
         }
       }
     }
 
-    // Migration / Backfill: Check for and correct known legacy discrepancies (LPG-12 and Nitrogen)
+    // Migration / Backfill: Reconcile product stock with authoritative transaction history
     try {
-      const p1 = await db.collection("products").findOne({ id: "p1" });
-      if (p1 && p1.stock === 65) {
-        const hasSm5 = await db.collection("stockMovements").findOne({ refType: "sales", refId: "so4", productId: "p1", type: "out" });
-        if (!hasSm5) {
-          await db.collection("stockMovements").insertOne({
-            id: "sm5",
-            date: new Date().toISOString(),
-            productId: "p1",
-            productName: p1.name || "LPG Domestic 12kg",
-            type: "out",
-            movementType: "SALE_ISSUE",
-            direction: "out",
-            quantity: 6,
-            balanceAfter: 59,
-            unitCost: 1200,
-            totalCost: 7200,
-            cogsAmount: 7200,
-            costingMethod: "fifo",
-            refType: "sales",
-            refId: "so4",
-            notes: "SO-2026-0004",
-            by: "Sales",
-          });
+      const { buildStockReport } = await import("./stock-report");
+      const dbProducts = await db.collection("products").find({}).toArray();
+      const dbMovements = await db.collection("stockMovements").find({}).toArray();
+      const prods = dbProducts.map((d: any) => clean<Product>(d));
+      const moves = dbMovements.map((d: any) => clean<StockMovement>(d));
+      const reports = buildStockReport(prods, moves, { preset: "all", from: "", to: "" });
+      for (const r of reports) {
+        const prod = prods.find((p) => p.id === r.id);
+        if (prod && prod.stock !== r.inHand) {
+          await db.collection("products").updateOne({ id: r.id }, { $set: { stock: r.inHand } });
         }
-        await db.collection("products").updateOne({ id: "p1" }, { $set: { stock: 59 } });
-        await db.collection("costLayers").updateOne({ id: "cl-p1" }, { $set: { qtyRemaining: 59 } });
-      }
-
-      const p5 = await db.collection("products").findOne({ id: "p5" });
-      if (p5 && p5.stock === 6) {
-        const hasSm4 = await db.collection("stockMovements").findOne({ refType: "sales", refId: "so3", productId: "p5", type: "out" });
-        if (!hasSm4) {
-          await db.collection("stockMovements").insertOne({
-            id: "sm4",
-            date: new Date().toISOString(),
-            productId: "p5",
-            productName: p5.name || "Nitrogen Industrial",
-            type: "out",
-            movementType: "SALE_ISSUE",
-            direction: "out",
-            quantity: 4,
-            balanceAfter: 2,
-            unitCost: 880,
-            totalCost: 3520,
-            cogsAmount: 3520,
-            costingMethod: "fifo",
-            refType: "sales",
-            refId: "so3",
-            notes: "SO-2026-0003",
-            by: "Sales",
-          });
-        }
-        await db.collection("products").updateOne({ id: "p5" }, { $set: { stock: 2 } });
-        await db.collection("costLayers").updateOne({ id: "cl-p5" }, { $set: { qtyRemaining: 2 } });
       }
     } catch {
       /* ignore migration race */
     }
-  })().catch((e) => { seedPromise = null; throw e; });
+  })().catch((e) => {
+    seedPromise = null;
+    throw e;
+  });
   return seedPromise;
 }
 
 async function collAll<T>(name: CollName): Promise<T[]> {
   const db = await getDb();
   await ensureSeeded();
-  const docs = await db.collection(name).find({}).sort({ createdAt: -1, date: -1, timestamp: -1 }).toArray();
+  const docs = await db
+    .collection(name)
+    .find({})
+    .sort({ createdAt: -1, date: -1, timestamp: -1 })
+    .toArray();
   return docs.map((d) => {
     const c = clean<any>(d);
     if (name === "appUsers") {
@@ -165,7 +171,7 @@ async function collGet<T>(name: CollName, id: string): Promise<T | null> {
 }
 
 async function ensureCylinderSerialIndex(db?: Awaited<ReturnType<typeof getDb>>) {
-  const database = db ?? await getDb();
+  const database = db ?? (await getDb());
   try {
     await database.collection("cylinders").createIndex(
       { serialKey: 1 },
@@ -189,17 +195,26 @@ async function serialTaken(serial: string, excludeId?: string) {
   const key = normalizeSerialKey(serial);
   if (!key) return false;
   const db = await getDb();
-  const docs = await db.collection("cylinders").find(
-    excludeId ? { id: { $ne: excludeId } } : {},
-    { projection: { id: 1, serialNumber: 1, serialKey: 1 } },
-  ).toArray();
+  const docs = await db
+    .collection("cylinders")
+    .find(excludeId ? { id: { $ne: excludeId } } : {}, {
+      projection: { id: 1, serialNumber: 1, serialKey: 1 },
+    })
+    .toArray();
   return docs.some((d) => {
-    const stored = typeof d.serialKey === "string" && d.serialKey ? d.serialKey : normalizeSerialKey(d.serialNumber);
+    const stored =
+      typeof d.serialKey === "string" && d.serialKey
+        ? d.serialKey
+        : normalizeSerialKey(d.serialNumber);
     return stored === key;
   });
 }
 
-async function collCreate<T extends { id?: string }>(name: CollName, data: any, user?: { username?: string }): Promise<T> {
+async function collCreate<T extends { id?: string }>(
+  name: CollName,
+  data: any,
+  user?: { username?: string },
+): Promise<T> {
   const db = await getDb();
   await ensureSeeded();
   const { getNextSequence } = await import("./document-sequence");
@@ -219,7 +234,13 @@ async function collCreate<T extends { id?: string }>(name: CollName, data: any, 
     if (!doc.orderNo || String(doc.orderNo).length < 15) {
       doc.orderNo = await getNextSequence(db, "PO");
     }
-  } else if (name === "vouchers" && (!doc.voucherNo || String(doc.voucherNo).startsWith("RV-") || String(doc.voucherNo).startsWith("PV-") || String(doc.voucherNo).startsWith("JV-"))) {
+  } else if (
+    name === "vouchers" &&
+    (!doc.voucherNo ||
+      String(doc.voucherNo).startsWith("RV-") ||
+      String(doc.voucherNo).startsWith("PV-") ||
+      String(doc.voucherNo).startsWith("JV-"))
+  ) {
     const pfx = String(doc.voucherNo || "").slice(0, 2) || "RV";
     if (!doc.voucherNo || String(doc.voucherNo).length < 15) {
       doc.voucherNo = await getNextSequence(db, pfx);
@@ -237,7 +258,7 @@ async function collCreate<T extends { id?: string }>(name: CollName, data: any, 
     const serial = String(data?.serialNumber || "");
     if (trackingEnforcesSerialUnique(method)) {
       const serialKey = normalizeSerialKey(serial);
-      if (serialKey && await serialTaken(serial)) {
+      if (serialKey && (await serialTaken(serial))) {
         throw new Error(`Serial number ${serial} is already assigned`);
       }
       if (serialKey) doc.serialKey = serialKey;
@@ -273,7 +294,12 @@ async function collCreate<T extends { id?: string }>(name: CollName, data: any, 
   return clean<T>(doc);
 }
 
-async function collUpdate<T>(name: CollName, id: string, patch: any, user?: { username?: string }): Promise<T> {
+async function collUpdate<T>(
+  name: CollName,
+  id: string,
+  patch: any,
+  user?: { username?: string },
+): Promise<T> {
   const db = await getDb();
   await ensureSeeded();
   if (!id) throw new Error("Missing record id");
@@ -301,9 +327,7 @@ async function collUpdate<T>(name: CollName, id: string, patch: any, user?: { us
   }
   const existing = await findById(name, id);
   if (!existing) throw new Error(`Record not found (${name}/${id})`);
-  const filter = existing.id != null
-    ? { id: String(existing.id) }
-    : { _id: existing._id };
+  const filter = existing.id != null ? { id: String(existing.id) } : { _id: existing._id };
   try {
     const result = await db.collection(name).updateOne(filter, update);
     if (result.matchedCount === 0) {
@@ -412,13 +436,21 @@ export const crudFn = createServerFn({ method: "POST" })
 
     const id = data.id != null ? String(data.id) : undefined;
     switch (data.op) {
-      case "list": return await collAll(data.coll);
-      case "get": return await collGet(data.coll, id!);
-      case "create": return await collCreate(data.coll, data.payload, user);
-      case "update": return await collUpdate(data.coll, id!, data.payload, user);
-      case "remove": await collRemove(data.coll, id!, user); return { ok: true };
-      case "claim": return await collClaim(data.coll, id!, data.payload);
-      default: return null;
+      case "list":
+        return await collAll(data.coll);
+      case "get":
+        return await collGet(data.coll, id!);
+      case "create":
+        return await collCreate(data.coll, data.payload, user);
+      case "update":
+        return await collUpdate(data.coll, id!, data.payload, user);
+      case "remove":
+        await collRemove(data.coll, id!, user);
+        return { ok: true };
+      case "claim":
+        return await collClaim(data.coll, id!, data.payload);
+      default:
+        return null;
     }
   });
 
@@ -429,68 +461,109 @@ function dhakaDay(d: Date) {
 
 function balanceFor(ledger: LedgerEntry[], account: "cash" | "bank", named: Account[] = []) {
   return ledger
-    .filter((e) => (account === "bank" ? isBankBookAccount(e.account, named) : isCashBookAccount(e.account, named)))
+    .filter((e) =>
+      account === "bank"
+        ? isBankBookAccount(e.account, named)
+        : isCashBookAccount(e.account, named),
+    )
     .reduce((a, e) => a + (e.direction === "in" ? e.amount : -e.amount), 0);
 }
 
 // ---------- Dashboard aggregation ----------
-export const dashboardFn = createServerFn({ method: "GET" }).handler(async (): Promise<DashboardStats & { stockAlerts: StockAlert[] }> => {
-  await requireUser();
-  const db = await getDb();
-  await ensureSeeded();
+export const dashboardFn = createServerFn({ method: "GET" }).handler(
+  async (): Promise<DashboardStats & { stockAlerts: StockAlert[] }> => {
+    await requireUser();
+    const db = await getDb();
+    await ensureSeeded();
 
-  const sales = (await db.collection("sales").find({}).toArray()) as unknown as SalesOrder[];
-  const products = (await db.collection("products").find({}).toArray()) as unknown as Product[];
-  const suppliers = (await db.collection("suppliers").find({}).toArray()) as unknown as Supplier[];
-  const customers = (await db.collection("customers").find({}).toArray()) as unknown as Customer[];
-  const expenses = (await db.collection("expenses").find({}).toArray()) as unknown as Expense[];
-  const ledger = (await db.collection("ledger").find({}).toArray()) as unknown as LedgerEntry[];
-  const cylinders = (await db.collection("cylinders").find({}).toArray()) as unknown as Cylinder[];
-  const purchases = (await db.collection("purchases").find({}).toArray()) as unknown as PurchaseOrder[];
+    const sales = (await db.collection("sales").find({}).toArray()) as unknown as SalesOrder[];
+    const products = (await db.collection("products").find({}).toArray()) as unknown as Product[];
+    const suppliers = (await db
+      .collection("suppliers")
+      .find({})
+      .toArray()) as unknown as Supplier[];
+    const customers = (await db
+      .collection("customers")
+      .find({})
+      .toArray()) as unknown as Customer[];
+    const expenses = (await db.collection("expenses").find({}).toArray()) as unknown as Expense[];
+    const ledger = (await db.collection("ledger").find({}).toArray()) as unknown as LedgerEntry[];
+    const cylinders = (await db
+      .collection("cylinders")
+      .find({})
+      .toArray()) as unknown as Cylinder[];
+    const purchases = (await db
+      .collection("purchases")
+      .find({})
+      .toArray()) as unknown as PurchaseOrder[];
 
-  const todayStr = dhakaDay(new Date());
-  const todaysOrders = sales.filter((s) => s.date && dhakaDay(new Date(s.date)) === todayStr && s.status !== "cancelled" && s.status !== "draft");
-  const todaySales = todaysOrders.reduce((a, o) => a + (o.total || 0), 0);
-  const todayCollection = todaysOrders.reduce((a, o) => a + (o.paid || 0), 0);
+    const todayStr = dhakaDay(new Date());
+    const todaysOrders = sales.filter(
+      (s) =>
+        s.date &&
+        dhakaDay(new Date(s.date)) === todayStr &&
+        s.status !== "cancelled" &&
+        s.status !== "draft",
+    );
+    const todaySales = todaysOrders.reduce((a, o) => a + (o.total || 0), 0);
+    const todayCollection = todaysOrders.reduce((a, o) => a + (o.paid || 0), 0);
 
-  const todaysExpenses = expenses.filter((e) => e.date && dhakaDay(new Date(e.date)) === todayStr);
-  const todayExpense = todaysExpenses.reduce((a, e) => a + (e.amount || 0), 0);
+    const todaysExpenses = expenses.filter(
+      (e) => e.date && dhakaDay(new Date(e.date)) === todayStr,
+    );
+    const todayExpense = todaysExpenses.reduce((a, e) => a + (e.amount || 0), 0);
 
-  const vouchers = (await db.collection("vouchers").find({}).toArray()) as unknown as Voucher[];
-  const namedAccounts = (await db.collection("accounts").find({}).toArray()) as unknown as Account[];
+    const vouchers = (await db.collection("vouchers").find({}).toArray()) as unknown as Voucher[];
+    const namedAccounts = (await db
+      .collection("accounts")
+      .find({})
+      .toArray()) as unknown as Account[];
 
-  const { totalDue: customerDue } = computeCustomerReceivables(customers, sales, vouchers);
-  const { totalDue: supplierPayable } = computeSupplierPayables(suppliers, purchases, vouchers);
+    const { totalDue: customerDue } = computeCustomerReceivables(customers, sales, vouchers);
+    const { totalDue: supplierPayable } = computeSupplierPayables(suppliers, purchases, vouchers);
 
-  const monthPrefix = todayStr.slice(0, 7);
-  const monthlySales = sales
-    .filter((s) => s.date && dhakaDay(new Date(s.date)).startsWith(monthPrefix) && s.status !== "cancelled" && s.status !== "draft")
-    .reduce((a, o) => a + (o.total || 0), 0);
+    const monthPrefix = todayStr.slice(0, 7);
+    const monthlySales = sales
+      .filter(
+        (s) =>
+          s.date &&
+          dhakaDay(new Date(s.date)).startsWith(monthPrefix) &&
+          s.status !== "cancelled" &&
+          s.status !== "draft",
+      )
+      .reduce((a, o) => a + (o.total || 0), 0);
 
-  const stockAlerts: StockAlert[] = products
-    .filter((p) => (p.stock ?? 0) <= (p.reorderLevel ?? 0))
-    .map((p) => ({ productId: p.id, productName: p.name, stock: p.stock, reorderLevel: p.reorderLevel }));
+    const stockAlerts: StockAlert[] = products
+      .filter((p) => (p.stock ?? 0) <= (p.reorderLevel ?? 0))
+      .map((p) => ({
+        productId: p.id,
+        productName: p.name,
+        stock: p.stock,
+        reorderLevel: p.reorderLevel,
+      }));
 
-  const countStatus = (status: Cylinder["status"]) => cylinders.filter((c) => c.status === status).length;
+    const countStatus = (status: Cylinder["status"]) =>
+      cylinders.filter((c) => c.status === status).length;
 
-  return {
-    todaySales,
-    todayCollection,
-    todayExpense,
-    customerDue,
-    supplierPayable,
-    cashBalance: Math.round(balanceFor(ledger, "cash", namedAccounts)),
-    bankBalance: Math.round(balanceFor(ledger, "bank", namedAccounts)),
-    availableStock: products.reduce((a, p) => a + (p.stock || 0), 0),
-    cylindersInWarehouse: countStatus("in_stock"),
-    cylindersWithCustomers: countStatus("at_customer"),
-    cylindersUnderRefill: countStatus("refilling"),
-    damagedCylinders: countStatus("damaged"),
-    lostCylinders: countStatus("lost"),
-    monthlySales,
-    stockAlerts,
-  };
-});
+    return {
+      todaySales,
+      todayCollection,
+      todayExpense,
+      customerDue,
+      supplierPayable,
+      cashBalance: Math.round(balanceFor(ledger, "cash", namedAccounts)),
+      bankBalance: Math.round(balanceFor(ledger, "bank", namedAccounts)),
+      availableStock: products.reduce((a, p) => a + (p.stock || 0), 0),
+      cylindersInWarehouse: countStatus("in_stock"),
+      cylindersWithCustomers: countStatus("at_customer"),
+      cylindersUnderRefill: countStatus("refilling"),
+      damagedCylinders: countStatus("damaged"),
+      lostCylinders: countStatus("lost"),
+      monthlySales,
+      stockAlerts,
+    };
+  },
+);
 
 // ---------- Notifications aggregation ----------
 export const notificationsFn = createServerFn({ method: "GET" }).handler(async () => {
@@ -498,25 +571,51 @@ export const notificationsFn = createServerFn({ method: "GET" }).handler(async (
   const db = await getDb();
   await ensureSeeded();
 
-  const products = await db.collection("products").find({}).toArray() as unknown as Product[];
-  const lowStock = products.filter(p => (p.stock || 0) <= (p.reorderLevel || 0));
+  const products = (await db.collection("products").find({}).toArray()) as unknown as Product[];
+  const lowStock = products.filter((p) => (p.stock || 0) <= (p.reorderLevel || 0));
 
-  const pendingDeliveries = await db.collection("deliveries").find({ status: "pending" }).toArray() as unknown as Delivery[];
-  const pendingPurchases = await db.collection("purchases").find({ status: { $in: ["ordered", "partial"] } }).toArray() as unknown as PurchaseOrder[];
-  const pendingSales = await db.collection("sales").find({ status: "confirmed" }).toArray() as unknown as SalesOrder[];
+  const pendingDeliveries = (await db
+    .collection("deliveries")
+    .find({ status: "pending" })
+    .toArray()) as unknown as Delivery[];
+  const pendingPurchases = (await db
+    .collection("purchases")
+    .find({ status: { $in: ["ordered", "partial"] } })
+    .toArray()) as unknown as PurchaseOrder[];
+  const pendingSales = (await db
+    .collection("sales")
+    .find({ status: "confirmed" })
+    .toArray()) as unknown as SalesOrder[];
 
-  const customers = await db.collection("customers").find({}).toArray() as unknown as Customer[];
-  const sales = await db.collection("sales").find({}).toArray() as unknown as SalesOrder[];
-  const vouchers = await db.collection("vouchers").find({}).toArray() as unknown as Voucher[];
+  const customers = (await db.collection("customers").find({}).toArray()) as unknown as Customer[];
+  const sales = (await db.collection("sales").find({}).toArray()) as unknown as SalesOrder[];
+  const vouchers = (await db.collection("vouchers").find({}).toArray()) as unknown as Voucher[];
   const creditReminders = customers
     .map((c) => creditReminderNotice(c, sales, vouchers))
     .filter((n): n is NonNullable<typeof n> => n != null);
 
   return {
-    lowStock: lowStock.map(p => ({ id: p.id, name: p.name, stock: p.stock, reorderLevel: p.reorderLevel })),
-    pendingDeliveries: pendingDeliveries.map(d => ({ id: d.id, challanNo: d.challanNo, customerName: d.customerName })),
-    pendingPurchases: pendingPurchases.map(p => ({ id: p.id, orderNo: p.orderNo, supplierName: p.supplierName })),
-    pendingSales: pendingSales.map(s => ({ id: s.id, orderNo: s.orderNo, customerName: s.customerName })),
+    lowStock: lowStock.map((p) => ({
+      id: p.id,
+      name: p.name,
+      stock: p.stock,
+      reorderLevel: p.reorderLevel,
+    })),
+    pendingDeliveries: pendingDeliveries.map((d) => ({
+      id: d.id,
+      challanNo: d.challanNo,
+      customerName: d.customerName,
+    })),
+    pendingPurchases: pendingPurchases.map((p) => ({
+      id: p.id,
+      orderNo: p.orderNo,
+      supplierName: p.supplierName,
+    })),
+    pendingSales: pendingSales.map((s) => ({
+      id: s.id,
+      orderNo: s.orderNo,
+      customerName: s.customerName,
+    })),
     creditReminders,
   };
 });
@@ -530,10 +629,23 @@ export const mongoHealthFn = createServerFn({ method: "GET" }).handler(async () 
     await ensureSeeded();
     const counts: Record<string, number> = {};
     for (const name of [
-      "customers", "suppliers", "products", "cylinders", "movements",
-      "sales", "deliveries", "expenses", "ledger",
-      "purchases", "stockMovements", "vouchers", "employees", "payroll", "accounts",
-      "chartOfAccounts", "assets"
+      "customers",
+      "suppliers",
+      "products",
+      "cylinders",
+      "movements",
+      "sales",
+      "deliveries",
+      "expenses",
+      "ledger",
+      "purchases",
+      "stockMovements",
+      "vouchers",
+      "employees",
+      "payroll",
+      "accounts",
+      "chartOfAccounts",
+      "assets",
     ] as const) {
       counts[name] = await db.collection(name).countDocuments();
     }

@@ -26,7 +26,11 @@ export function SupplierForm({ id }: { id?: string }) {
     enabled: !!id,
   });
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormValues>({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<FormValues>({
     resolver: zodResolver(supplierSchema),
     values: existing
       ? {
@@ -63,37 +67,85 @@ export function SupplierForm({ id }: { id?: string }) {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (id && isLoading) return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
-  if (id && !existing) return <div className="p-6 text-sm text-destructive">{t("suppliers.notFound")}</div>;
+  if (id && isLoading)
+    return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
+  if (id && !existing)
+    return <div className="p-6 text-sm text-destructive">{t("suppliers.notFound")}</div>;
 
   return (
     <div>
-      <PageHeader title={mode === "create" ? t("suppliers.new") : t("suppliers.edit")} backTo={id ? { to: "/suppliers/$id", params: { id } } : "/suppliers"} />
-      <Card><CardContent className="pt-6">
-        <form onSubmit={handleSubmit((v) => mutation.mutate(v))} className="grid gap-4 md:grid-cols-2">
-          <Row label={t("common.name")} error={errors.name?.message}><Input {...register("name")} /></Row>
-          <Row label={t("common.phone")} error={errors.phone?.message}><Input {...register("phone")} /></Row>
-          <Row label={t("common.email")} error={errors.email?.message}><Input type="email" {...register("email")} /></Row>
-          <Row label={t("common.address")} error={errors.address?.message} className="md:col-span-2"><Input {...register("address")} /></Row>
-          <Row label={t("suppliers.payable")} error={errors.openingBalance?.message}>
-            <Input type="number" step="0.01" {...register("openingBalance", { valueAsNumber: true })} />
-          </Row>
-          <div className="md:col-span-2 flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => navigate({ to: id ? "/suppliers/$id" : "/suppliers", params: id ? { id } : undefined })}>{t("common.cancel")}</Button>
-            <Button type="submit" disabled={isSubmitting || mutation.isPending}>
-              {t("common.save")}
-            </Button>
-          </div>
-        </form>
-      </CardContent></Card>
+      <PageHeader
+        title={mode === "create" ? t("suppliers.new") : t("suppliers.edit")}
+        backTo={id ? { to: "/suppliers/$id", params: { id } } : "/suppliers"}
+      />
+      <Card>
+        <CardContent className="pt-6">
+          <form
+            onSubmit={handleSubmit((v) => mutation.mutate(v))}
+            className="grid gap-4 md:grid-cols-2"
+          >
+            <Row label={t("common.name")} error={errors.name?.message}>
+              <Input {...register("name")} />
+            </Row>
+            <Row label={t("common.phone")} error={errors.phone?.message}>
+              <Input {...register("phone")} />
+            </Row>
+            <Row label={t("common.email")} error={errors.email?.message}>
+              <Input type="email" {...register("email")} />
+            </Row>
+            <Row
+              label={t("common.address")}
+              error={errors.address?.message}
+              className="md:col-span-2"
+            >
+              <Input {...register("address")} />
+            </Row>
+            <Row label={t("suppliers.payable")} error={errors.openingBalance?.message}>
+              <Input
+                type="number"
+                step="0.01"
+                {...register("openingBalance", { valueAsNumber: true })}
+              />
+            </Row>
+            <div className="md:col-span-2 flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() =>
+                  navigate({
+                    to: id ? "/suppliers/$id" : "/suppliers",
+                    params: id ? { id } : undefined,
+                  })
+                }
+              >
+                {t("common.cancel")}
+              </Button>
+              <Button type="submit" disabled={isSubmitting || mutation.isPending}>
+                {t("common.save")}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
-function Row({ label, error, children, className = "" }: { label: string; error?: string; children: React.ReactNode; className?: string }) {
+function Row({
+  label,
+  error,
+  children,
+  className = "",
+}: {
+  label: string;
+  error?: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
     <div className={`space-y-1.5 ${className}`}>
-      <Label>{label}</Label>{children}
+      <Label>{label}</Label>
+      {children}
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );

@@ -5,7 +5,11 @@ import { cylinderService } from "@/services/cylinder.service";
 import { productService } from "@/services/product.service";
 import { customerService } from "@/services/customer.service";
 import { supplierService } from "@/services/supplier.service";
-import { buildCylinderLedger, type CylinderHeadKind, type CylinderHeadReport } from "@/lib/cylinder-ledger";
+import {
+  buildCylinderLedger,
+  type CylinderHeadKind,
+  type CylinderHeadReport,
+} from "@/lib/cylinder-ledger";
 import { formatDate } from "@/utils/formatters";
 import type { DateRange } from "@/lib/date-range";
 import { useT, type MessageKey } from "@/i18n";
@@ -14,7 +18,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { PartyNameLink } from "@/components/common/PartyNameLink";
 
@@ -41,11 +49,26 @@ export function CylinderLedger({ range }: { range: DateRange }) {
   const [draft, setDraft] = useState<LedgerFilter>(EMPTY_FILTER);
   const [applied, setApplied] = useState<LedgerFilter>(EMPTY_FILTER);
 
-  const { data: cylinders = [], isLoading: l1 } = useQuery({ queryKey: ["cylinders"], queryFn: cylinderService.list });
-  const { data: movements = [], isLoading: l2 } = useQuery({ queryKey: ["cylinderMovements"], queryFn: cylinderService.listMovements });
-  const { data: products = [] } = useQuery({ queryKey: ["products"], queryFn: productService.list });
-  const { data: customers = [] } = useQuery({ queryKey: ["customers"], queryFn: customerService.list });
-  const { data: suppliers = [] } = useQuery({ queryKey: ["suppliers"], queryFn: supplierService.list });
+  const { data: cylinders = [], isLoading: l1 } = useQuery({
+    queryKey: ["cylinders"],
+    queryFn: cylinderService.list,
+  });
+  const { data: movements = [], isLoading: l2 } = useQuery({
+    queryKey: ["cylinderMovements"],
+    queryFn: cylinderService.listMovements,
+  });
+  const { data: products = [] } = useQuery({
+    queryKey: ["products"],
+    queryFn: productService.list,
+  });
+  const { data: customers = [] } = useQuery({
+    queryKey: ["customers"],
+    queryFn: customerService.list,
+  });
+  const { data: suppliers = [] } = useQuery({
+    queryKey: ["suppliers"],
+    queryFn: supplierService.list,
+  });
 
   const allHeads = useMemo(
     () => buildCylinderLedger({ cylinders, movements, products, customers, suppliers, range }),
@@ -82,12 +105,14 @@ export function CylinderLedger({ range }: { range: DateRange }) {
     if (applied.headId !== ALL) list = list.filter((h) => h.id === applied.headId);
     const q = applied.q.trim().toLowerCase();
     if (q) {
-      list = list.filter((h) =>
-        h.name.toLowerCase().includes(q)
-        || h.lines.some((line) =>
-          line.productName.toLowerCase().includes(q)
-          || (line.serial || "").toLowerCase().includes(q),
-        ),
+      list = list.filter(
+        (h) =>
+          h.name.toLowerCase().includes(q) ||
+          h.lines.some(
+            (line) =>
+              line.productName.toLowerCase().includes(q) ||
+              (line.serial || "").toLowerCase().includes(q),
+          ),
       );
     }
     return list;
@@ -97,12 +122,17 @@ export function CylinderLedger({ range }: { range: DateRange }) {
     const map = new Map<CylinderHeadKind, CylinderHeadReport[]>();
     for (const k of KIND_ORDER) map.set(k, []);
     for (const h of heads) map.get(h.kind)?.push(h);
-    return KIND_ORDER.filter((k) => (map.get(k)?.length ?? 0) > 0).map((k) => ({ kind: k, items: map.get(k)! }));
+    return KIND_ORDER.filter((k) => (map.get(k)?.length ?? 0) > 0).map((k) => ({
+      kind: k,
+      items: map.get(k)!,
+    }));
   }, [heads]);
 
   const setKind = (kind: LedgerFilter["kind"]) => {
     setDraft((prev) => {
-      const stillValid = prev.headId === ALL || allHeads.some((h) => h.id === prev.headId && (kind === ALL || h.kind === kind));
+      const stillValid =
+        prev.headId === ALL ||
+        allHeads.some((h) => h.id === prev.headId && (kind === ALL || h.kind === kind));
       return { ...prev, kind, headId: stillValid ? prev.headId : ALL };
     });
   };
@@ -117,7 +147,9 @@ export function CylinderLedger({ range }: { range: DateRange }) {
     return <p className="py-8 text-center text-sm text-muted-foreground">{t("common.loading")}</p>;
   }
   if (allHeads.length === 0) {
-    return <p className="py-8 text-center text-sm text-muted-foreground">{t("cylinders.ledgerEmpty")}</p>;
+    return (
+      <p className="py-8 text-center text-sm text-muted-foreground">{t("cylinders.ledgerEmpty")}</p>
+    );
   }
 
   return (
@@ -141,14 +173,19 @@ export function CylinderLedger({ range }: { range: DateRange }) {
               <SelectContent>
                 <SelectItem value={ALL}>{t("filter.all")}</SelectItem>
                 {KIND_ORDER.map((k) => (
-                  <SelectItem key={k} value={k}>{t(KIND_LABEL[k])}</SelectItem>
+                  <SelectItem key={k} value={k}>
+                    {t(KIND_LABEL[k])}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">{t("cylinders.filterParty")}</Label>
-            <Select value={draft.headId} onValueChange={(headId) => setDraft((p) => ({ ...p, headId }))}>
+            <Select
+              value={draft.headId}
+              onValueChange={(headId) => setDraft((p) => ({ ...p, headId }))}
+            >
               <SelectTrigger className="h-9">
                 <SelectValue />
               </SelectTrigger>
@@ -164,14 +201,19 @@ export function CylinderLedger({ range }: { range: DateRange }) {
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">{t("common.product")}</Label>
-            <Select value={draft.productId} onValueChange={(productId) => setDraft((p) => ({ ...p, productId }))}>
+            <Select
+              value={draft.productId}
+              onValueChange={(productId) => setDraft((p) => ({ ...p, productId }))}
+            >
               <SelectTrigger className="h-9">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>{t("cylinders.allProducts")}</SelectItem>
                 {cylinderProducts.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -221,7 +263,9 @@ export function CylinderLedger({ range }: { range: DateRange }) {
                         head.name
                       )}
                     </p>
-                    <Badge variant="secondary" className="mt-1 text-[10px]">{t(KIND_LABEL[head.kind])}</Badge>
+                    <Badge variant="secondary" className="mt-1 text-[10px]">
+                      {t(KIND_LABEL[head.kind])}
+                    </Badge>
                   </div>
                   <Stat label={t("cylinders.delivered")} value={String(head.delivered)} />
                   <Stat label={t("cylinders.received")} value={String(head.received)} />
@@ -233,24 +277,42 @@ export function CylinderLedger({ range }: { range: DateRange }) {
                       <tr className="border-b bg-card text-left text-[11px] uppercase tracking-wide text-muted-foreground">
                         <th className="px-3 py-2 font-medium">{t("common.date")}</th>
                         <th className="px-3 py-2 font-medium">{t("common.product")}</th>
-                        <th className="px-3 py-2 text-right font-medium">{t("cylinders.delivered")}</th>
-                        <th className="px-3 py-2 text-right font-medium">{t("cylinders.received")}</th>
-                        <th className="px-3 py-2 text-right font-medium">{t("inventory.balance")}</th>
+                        <th className="px-3 py-2 text-right font-medium">
+                          {t("cylinders.delivered")}
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium">
+                          {t("cylinders.received")}
+                        </th>
+                        <th className="px-3 py-2 text-right font-medium">
+                          {t("inventory.balance")}
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
                       {head.lines.map((line) => (
                         <tr key={line.id} className="border-b last:border-0">
-                          <td className="whitespace-nowrap px-3 py-2 text-xs">{formatDate(line.date)}</td>
+                          <td className="whitespace-nowrap px-3 py-2 text-xs">
+                            {formatDate(line.date)}
+                          </td>
                           <td className="px-3 py-2">
-                            {line.productName === "Opening" ? t("statement.opening") : line.productName}
+                            {line.productName === "Opening"
+                              ? t("statement.opening")
+                              : line.productName}
                             {line.serial && (
-                              <span className="ml-2 font-mono text-[10px] text-muted-foreground">{line.serial}</span>
+                              <span className="ml-2 font-mono text-[10px] text-muted-foreground">
+                                {line.serial}
+                              </span>
                             )}
                           </td>
-                          <td className="px-3 py-2 text-right tabular-nums">{line.delivered || "—"}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">{line.received || "—"}</td>
-                          <td className="px-3 py-2 text-right tabular-nums font-medium">{line.balance}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">
+                            {line.delivered || "—"}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums">
+                            {line.received || "—"}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums font-medium">
+                            {line.balance}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -268,8 +330,12 @@ export function CylinderLedger({ range }: { range: DateRange }) {
 function Stat({ label, value, emphasize }: { label: string; value: string; emphasize?: boolean }) {
   return (
     <div>
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className={emphasize ? "font-display text-sm font-semibold" : "text-sm font-medium"}>{value}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p className={emphasize ? "font-display text-sm font-semibold" : "text-sm font-medium"}>
+        {value}
+      </p>
     </div>
   );
 }

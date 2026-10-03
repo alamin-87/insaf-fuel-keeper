@@ -3,7 +3,9 @@ const BASE = "http://localhost:8080";
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage();
 const failed = [];
-page.on("response", (r) => { if (r.status() >= 400) failed.push(`${r.status()} ${r.url()}`); });
+page.on("response", (r) => {
+  if (r.status() >= 400) failed.push(`${r.status()} ${r.url()}`);
+});
 page.on("pageerror", (e) => console.log("PAGEERR", e.message));
 await page.goto(`${BASE}/login`, { waitUntil: "networkidle" });
 await page.locator("#username").fill("operator");
@@ -36,7 +38,15 @@ if (await firstPo.count()) {
   if (await recv.count()) {
     await recv.first().click();
     await page.waitForTimeout(1000);
-    console.log("MODAL", (await page.locator("[role=dialog]").innerText().catch(() => "no-dialog")).slice(0, 800));
+    console.log(
+      "MODAL",
+      (
+        await page
+          .locator("[role=dialog]")
+          .innerText()
+          .catch(() => "no-dialog")
+      ).slice(0, 800),
+    );
     await page.keyboard.press("Escape");
   }
 }

@@ -312,10 +312,12 @@ export const bn = {
   "products.imageRemove": "ছবি সরান",
   "products.imageInvalid": "এই ছবি ব্যবহার করা যায়নি। অন্য ফাইল চেষ্টা করুন।",
   "products.accounting": "অ্যাকাউন্টিং",
-  "products.accountingHint": "চার্ট অব অ্যাকাউন্টস থেকে ইনকাম ও এক্সপেন্স অ্যাকাউন্ট ম্যাপ করুন। কস্টিং মেথড অনুযায়ী ইনভেন্টরি ইস্যু হবে।",
+  "products.accountingHint":
+    "চার্ট অব অ্যাকাউন্টস থেকে ইনকাম ও এক্সপেন্স অ্যাকাউন্ট ম্যাপ করুন। কস্টিং মেথড অনুযায়ী ইনভেন্টরি ইস্যু হবে।",
   "products.incomeAccount": "ইনকাম অ্যাকাউন্ট",
   "products.expenseAccount": "এক্সপেন্স অ্যাকাউন্ট",
-  "products.coaEmpty": "এখনো COA অ্যাকাউন্ট নেই। অ্যাকাউন্টিং → চার্ট অব অ্যাকাউন্টসে ইনকাম/এক্সপেন্স যোগ করুন।",
+  "products.coaEmpty":
+    "এখনো COA অ্যাকাউন্ট নেই। অ্যাকাউন্টিং → চার্ট অব অ্যাকাউন্টসে ইনকাম/এক্সপেন্স যোগ করুন।",
   "products.costingMethod": "কস্টিং মেথড",
   "products.costing.fifo": "FIFO",
   "products.costing.fifoHint": "ফার্স্ট ইন ফার্স্ট আউট — পুরোনো স্টক আগে ডেলিভারি হবে।",
@@ -350,7 +352,8 @@ export const bn = {
   "sales.markInvoiced": "ইনভয়েসড করুন",
   "sales.cancelOrder": "অর্ডার বাতিল",
   "sales.cancelQuotation": "কোটেশন বাতিল",
-  "sales.stockNote": "সেলস অর্ডার স্টক রিজার্ভ করে। ডেলিভারিতে ভরা/খালি আপডেট হয়। ইনভয়েসে স্টক আর কাটে না।",
+  "sales.stockNote":
+    "সেলস অর্ডার স্টক রিজার্ভ করে। ডেলিভারিতে ভরা/খালি আপডেট হয়। ইনভয়েসে স্টক আর কাটে না।",
   "sales.sellGasOnly": "শুধু গ্যাস বিক্রি",
   "sales.sellGasOnlyHint": "শুধু গ্যাসের ইনভয়েস। সিলিন্ডার মুভমেন্ট হবে না।",
   "sales.recordPayment": "পেমেন্ট রেকর্ড",
@@ -426,8 +429,10 @@ export const bn = {
   "purchases.totalBelowPaid": "ক্রয় টোটাল ইতিমধ্যে পরিশোধিত অর্থের চেয়ে কম হতে পারে না",
   "purchases.unpaid": "অপরিশোধিত / ক্রেডিট",
   "purchases.credit": "ক্রেডিট",
-  "purchases.creditHint": "ক্রেডিট ক্রয় — কোনো পেমেন্ট রেকর্ড হয় না। বাকি অর্থ সরবরাহকারী খাতায় প্রদেয় থাকে।",
-  "purchases.paymentHint": "প্রতিটি পেমেন্ট ক্যাশ/ব্যাংক এবং সরবরাহকারী খাতা আপডেট করে। আগের পেমেন্ট সংরক্ষিত থাকে।",
+  "purchases.creditHint":
+    "ক্রেডিট ক্রয় — কোনো পেমেন্ট রেকর্ড হয় না। বাকি অর্থ সরবরাহকারী খাতায় প্রদেয় থাকে।",
+  "purchases.paymentHint":
+    "প্রতিটি পেমেন্ট ক্যাশ/ব্যাংক এবং সরবরাহকারী খাতা আপডেট করে। আগের পেমেন্ট সংরক্ষিত থাকে।",
   "purchases.priorPayment": "আগের পেমেন্ট",
   "purchases.notFound": "ক্রয় অর্ডার পাওয়া যায়নি।",
   "purchases.receive": "পণ্য গ্রহণ (জিআরএন)",
@@ -438,7 +443,8 @@ export const bn = {
   "purchases.cancel": "পিও বাতিল",
   "purchases.receiveHint": "গ্রহণে স্টক আপডেট হয়। সিলিন্ডার পণ্যে সিরিয়াল ট্র্যাকিংও হয়।",
   "purchases.receiveCylinders": "সিলিন্ডার গ্রহণ",
-  "purchases.serialHint": "ঐচ্ছিক। {qty}টি সিরিয়াল লিখুন (লাইন বা কমা), অথবা খালি রেখে শুধু পরিমাণ গ্রহণ করুন। সিরিয়াল জেনারেট বাধ্যতামূলক নয়।",
+  "purchases.serialHint":
+    "ঐচ্ছিক। {qty}টি সিরিয়াল লিখুন (লাইন বা কমা), অথবা খালি রেখে শুধু পরিমাণ গ্রহণ করুন। সিরিয়াল জেনারেট বাধ্যতামূলক নয়।",
   "purchases.generateSerials": "সিরিয়াল তৈরি",
   "purchases.supplierPayment": "সরবরাহকারী পেমেন্ট",
   "purchases.paidFrom": "পরিশোধ মাধ্যম",
@@ -598,7 +604,8 @@ export const bn = {
   "cylinders.gasCategory": "গ্যাস ক্যাটাগরি",
   "cylinders.filterSize": "পণ্য / সাইজ",
   "cylinders.filterWarehouse": "ওয়্যারহাউস",
-  "cylinders.ledgerHint": "গ্রাহক, সাপ্লায়ার ও ওয়্যারহাউস হেড। প্রতিটির নিচে: তারিখ → পণ্য → ডেলিভার্ড → রিসিভড → ব্যালেন্স।",
+  "cylinders.ledgerHint":
+    "গ্রাহক, সাপ্লায়ার ও ওয়্যারহাউস হেড। প্রতিটির নিচে: তারিখ → পণ্য → ডেলিভার্ড → রিসিভড → ব্যালেন্স।",
   "cylinders.ledgerEmpty": "এখনো সিলিন্ডার মুভমেন্ট নেই।",
   "cylinders.delivered": "ডেলিভার্ড",
   "cylinders.received": "রিসিভড",
@@ -733,7 +740,8 @@ export const bn = {
   "reports.sales": "সেলস রিপোর্ট",
   "reports.purchase": "ক্রয় রিপোর্ট",
   "reports.stock": "স্টক রিপোর্ট",
-  "reports.stockHint": "প্রতিটি পণ্য একটি স্টক অ্যাকাউন্ট। আগে সামারি, তার নিচে তারিখ অনুযায়ী ইন / আউট / ইন হ্যান্ড।",
+  "reports.stockHint":
+    "প্রতিটি পণ্য একটি স্টক অ্যাকাউন্ট। আগে সামারি, তার নিচে তারিখ অনুযায়ী ইন / আউট / ইন হ্যান্ড।",
   "reports.stockIn": "ইন",
   "reports.stockOut": "আউট",
   "reports.inHand": "ইন হ্যান্ড",
@@ -815,7 +823,8 @@ export const bn = {
   "settings.reset": "ডিফল্টে ফিরুন",
   "settings.saved": "সেটিংস আপডেট হয়েছে",
   "settings.usersTitle": "অ্যাপ ইউজার",
-  "settings.usersHint": "ইউজারনেম, রোল, পাসওয়ার্ড ও স্ট্যাটাস সম্পাদনা করুন। পরিবর্তন সাথে সাথে লগইনে কাজ করবে।",
+  "settings.usersHint":
+    "ইউজারনেম, রোল, পাসওয়ার্ড ও স্ট্যাটাস সম্পাদনা করুন। পরিবর্তন সাথে সাথে লগইনে কাজ করবে।",
   "settings.addUser": "ইউজার যোগ",
   "settings.username": "ইউজারনেম",
   "settings.displayName": "প্রদর্শন নাম",

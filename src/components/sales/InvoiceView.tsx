@@ -15,7 +15,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/common/PageHeader";
 import { PrintDocHeader } from "@/components/common/PrintDocHeader";
@@ -27,7 +32,11 @@ import {
   type MoneyReceiptModel,
 } from "@/components/sales/MoneyReceiptPrint";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import type { PaymentMethod, SalesStatus, Voucher } from "@/types";
 import { useT } from "@/i18n";
@@ -37,7 +46,11 @@ export function InvoiceView({ id }: { id: string }) {
   const t = useT();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const { data: order, isLoading, isFetched } = useQuery({
+  const {
+    data: order,
+    isLoading,
+    isFetched,
+  } = useQuery({
     queryKey: ["sales", id],
     queryFn: () => salesService.get(id),
   });
@@ -46,9 +59,18 @@ export function InvoiceView({ id }: { id: string }) {
     queryFn: () => customerService.get(order!.customerId),
     enabled: !!order?.customerId,
   });
-  const { data: products = [] } = useQuery({ queryKey: ["products"], queryFn: productService.list });
-  const { data: accounts = [] } = useQuery({ queryKey: ["accounts"], queryFn: accountingService.listAccounts });
-  const { data: vouchers = [] } = useQuery({ queryKey: ["vouchers"], queryFn: accountingService.listVouchers });
+  const { data: products = [] } = useQuery({
+    queryKey: ["products"],
+    queryFn: productService.list,
+  });
+  const { data: accounts = [] } = useQuery({
+    queryKey: ["accounts"],
+    queryFn: accountingService.listAccounts,
+  });
+  const { data: vouchers = [] } = useQuery({
+    queryKey: ["vouchers"],
+    queryFn: accountingService.listVouchers,
+  });
   const [amount, setAmount] = useState<string>("");
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [bankAccount, setBankAccount] = useState<string>("");
@@ -66,7 +88,12 @@ export function InvoiceView({ id }: { id: string }) {
 
   const pay = useMutation({
     mutationFn: (n: number) =>
-      salesService.recordPayment(id, n, method, method === "bank" ? (bankAccount || "bank") : undefined),
+      salesService.recordPayment(
+        id,
+        n,
+        method,
+        method === "bank" ? bankAccount || "bank" : undefined,
+      ),
     onSuccess: (result: { order: unknown; receipt: Voucher }) => {
       invalidate();
       toast.success(t("sales.paymentReceiptReady"));
@@ -105,8 +132,10 @@ export function InvoiceView({ id }: { id: string }) {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (isLoading) return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
-  if (isFetched && !order) return <div className="p-6 text-sm text-destructive">{t("sales.notFound")}</div>;
+  if (isLoading)
+    return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
+  if (isFetched && !order)
+    return <div className="p-6 text-sm text-destructive">{t("sales.notFound")}</div>;
   if (!order) return null;
 
   const isQuote = order.status === "draft" || order.orderNo.startsWith("QT");
@@ -132,22 +161,31 @@ export function InvoiceView({ id }: { id: string }) {
     <div className="invoice-print-root">
       <PageHeader
         title={`${isQuote ? t("sales.quotationLabel") : t("sales.invoice")} ${order.orderNo}`}
-        description={t("sales.issuedTo", { customer: order.customerName, date: formatDate(order.date) })}
+        description={t("sales.issuedTo", {
+          customer: order.customerName,
+          date: formatDate(order.date),
+        })}
         backTo="/sales"
         backLabel={t("sales.title")}
         actions={
           <div className="flex flex-wrap gap-2">
-            {(order.status !== "cancelled") && (
+            {order.status !== "cancelled" && (
               <Button variant="outline" asChild>
-                <Link to="/sales/$id/edit" params={{ id: order.id }}>{t("common.edit")}</Link>
+                <Link to="/sales/$id/edit" params={{ id: order.id }}>
+                  {t("common.edit")}
+                </Link>
               </Button>
             )}
             <Button variant="outline" asChild>
-              <Link to="/customers/$id/statement" params={{ id: order.customerId }}>{t("customers.statement")}</Link>
+              <Link to="/customers/$id/statement" params={{ id: order.customerId }}>
+                {t("customers.statement")}
+              </Link>
             </Button>
             {!isQuote && (
               <Button variant="outline" asChild>
-                <Link to="/deliveries/new" search={{ salesOrderId: order.id }}>{t("sales.createDelivery")}</Link>
+                <Link to="/deliveries/new" search={{ salesOrderId: order.id }}>
+                  {t("sales.createDelivery")}
+                </Link>
               </Button>
             )}
             <Button variant="outline" onClick={() => window.print()}>
@@ -193,7 +231,9 @@ export function InvoiceView({ id }: { id: string }) {
                   <PartyNameLink kind="customer" id={order.customerId} name={order.customerName} />
                 </p>
                 {customer?.phone && <p className="text-muted-foreground">{customer.phone}</p>}
-                {customer?.address && <p className="max-w-sm text-muted-foreground">{customer.address}</p>}
+                {customer?.address && (
+                  <p className="max-w-sm text-muted-foreground">{customer.address}</p>
+                )}
               </div>
               <PrintMeta
                 className="lg:grid-cols-2"
@@ -201,11 +241,19 @@ export function InvoiceView({ id }: { id: string }) {
                   { label: docNoLabel, value: <span className="font-mono">{order.orderNo}</span> },
                   { label: t("common.date"), value: formatDate(order.date) },
                   { label: t("sales.orderStatus"), value: t(`status.${order.status}` as any) },
-                  { label: t("sales.paymentStatus"), value: t(`sales.${paymentStatus(order.total, order.paid)}`) },
-                  ...(order.receiverName ? [{ label: t("sales.receiver"), value: order.receiverName }] : []),
+                  {
+                    label: t("sales.paymentStatus"),
+                    value: t(`sales.${paymentStatus(order.total, order.paid)}`),
+                  },
+                  ...(order.receiverName
+                    ? [{ label: t("sales.receiver"), value: order.receiverName }]
+                    : []),
                   ...(isQuote
                     ? [
-                        { label: t("sales.validity"), value: validityDate || t("sales.validityDays") },
+                        {
+                          label: t("sales.validity"),
+                          value: validityDate || t("sales.validityDays"),
+                        },
                       ]
                     : [
                         { label: t("common.paid"), value: formatCurrency(order.paid) },
@@ -228,18 +276,26 @@ export function InvoiceView({ id }: { id: string }) {
                 </TableHeader>
                 <TableBody>
                   {order.items
-                    .filter((it) => !isCylinderMovementOnly(it, products.find((p) => p.id === it.productId)))
+                    .filter(
+                      (it) =>
+                        !isCylinderMovementOnly(
+                          it,
+                          products.find((p) => p.id === it.productId),
+                        ),
+                    )
                     .map((it, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="text-muted-foreground">{i + 1}</TableCell>
-                      <TableCell>{it.productName}</TableCell>
-                      <TableCell className="text-right tabular-nums">{it.quantity}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatCurrency(it.price)}</TableCell>
-                      <TableCell className="text-right font-medium tabular-nums">
-                        {formatCurrency(lineAmount(it))}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                      <TableRow key={i}>
+                        <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                        <TableCell>{it.productName}</TableCell>
+                        <TableCell className="text-right tabular-nums">{it.quantity}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {formatCurrency(it.price)}
+                        </TableCell>
+                        <TableCell className="text-right font-medium tabular-nums">
+                          {formatCurrency(lineAmount(it))}
+                        </TableCell>
+                      </TableRow>
+                    ))}
                 </TableBody>
               </Table>
             </div>
@@ -249,20 +305,29 @@ export function InvoiceView({ id }: { id: string }) {
                 isQuote
                   ? [
                       { label: t("common.subtotal"), value: formatCurrency(order.subtotal) },
-                      { label: t("sales.grandTotal"), value: formatCurrency(order.total), bold: true },
+                      {
+                        label: t("sales.grandTotal"),
+                        value: formatCurrency(order.total),
+                        bold: true,
+                      },
                     ]
                   : [
                       { label: t("common.total"), value: formatCurrency(order.total), bold: true },
                       { label: t("common.paid"), value: formatCurrency(order.paid) },
                       { label: t("common.due"), value: formatCurrency(due), bold: true },
-                      { label: t("sales.paymentStatus"), value: t(`sales.${paymentStatus(order.total, order.paid)}`) },
+                      {
+                        label: t("sales.paymentStatus"),
+                        value: t(`sales.${paymentStatus(order.total, order.paid)}`),
+                      },
                     ]
               }
             />
 
             {isQuote && (
               <div className="print-avoid-break space-y-1 border-t pt-3 text-xs text-muted-foreground">
-                <p className="font-semibold text-foreground">{t("sales.validity")}: {t("sales.validityDays")}</p>
+                <p className="font-semibold text-foreground">
+                  {t("sales.validity")}: {t("sales.validityDays")}
+                </p>
                 <p>{t("sales.quoteTerms")}</p>
               </div>
             )}
@@ -278,18 +343,26 @@ export function InvoiceView({ id }: { id: string }) {
 
             {!isQuote && (
               <div className="invoice-money-receipt border-t pt-2">
-                <p className="mb-2 text-center text-sm font-bold uppercase tracking-wide">{t("doc.moneyReceipt")}</p>
+                <p className="mb-2 text-center text-sm font-bold uppercase tracking-wide">
+                  {t("doc.moneyReceipt")}
+                </p>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs sm:grid-cols-3">
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{t("doc.receivedFrom")}</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      {t("doc.receivedFrom")}
+                    </p>
                     <p className="font-medium">{order.customerName}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{t("doc.reference")}</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      {t("doc.reference")}
+                    </p>
                     <p className="font-mono">{order.orderNo}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{t("common.paid")}</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      {t("common.paid")}
+                    </p>
                     <p className="font-medium tabular-nums">{formatCurrency(order.paid)}</p>
                   </div>
                 </div>
@@ -321,17 +394,31 @@ export function InvoiceView({ id }: { id: string }) {
                 </Button>
               )}
               {order.status === "confirmed" && (
-                <Button className="w-full" disabled={busy} onClick={() => setStatus.mutate("invoiced")}>
+                <Button
+                  className="w-full"
+                  disabled={busy}
+                  onClick={() => setStatus.mutate("invoiced")}
+                >
                   {t("sales.markInvoiced")}
                 </Button>
               )}
               {(order.status === "confirmed" || order.status === "invoiced") && (
-                <Button className="w-full" variant="destructive" disabled={busy} onClick={() => setStatus.mutate("cancelled")}>
+                <Button
+                  className="w-full"
+                  variant="destructive"
+                  disabled={busy}
+                  onClick={() => setStatus.mutate("cancelled")}
+                >
                   {t("sales.cancelOrder")}
                 </Button>
               )}
               {order.status === "draft" && (
-                <Button className="w-full" variant="outline" disabled={busy} onClick={() => setStatus.mutate("cancelled")}>
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => setStatus.mutate("cancelled")}
+                >
                   {t("sales.cancelQuotation")}
                 </Button>
               )}
@@ -345,11 +432,15 @@ export function InvoiceView({ id }: { id: string }) {
                 <h3 className="font-semibold">{t("sales.recordPayment")}</h3>
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div>
-                    <p className="text-[10px] uppercase text-muted-foreground">{t("common.total")}</p>
+                    <p className="text-[10px] uppercase text-muted-foreground">
+                      {t("common.total")}
+                    </p>
                     <p className="font-medium">{formatCurrency(order.total)}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] uppercase text-muted-foreground">{t("common.paid")}</p>
+                    <p className="text-[10px] uppercase text-muted-foreground">
+                      {t("common.paid")}
+                    </p>
                     <p className="font-medium">{formatCurrency(order.paid)}</p>
                   </div>
                   <div>
@@ -357,8 +448,12 @@ export function InvoiceView({ id }: { id: string }) {
                     <p className="font-medium">{formatCurrency(due)}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] uppercase text-muted-foreground">{t("sales.paymentStatus")}</p>
-                    <p className="font-medium">{t(`sales.${paymentStatus(order.total, order.paid)}`)}</p>
+                    <p className="text-[10px] uppercase text-muted-foreground">
+                      {t("sales.paymentStatus")}
+                    </p>
+                    <p className="font-medium">
+                      {t(`sales.${paymentStatus(order.total, order.paid)}`)}
+                    </p>
                   </div>
                 </div>
                 {payments.length > 0 && (
@@ -374,11 +469,19 @@ export function InvoiceView({ id }: { id: string }) {
                       <TableBody>
                         {payments.map((p) => (
                           <TableRow key={p.id}>
-                            <TableCell className="whitespace-nowrap text-xs">{formatDate(p.date)}</TableCell>
-                            <TableCell className="text-xs">
-                              {p.account === "cash" ? t("common.cash") : p.account === "bank" ? t("common.bank") : p.account}
+                            <TableCell className="whitespace-nowrap text-xs">
+                              {formatDate(p.date)}
                             </TableCell>
-                            <TableCell className="text-right tabular-nums">{formatCurrency(p.amount)}</TableCell>
+                            <TableCell className="text-xs">
+                              {p.account === "cash"
+                                ? t("common.cash")
+                                : p.account === "bank"
+                                  ? t("common.bank")
+                                  : p.account}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {formatCurrency(p.amount)}
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -403,7 +506,9 @@ export function InvoiceView({ id }: { id: string }) {
                     onValueChange={(v) => setMethod(v as PaymentMethod)}
                     disabled={payLocked}
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="cash">{t("common.cash")}</SelectItem>
                       <SelectItem value="bank">{t("common.bank")}</SelectItem>
@@ -414,10 +519,14 @@ export function InvoiceView({ id }: { id: string }) {
                   <div className="space-y-1.5">
                     <Label>{t("sales.bankAccount")}</Label>
                     <Select value={bankAccount} onValueChange={setBankAccount} disabled={payLocked}>
-                      <SelectTrigger><SelectValue placeholder={t("common.select")} /></SelectTrigger>
+                      <SelectTrigger>
+                        <SelectValue placeholder={t("common.select")} />
+                      </SelectTrigger>
                       <SelectContent>
                         {bankAccounts.map((a) => (
-                          <SelectItem key={a.id} value={a.name}>{a.name}</SelectItem>
+                          <SelectItem key={a.id} value={a.name}>
+                            {a.name}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -426,11 +535,11 @@ export function InvoiceView({ id }: { id: string }) {
                 <Button
                   className="w-full"
                   disabled={
-                    payLocked
-                    || !amount
-                    || Number(amount) <= 0
-                    || Number(amount) > due + 0.009
-                    || (method === "bank" && bankAccounts.length > 0 && !bankAccount)
+                    payLocked ||
+                    !amount ||
+                    Number(amount) <= 0 ||
+                    Number(amount) > due + 0.009 ||
+                    (method === "bank" && bankAccounts.length > 0 && !bankAccount)
                   }
                   onClick={() => {
                     if (pay.isPending) return;
@@ -439,7 +548,11 @@ export function InvoiceView({ id }: { id: string }) {
                     pay.mutate(n);
                   }}
                 >
-                  {due <= 0 ? t("sales.fullyPaid") : payments.length > 0 ? t("sales.addPayment") : t("sales.recordPayment")}
+                  {due <= 0
+                    ? t("sales.fullyPaid")
+                    : payments.length > 0
+                      ? t("sales.addPayment")
+                      : t("sales.recordPayment")}
                 </Button>
                 <p className="text-xs text-muted-foreground">{t("sales.paymentHint")}</p>
               </CardContent>

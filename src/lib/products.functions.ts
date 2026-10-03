@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { CostingMethod, Product, ProductType, UnitOfMeasure } from "@/types";
 
-const clean = <T,>(doc: any): T => {
+const clean = <T>(doc: any): T => {
   if (!doc) return doc;
   const { _id, ...rest } = doc;
   return rest as T;
@@ -75,7 +75,8 @@ export const updateProductFn = createServerFn({ method: "POST" })
     }
     if (src.reorderLevel != null) {
       const reorderLevel = Number(src.reorderLevel);
-      if (!Number.isFinite(reorderLevel) || reorderLevel < 0) throw new Error("Invalid reorder level");
+      if (!Number.isFinite(reorderLevel) || reorderLevel < 0)
+        throw new Error("Invalid reorder level");
       patch.reorderLevel = reorderLevel;
     }
     if ("image" in src) {
@@ -101,10 +102,9 @@ export const updateProductFn = createServerFn({ method: "POST" })
 
     const { getDb } = await import("./mongo.server");
     const db = await getDb();
-    const result = await db.collection("products").updateOne(
-      { id: String(existing.id) },
-      { $set: patch },
-    );
+    const result = await db
+      .collection("products")
+      .updateOne({ id: String(existing.id) }, { $set: patch });
     if (result.matchedCount === 0) {
       throw new Error(`Record not found (products/${existing.id})`);
     }

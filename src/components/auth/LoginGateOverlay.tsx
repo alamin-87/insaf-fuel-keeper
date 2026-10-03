@@ -101,7 +101,10 @@ export function LoginGateOverlay({
         className="login-gate-panel login-gate-panel-right absolute inset-y-0 right-0 w-1/2 border-l border-emerald-500/20"
       />
 
-      <div ref={contentRef} className="relative z-10 flex w-full max-w-sm flex-col items-center px-6 text-center">
+      <div
+        ref={contentRef}
+        className="relative z-10 flex w-full max-w-sm flex-col items-center px-6 text-center"
+      >
         <div className="login-gate-emblem relative mb-5">
           <BrandLogo size="xl" className="rounded-2xl shadow-[0_0_40px_rgba(30,58,95,0.55)]" />
           <span className="login-gate-ring absolute inset-0 rounded-2xl border border-amber-300/40" />

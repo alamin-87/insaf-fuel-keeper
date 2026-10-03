@@ -18,7 +18,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/common/PageHeader";
 import { ProductImage } from "@/components/common/ProductImage";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { useT, type MessageKey } from "@/i18n";
 import type { CostingMethod } from "@/types";
@@ -52,7 +56,12 @@ export function ProductForm({ id }: { id?: string }) {
   const expenseAccounts = coa.filter((a) => a.type === "Expense");
 
   const {
-    register, handleSubmit, setValue, watch, reset, formState: { errors, isSubmitting },
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    reset,
+    formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: {
@@ -124,8 +133,10 @@ export function ProductForm({ id }: { id?: string }) {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (id && isLoading) return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
-  if (id && !existing) return <div className="p-6 text-sm text-destructive">{t("products.notFound")}</div>;
+  if (id && isLoading)
+    return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
+  if (id && !existing)
+    return <div className="p-6 text-sm text-destructive">{t("products.notFound")}</div>;
 
   const costing = watch("costingMethod") || "fifo";
   const image = watch("image") || "";
@@ -149,170 +160,249 @@ export function ProductForm({ id }: { id?: string }) {
 
   return (
     <div>
-      <PageHeader title={mode === "create" ? t("products.new") : t("products.edit")} backTo={id ? { to: "/products/$id", params: { id } } : "/products"} />
-      <Card><CardContent className="pt-6">
-        <form
-          onSubmit={handleSubmit(
-            (v) => mutation.mutate(v),
-            () => toast.error(t("products.validationFailed")),
-          )}
-          className="grid gap-4 md:grid-cols-2"
-        >
-          <div className="md:col-span-2 flex flex-col gap-3 rounded-xl border bg-muted/20 p-4 sm:flex-row sm:items-center">
-            <ProductImage src={image || undefined} alt={watch("name") || "product"} size="lg" />
-            <div className="min-w-0 flex-1 space-y-2">
-              <Label>{t("products.image")}</Label>
-              <p className="text-xs text-muted-foreground">{t("products.imageHint")}</p>
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" size="sm" asChild>
-                  <label className="cursor-pointer">
-                    <ImagePlus className="mr-1 h-4 w-4" />
-                    {t("products.imageUpload")}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="sr-only"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        e.target.value = "";
-                        void onPickImage(file);
-                      }}
-                    />
-                  </label>
-                </Button>
-                {image && (
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setValue("image", "", { shouldDirty: true })}>
-                    <Trash2 className="mr-1 h-4 w-4" />
-                    {t("products.imageRemove")}
+      <PageHeader
+        title={mode === "create" ? t("products.new") : t("products.edit")}
+        backTo={id ? { to: "/products/$id", params: { id } } : "/products"}
+      />
+      <Card>
+        <CardContent className="pt-6">
+          <form
+            onSubmit={handleSubmit(
+              (v) => mutation.mutate(v),
+              () => toast.error(t("products.validationFailed")),
+            )}
+            className="grid gap-4 md:grid-cols-2"
+          >
+            <div className="md:col-span-2 flex flex-col gap-3 rounded-xl border bg-muted/20 p-4 sm:flex-row sm:items-center">
+              <ProductImage src={image || undefined} alt={watch("name") || "product"} size="lg" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <Label>{t("products.image")}</Label>
+                <p className="text-xs text-muted-foreground">{t("products.imageHint")}</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" size="sm" asChild>
+                    <label className="cursor-pointer">
+                      <ImagePlus className="mr-1 h-4 w-4" />
+                      {t("products.imageUpload")}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = "";
+                          void onPickImage(file);
+                        }}
+                      />
+                    </label>
                   </Button>
-                )}
+                  {image && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setValue("image", "", { shouldDirty: true })}
+                    >
+                      <Trash2 className="mr-1 h-4 w-4" />
+                      {t("products.imageRemove")}
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
 
-          <Row label={t("products.code")} error={errors.code?.message}><Input {...register("code")} /></Row>
-          <Row label={t("common.name")} error={errors.name?.message}><Input {...register("name")} /></Row>
-          <Row label={t("common.category")}>
-            <Select value={watch("category")} onValueChange={(v) => setValue("category", v as FormValues["category"])}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {categoryOptions.map((c) => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Row>
-          <Row label={t("products.productType")}>
-            <Select value={watch("productType")} onValueChange={(v) => setValue("productType", v as FormValues["productType"])}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="gas">{t("products.type.gas")}</SelectItem>
-                <SelectItem value="cylinder">{t("products.type.cylinder")}</SelectItem>
-              </SelectContent>
-            </Select>
-          </Row>
-          <Row label={t("products.uom")}>
-            <Select value={watch("uom")} onValueChange={(v) => setValue("uom", v as FormValues["uom"])}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {["kg", "cyl", "ltr", "pcs"].map((c) => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Row>
-          <Row label={t("products.salesPrice")} error={errors.price?.message}>
-            <Input type="number" step="0.01" min={0} {...register("price", { valueAsNumber: true })} />
-          </Row>
-          <Row label={t("products.costPrice")} error={errors.cost?.message}>
-            <Input type="number" step="0.01" min={0} {...register("cost", { valueAsNumber: true })} />
-          </Row>
-          <Row label={t("products.reorder")}><Input type="number" {...register("reorderLevel")} /></Row>
-          {mode === "create" && (
-            <Row label={t("products.stock")}><Input type="number" {...register("stock")} /></Row>
-          )}
-
-          <div className="md:col-span-2 space-y-4 rounded-xl border bg-muted/20 p-4">
-            <div>
-              <h3 className="font-display text-sm font-semibold">{t("products.accounting")}</h3>
-              <p className="mt-0.5 text-xs text-muted-foreground">{t("products.accountingHint")}</p>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <Row label={t("products.incomeAccount")}>
-                <Select
-                  value={watch("incomeAccountId") || NONE}
-                  onValueChange={(v) => setValue("incomeAccountId", v === NONE ? "" : v)}
-                >
-                  <SelectTrigger><SelectValue placeholder={t("common.select")} /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE}>—</SelectItem>
-                    {incomeAccounts.map((a) => (
-                      <SelectItem key={a.id} value={a.id}>
-                        {a.code ? `${a.code} · ` : ""}{a.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <Row label={t("products.code")} error={errors.code?.message}>
+              <Input {...register("code")} />
+            </Row>
+            <Row label={t("common.name")} error={errors.name?.message}>
+              <Input {...register("name")} />
+            </Row>
+            <Row label={t("common.category")}>
+              <Select
+                value={watch("category")}
+                onValueChange={(v) => setValue("category", v as FormValues["category"])}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {categoryOptions.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Row>
+            <Row label={t("products.productType")}>
+              <Select
+                value={watch("productType")}
+                onValueChange={(v) => setValue("productType", v as FormValues["productType"])}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="gas">{t("products.type.gas")}</SelectItem>
+                  <SelectItem value="cylinder">{t("products.type.cylinder")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </Row>
+            <Row label={t("products.uom")}>
+              <Select
+                value={watch("uom")}
+                onValueChange={(v) => setValue("uom", v as FormValues["uom"])}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {["kg", "cyl", "ltr", "pcs"].map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Row>
+            <Row label={t("products.salesPrice")} error={errors.price?.message}>
+              <Input
+                type="number"
+                step="0.01"
+                min={0}
+                {...register("price", { valueAsNumber: true })}
+              />
+            </Row>
+            <Row label={t("products.costPrice")} error={errors.cost?.message}>
+              <Input
+                type="number"
+                step="0.01"
+                min={0}
+                {...register("cost", { valueAsNumber: true })}
+              />
+            </Row>
+            <Row label={t("products.reorder")}>
+              <Input type="number" {...register("reorderLevel")} />
+            </Row>
+            {mode === "create" && (
+              <Row label={t("products.stock")}>
+                <Input type="number" {...register("stock")} />
               </Row>
-              <Row label={t("products.expenseAccount")}>
-                <Select
-                  value={watch("expenseAccountId") || NONE}
-                  onValueChange={(v) => setValue("expenseAccountId", v === NONE ? "" : v)}
-                >
-                  <SelectTrigger><SelectValue placeholder={t("common.select")} /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE}>—</SelectItem>
-                    {expenseAccounts.map((a) => (
-                      <SelectItem key={a.id} value={a.id}>
-                        {a.code ? `${a.code} · ` : ""}{a.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Row>
-            </div>
-            {coa.length === 0 && (
-              <p className="text-xs text-amber-700 dark:text-amber-400">{t("products.coaEmpty")}</p>
             )}
 
-            <div>
-              <Label>{t("products.costingMethod")}</Label>
-              <div className="mt-2 grid gap-2 sm:grid-cols-3">
-                {COSTING.map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => setValue("costingMethod", opt.id)}
-                    className={
-                      costing === opt.id
-                        ? "rounded-lg border border-primary bg-primary/5 p-3 text-left"
-                        : "rounded-lg border bg-card p-3 text-left hover:border-primary/40"
-                    }
+            <div className="md:col-span-2 space-y-4 rounded-xl border bg-muted/20 p-4">
+              <div>
+                <h3 className="font-display text-sm font-semibold">{t("products.accounting")}</h3>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {t("products.accountingHint")}
+                </p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Row label={t("products.incomeAccount")}>
+                  <Select
+                    value={watch("incomeAccountId") || NONE}
+                    onValueChange={(v) => setValue("incomeAccountId", v === NONE ? "" : v)}
                   >
-                    <p className="text-sm font-semibold">{t(opt.label)}</p>
-                    <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{t(opt.hint)}</p>
-                  </button>
-                ))}
+                    <SelectTrigger>
+                      <SelectValue placeholder={t("common.select")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NONE}>—</SelectItem>
+                      {incomeAccounts.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.code ? `${a.code} · ` : ""}
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Row>
+                <Row label={t("products.expenseAccount")}>
+                  <Select
+                    value={watch("expenseAccountId") || NONE}
+                    onValueChange={(v) => setValue("expenseAccountId", v === NONE ? "" : v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t("common.select")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NONE}>—</SelectItem>
+                      {expenseAccounts.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.code ? `${a.code} · ` : ""}
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Row>
+              </div>
+              {coa.length === 0 && (
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  {t("products.coaEmpty")}
+                </p>
+              )}
+
+              <div>
+                <Label>{t("products.costingMethod")}</Label>
+                <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                  {COSTING.map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setValue("costingMethod", opt.id)}
+                      className={
+                        costing === opt.id
+                          ? "rounded-lg border border-primary bg-primary/5 p-3 text-left"
+                          : "rounded-lg border bg-card p-3 text-left hover:border-primary/40"
+                      }
+                    >
+                      <p className="text-sm font-semibold">{t(opt.label)}</p>
+                      <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                        {t(opt.hint)}
+                      </p>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="md:col-span-2 flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => navigate({ to: id ? "/products/$id" : "/products", params: id ? { id } : undefined })}>{t("common.cancel")}</Button>
-            <Button type="submit" disabled={isSubmitting || mutation.isPending}>
-              {t("common.save")}
-            </Button>
-          </div>
-        </form>
-      </CardContent></Card>
+            <div className="md:col-span-2 flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() =>
+                  navigate({
+                    to: id ? "/products/$id" : "/products",
+                    params: id ? { id } : undefined,
+                  })
+                }
+              >
+                {t("common.cancel")}
+              </Button>
+              <Button type="submit" disabled={isSubmitting || mutation.isPending}>
+                {t("common.save")}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
-function Row({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+function Row({
+  label,
+  error,
+  children,
+}: {
+  label: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="space-y-1.5">
-      <Label>{label}</Label>{children}
+      <Label>{label}</Label>
+      {children}
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );

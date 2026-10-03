@@ -3,7 +3,16 @@ import { createFileRoute, redirect, useNavigate, useRouter } from "@tanstack/rea
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  Building2, Calculator, ClipboardCheck, HardHat, Languages, Shield, Sparkles, Truck, Users, Warehouse,
+  Building2,
+  Calculator,
+  ClipboardCheck,
+  HardHat,
+  Languages,
+  Shield,
+  Sparkles,
+  Truck,
+  Users,
+  Warehouse,
 } from "lucide-react";
 import { loginFn, getSessionFn, demoLoginEnabledFn } from "@/lib/auth.functions";
 import { LoginGateOverlay } from "@/components/auth/LoginGateOverlay";
@@ -45,14 +54,46 @@ const QUICK_ACCESS: Array<{ username: string; displayName: string; role: AppRole
 ];
 
 const ROLE_META: Record<AppRole, { icon: typeof Shield; tone: string; glow: string }> = {
-  Administrator: { icon: Shield, tone: "from-emerald-500/35 to-teal-900/20 border-emerald-400/35", glow: "group-hover:shadow-emerald-500/25" },
-  Manager: { icon: HardHat, tone: "from-sky-500/30 to-blue-900/20 border-sky-400/35", glow: "group-hover:shadow-sky-500/25" },
-  Sales: { icon: Users, tone: "from-amber-500/30 to-orange-900/20 border-amber-400/35", glow: "group-hover:shadow-amber-500/25" },
-  Warehouse: { icon: Warehouse, tone: "from-violet-500/30 to-purple-900/20 border-violet-400/35", glow: "group-hover:shadow-violet-500/25" },
-  Accounts: { icon: Calculator, tone: "from-cyan-500/30 to-teal-900/20 border-cyan-400/35", glow: "group-hover:shadow-cyan-500/25" },
-  HR: { icon: Building2, tone: "from-rose-500/30 to-pink-900/20 border-rose-400/35", glow: "group-hover:shadow-rose-500/25" },
-  Delivery: { icon: Truck, tone: "from-lime-500/30 to-green-900/20 border-lime-400/35", glow: "group-hover:shadow-lime-500/25" },
-  Auditor: { icon: ClipboardCheck, tone: "from-slate-400/25 to-slate-800/20 border-slate-400/35", glow: "group-hover:shadow-slate-400/20" },
+  Administrator: {
+    icon: Shield,
+    tone: "from-emerald-500/35 to-teal-900/20 border-emerald-400/35",
+    glow: "group-hover:shadow-emerald-500/25",
+  },
+  Manager: {
+    icon: HardHat,
+    tone: "from-sky-500/30 to-blue-900/20 border-sky-400/35",
+    glow: "group-hover:shadow-sky-500/25",
+  },
+  Sales: {
+    icon: Users,
+    tone: "from-amber-500/30 to-orange-900/20 border-amber-400/35",
+    glow: "group-hover:shadow-amber-500/25",
+  },
+  Warehouse: {
+    icon: Warehouse,
+    tone: "from-violet-500/30 to-purple-900/20 border-violet-400/35",
+    glow: "group-hover:shadow-violet-500/25",
+  },
+  Accounts: {
+    icon: Calculator,
+    tone: "from-cyan-500/30 to-teal-900/20 border-cyan-400/35",
+    glow: "group-hover:shadow-cyan-500/25",
+  },
+  HR: {
+    icon: Building2,
+    tone: "from-rose-500/30 to-pink-900/20 border-rose-400/35",
+    glow: "group-hover:shadow-rose-500/25",
+  },
+  Delivery: {
+    icon: Truck,
+    tone: "from-lime-500/30 to-green-900/20 border-lime-400/35",
+    glow: "group-hover:shadow-lime-500/25",
+  },
+  Auditor: {
+    icon: ClipboardCheck,
+    tone: "from-slate-400/25 to-slate-800/20 border-slate-400/35",
+    glow: "group-hover:shadow-slate-400/20",
+  },
 };
 
 const QUICK_PASSWORD = "insaf123";
@@ -62,7 +103,10 @@ function safeRedirectPath(raw: string | undefined) {
   if (!raw) return "/";
   try {
     if (raw.startsWith("/") && !raw.startsWith("//")) return raw;
-    const url = new URL(raw, typeof window !== "undefined" ? window.location.origin : "http://localhost");
+    const url = new URL(
+      raw,
+      typeof window !== "undefined" ? window.location.origin : "http://localhost",
+    );
     if (typeof window !== "undefined" && url.origin !== window.location.origin) return "/";
     return `${url.pathname}${url.search}${url.hash}` || "/";
   } catch {
@@ -158,13 +202,19 @@ function LoginPage() {
     window.setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 120);
   };
 
-  const doLogin = async (user: string, pass: string, meta?: { displayName: string; role: AppRole }) => {
+  const doLogin = async (
+    user: string,
+    pass: string,
+    meta?: { displayName: string; role: AppRole },
+  ) => {
     setPending(true);
     setQuickUser(user);
     try {
       const result = await loginFn({ data: { username: user, password: pass } });
       if (!result.ok) {
-        toast.error(result.error === "Invalid username or password" ? t("login.invalid") : result.error);
+        toast.error(
+          result.error === "Invalid username or password" ? t("login.invalid") : result.error,
+        );
         return;
       }
       setGateUser({
@@ -197,7 +247,9 @@ function LoginPage() {
           <div className="flex min-w-0 items-center gap-2.5">
             <BrandLogo size="lg" className="rounded-lg shadow-lg shadow-sky-900/40" />
             <div className="min-w-0 truncate">
-              <p className="truncate font-display text-sm font-semibold sm:text-base">{t("brand.name")}</p>
+              <p className="truncate font-display text-sm font-semibold sm:text-base">
+                {t("brand.name")}
+              </p>
               <p className="truncate text-[10px] text-slate-400 sm:text-xs">{t("brand.tagline")}</p>
             </div>
           </div>
@@ -218,12 +270,16 @@ function LoginPage() {
           <aside data-login-enter className="order-1 w-full lg:order-2 lg:sticky lg:top-4">
             <div className="rounded-2xl border border-slate-800/80 bg-slate-900/70 p-4 shadow-2xl shadow-black/40 backdrop-blur-xl sm:p-5">
               <div className="mb-3">
-                <h2 className="font-display text-base font-semibold sm:text-lg">{t("login.title")}</h2>
+                <h2 className="font-display text-base font-semibold sm:text-lg">
+                  {t("login.title")}
+                </h2>
                 <p className="text-[11px] text-slate-400 sm:text-xs">{t("login.subtitle")}</p>
               </div>
               <form onSubmit={onSubmit} className="space-y-3">
                 <div className="space-y-1">
-                  <Label htmlFor="username" className="text-[11px] text-slate-300">{t("login.username")}</Label>
+                  <Label htmlFor="username" className="text-[11px] text-slate-300">
+                    {t("login.username")}
+                  </Label>
                   <Input
                     id="username"
                     value={username}
@@ -235,7 +291,9 @@ function LoginPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="password" className="text-[11px] text-slate-300">{t("login.password")}</Label>
+                  <Label htmlFor="password" className="text-[11px] text-slate-300">
+                    {t("login.password")}
+                  </Label>
                   <Input
                     id="password"
                     type="password"
@@ -255,72 +313,74 @@ function LoginPage() {
                   {pending && !quickUser ? t("login.submitting") : t("login.submit")}
                 </Button>
                 {showDemoLogin && (
-                <p className="text-center text-[10px] text-slate-500">
-                  {t("login.defaultHint")}{" "}
-                  <span className="font-mono text-slate-400">operator</span> /{" "}
-                  <span className="font-mono text-slate-400">insaf123</span>
-                </p>
+                  <p className="text-center text-[10px] text-slate-500">
+                    {t("login.defaultHint")}{" "}
+                    <span className="font-mono text-slate-400">operator</span> /{" "}
+                    <span className="font-mono text-slate-400">insaf123</span>
+                  </p>
                 )}
               </form>
             </div>
           </aside>
 
           {showDemoLogin && (
-          <section data-login-enter className="order-2 w-full min-w-0 lg:order-1">
-            <div className="mb-3">
-              <Badge className="h-5 bg-emerald-500/15 px-2 text-[10px] text-emerald-300 hover:bg-emerald-500/15">
-                <Sparkles className="mr-1 h-3 w-3" />
-                {t("login.quickAccess")}
-              </Badge>
-              <h1 className="mt-2 font-display text-lg font-bold leading-snug tracking-tight sm:text-xl lg:text-2xl">
-                {t("login.homeTitle")}
-              </h1>
-              <p className="mt-1 text-[11px] leading-relaxed text-slate-400 sm:text-xs">
-                {t("login.homeHint")}
-              </p>
-            </div>
+            <section data-login-enter className="order-2 w-full min-w-0 lg:order-1">
+              <div className="mb-3">
+                <Badge className="h-5 bg-emerald-500/15 px-2 text-[10px] text-emerald-300 hover:bg-emerald-500/15">
+                  <Sparkles className="mr-1 h-3 w-3" />
+                  {t("login.quickAccess")}
+                </Badge>
+                <h1 className="mt-2 font-display text-lg font-bold leading-snug tracking-tight sm:text-xl lg:text-2xl">
+                  {t("login.homeTitle")}
+                </h1>
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-400 sm:text-xs">
+                  {t("login.homeHint")}
+                </p>
+              </div>
 
-            <div className="login-role-grid grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2.5 lg:grid-cols-4">
-              {QUICK_ACCESS.map((u) => {
-                const meta = ROLE_META[u.role] ?? ROLE_META.Auditor;
-                const Icon = meta.icon;
-                const busy = pending && quickUser === u.username;
-                return (
-                  <button
-                    key={u.username}
-                    type="button"
-                    data-login-card
-                    disabled={pending || gateActive}
-                    onClick={() => doLogin(u.username, QUICK_PASSWORD, u)}
-                    className={cn(
-                      "login-role-btn group flex min-h-[108px] w-full min-w-0 flex-col rounded-xl border bg-gradient-to-br p-3 text-left sm:min-h-[112px]",
-                      "shadow-lg shadow-black/20",
-                      meta.tone,
-                      meta.glow,
-                      busy && "ring-2 ring-emerald-400/60",
-                    )}
-                  >
-                    <div className="flex w-full items-start justify-between gap-1">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-950/50 text-emerald-300">
-                        <Icon className="h-4 w-4" />
+              <div className="login-role-grid grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2.5 lg:grid-cols-4">
+                {QUICK_ACCESS.map((u) => {
+                  const meta = ROLE_META[u.role] ?? ROLE_META.Auditor;
+                  const Icon = meta.icon;
+                  const busy = pending && quickUser === u.username;
+                  return (
+                    <button
+                      key={u.username}
+                      type="button"
+                      data-login-card
+                      disabled={pending || gateActive}
+                      onClick={() => doLogin(u.username, QUICK_PASSWORD, u)}
+                      className={cn(
+                        "login-role-btn group flex min-h-[108px] w-full min-w-0 flex-col rounded-xl border bg-gradient-to-br p-3 text-left sm:min-h-[112px]",
+                        "shadow-lg shadow-black/20",
+                        meta.tone,
+                        meta.glow,
+                        busy && "ring-2 ring-emerald-400/60",
+                      )}
+                    >
+                      <div className="flex w-full items-start justify-between gap-1">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-950/50 text-emerald-300">
+                          <Icon className="h-4 w-4" />
+                        </div>
+                        <span className="min-w-0 truncate rounded border border-white/10 bg-black/25 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-slate-300 sm:text-[10px]">
+                          {u.role}
+                        </span>
                       </div>
-                      <span className="min-w-0 truncate rounded border border-white/10 bg-black/25 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-slate-300 sm:text-[10px]">
-                        {u.role}
-                      </span>
-                    </div>
-                    <p className="mt-2 break-words text-xs font-semibold leading-tight sm:text-sm">{u.displayName}</p>
-                    <p className="truncate font-mono text-[10px] text-slate-500">{u.username}</p>
-                    <p className="mt-auto pt-2 text-[10px] font-medium text-emerald-300/90 group-hover:text-emerald-200 group-active:text-emerald-200">
-                      {busy ? t("login.submitting") : t("login.tapToEnter")}
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
-            <p className="mt-3 pb-2 text-center text-[10px] text-slate-600">
-              {t("login.quickPassHint")}
-            </p>
-          </section>
+                      <p className="mt-2 break-words text-xs font-semibold leading-tight sm:text-sm">
+                        {u.displayName}
+                      </p>
+                      <p className="truncate font-mono text-[10px] text-slate-500">{u.username}</p>
+                      <p className="mt-auto pt-2 text-[10px] font-medium text-emerald-300/90 group-hover:text-emerald-200 group-active:text-emerald-200">
+                        {busy ? t("login.submitting") : t("login.tapToEnter")}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-3 pb-2 text-center text-[10px] text-slate-600">
+                {t("login.quickPassHint")}
+              </p>
+            </section>
           )}
         </div>
       </div>

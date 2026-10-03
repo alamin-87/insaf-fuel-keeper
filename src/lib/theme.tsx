@@ -1,5 +1,11 @@
 import {
-  createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
 } from "react";
 
 export type BgThemeId =
@@ -19,12 +25,36 @@ export type AppThemeSettings = {
 const STORAGE_KEY = "insaf-theme-settings";
 
 export const BG_THEMES: { id: BgThemeId; labelKey: string; preview: string }[] = [
-  { id: "industrial-gas", labelKey: "settings.theme.industrial", preview: "from-slate-800 via-cyan-900 to-amber-800" },
-  { id: "mesh-soft", labelKey: "settings.theme.mesh", preview: "from-slate-100 via-blue-100 to-amber-50" },
-  { id: "midnight-plant", labelKey: "settings.theme.midnight", preview: "from-slate-950 via-indigo-950 to-slate-900" },
-  { id: "steel-slate", labelKey: "settings.theme.steel", preview: "from-zinc-200 via-slate-300 to-zinc-100" },
-  { id: "amber-yard", labelKey: "settings.theme.amber", preview: "from-amber-100 via-orange-50 to-slate-200" },
-  { id: "clean-minimal", labelKey: "settings.theme.clean", preview: "from-white via-slate-50 to-white" },
+  {
+    id: "industrial-gas",
+    labelKey: "settings.theme.industrial",
+    preview: "from-slate-800 via-cyan-900 to-amber-800",
+  },
+  {
+    id: "mesh-soft",
+    labelKey: "settings.theme.mesh",
+    preview: "from-slate-100 via-blue-100 to-amber-50",
+  },
+  {
+    id: "midnight-plant",
+    labelKey: "settings.theme.midnight",
+    preview: "from-slate-950 via-indigo-950 to-slate-900",
+  },
+  {
+    id: "steel-slate",
+    labelKey: "settings.theme.steel",
+    preview: "from-zinc-200 via-slate-300 to-zinc-100",
+  },
+  {
+    id: "amber-yard",
+    labelKey: "settings.theme.amber",
+    preview: "from-amber-100 via-orange-50 to-slate-200",
+  },
+  {
+    id: "clean-minimal",
+    labelKey: "settings.theme.clean",
+    preview: "from-white via-slate-50 to-white",
+  },
 ];
 
 const DEFAULTS: AppThemeSettings = {
@@ -48,7 +78,9 @@ function readSettings(): AppThemeSettings {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULTS;
     const parsed = JSON.parse(raw) as Partial<AppThemeSettings>;
-    const bgTheme = BG_THEMES.some((t) => t.id === parsed.bgTheme) ? (parsed.bgTheme as BgThemeId) : DEFAULTS.bgTheme;
+    const bgTheme = BG_THEMES.some((t) => t.id === parsed.bgTheme)
+      ? (parsed.bgTheme as BgThemeId)
+      : DEFAULTS.bgTheme;
     return {
       bgTheme,
       motionEnabled: parsed.motionEnabled ?? DEFAULTS.motionEnabled,

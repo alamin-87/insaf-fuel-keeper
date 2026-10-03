@@ -2,10 +2,25 @@ import type { AppModule } from "./settings-store";
 import type { AppPermission } from "./rbac";
 
 export type CrudCollName =
-  | "customers" | "suppliers" | "products" | "cylinders" | "movements"
-  | "sales" | "deliveries" | "expenses" | "ledger"
-  | "purchases" | "stockMovements" | "vouchers" | "employees" | "payroll"
-  | "appUsers" | "accounts" | "chartOfAccounts" | "assets" | "costLayers";
+  | "customers"
+  | "suppliers"
+  | "products"
+  | "cylinders"
+  | "movements"
+  | "sales"
+  | "deliveries"
+  | "expenses"
+  | "ledger"
+  | "purchases"
+  | "stockMovements"
+  | "vouchers"
+  | "employees"
+  | "payroll"
+  | "appUsers"
+  | "accounts"
+  | "chartOfAccounts"
+  | "assets"
+  | "costLayers";
 
 export type CrudOp = "list" | "get" | "create" | "update" | "remove" | "claim";
 
@@ -35,8 +50,26 @@ const READ: Record<CrudCollName, AppModule[]> = {
   customers: ["customers", "sales", "deliveries", "accounting", "reports"],
   suppliers: ["suppliers", "purchases", "accounting", "reports", "inventory"],
   products: ["products", "sales", "purchases", "inventory", "cylinders", "deliveries", "reports"],
-  cylinders: ["cylinders", "inventory", "deliveries", "sales", "purchases", "reports", "customers", "suppliers"],
-  movements: ["cylinders", "inventory", "deliveries", "sales", "purchases", "reports", "customers", "suppliers"],
+  cylinders: [
+    "cylinders",
+    "inventory",
+    "deliveries",
+    "sales",
+    "purchases",
+    "reports",
+    "customers",
+    "suppliers",
+  ],
+  movements: [
+    "cylinders",
+    "inventory",
+    "deliveries",
+    "sales",
+    "purchases",
+    "reports",
+    "customers",
+    "suppliers",
+  ],
   sales: ["sales", "accounting", "reports", "deliveries", "dashboard"],
   deliveries: ["deliveries", "sales", "reports"],
   expenses: ["expenses", "accounting", "reports", "dashboard"],

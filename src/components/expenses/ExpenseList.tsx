@@ -13,7 +13,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { formatCurrency, formatDate } from "@/utils/formatters";
 import type { Expense } from "@/types";
@@ -37,7 +41,11 @@ export function ExpenseList() {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const {
-    register, handleSubmit, setValue, watch, reset,
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -53,7 +61,8 @@ export function ExpenseList() {
   const startEdit = (row: Expense) => {
     setEditingId(row.id);
     setOpen(true);
-    const paymentMethod: FormValues["paymentMethod"] = row.paymentMethod === "bank" ? "bank" : "cash";
+    const paymentMethod: FormValues["paymentMethod"] =
+      row.paymentMethod === "bank" ? "bank" : "cash";
     reset({
       category: row.category,
       description: row.description,
@@ -72,9 +81,7 @@ export function ExpenseList() {
         paymentMethod: values.paymentMethod,
         date: values.date ? new Date(values.date).toISOString() : new Date().toISOString(),
       };
-      return editingId
-        ? expenseService.update(editingId, payload)
-        : expenseService.create(payload);
+      return editingId ? expenseService.update(editingId, payload) : expenseService.create(payload);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["expenses"] });
@@ -103,14 +110,22 @@ export function ExpenseList() {
         title={t("expenses.title")}
         description={t("expenses.desc")}
         actions={
-          <Button onClick={() => {
-            if (open) closeForm();
-            else {
-              setEditingId(null);
-              setOpen(true);
-              reset({ paymentMethod: "cash", amount: 0, category: "", description: "", date: new Date().toISOString().slice(0, 10) });
-            }
-          }}>
+          <Button
+            onClick={() => {
+              if (open) closeForm();
+              else {
+                setEditingId(null);
+                setOpen(true);
+                reset({
+                  paymentMethod: "cash",
+                  amount: 0,
+                  category: "",
+                  description: "",
+                  date: new Date().toISOString().slice(0, 10),
+                });
+              }
+            }}
+          >
             {open ? t("common.close") : t("expenses.record")}
           </Button>
         }
@@ -119,22 +134,33 @@ export function ExpenseList() {
       {open && (
         <Card>
           <CardContent className="pt-6">
-            <h3 className="mb-4 text-sm font-semibold">{editingId ? t("expenses.edit") : t("expenses.record")}</h3>
-            <form onSubmit={handleSubmit((v) => save.mutate(v))} className="grid gap-4 md:grid-cols-2">
+            <h3 className="mb-4 text-sm font-semibold">
+              {editingId ? t("expenses.edit") : t("expenses.record")}
+            </h3>
+            <form
+              onSubmit={handleSubmit((v) => save.mutate(v))}
+              className="grid gap-4 md:grid-cols-2"
+            >
               <div className="space-y-1.5">
                 <Label>{t("common.category")}</Label>
                 <Input {...register("category")} />
-                {errors.category && <p className="text-xs text-destructive">{errors.category.message}</p>}
+                {errors.category && (
+                  <p className="text-xs text-destructive">{errors.category.message}</p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label>{t("common.amount")}</Label>
                 <Input type="number" step="0.01" {...register("amount")} />
-                {errors.amount && <p className="text-xs text-destructive">{errors.amount.message}</p>}
+                {errors.amount && (
+                  <p className="text-xs text-destructive">{errors.amount.message}</p>
+                )}
               </div>
               <div className="space-y-1.5 md:col-span-2">
                 <Label>{t("common.description")}</Label>
                 <Input {...register("description")} />
-                {errors.description && <p className="text-xs text-destructive">{errors.description.message}</p>}
+                {errors.description && (
+                  <p className="text-xs text-destructive">{errors.description.message}</p>
+                )}
               </div>
               <div className="space-y-1.5">
                 <Label>{t("common.date")}</Label>
@@ -142,8 +168,13 @@ export function ExpenseList() {
               </div>
               <div className="space-y-1.5">
                 <Label>{t("expenses.paidFrom")}</Label>
-                <Select value={watch("paymentMethod")} onValueChange={(v) => setValue("paymentMethod", v as "cash" | "bank")}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select
+                  value={watch("paymentMethod")}
+                  onValueChange={(v) => setValue("paymentMethod", v as "cash" | "bank")}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="cash">{t("common.cash")}</SelectItem>
                     <SelectItem value="bank">{t("common.bank")}</SelectItem>
@@ -151,7 +182,9 @@ export function ExpenseList() {
                 </Select>
               </div>
               <div className="md:col-span-2 flex justify-end gap-2">
-                <Button type="button" variant="ghost" onClick={closeForm}>{t("common.cancel")}</Button>
+                <Button type="button" variant="ghost" onClick={closeForm}>
+                  {t("common.cancel")}
+                </Button>
                 <Button type="submit" disabled={isSubmitting || save.isPending}>
                   {editingId ? t("common.save") : t("expenses.save")}
                 </Button>
@@ -166,11 +199,36 @@ export function ExpenseList() {
         searchKeys={["category", "description"]}
         dateKey="date"
         columns={[
-          { key: "date", header: t("common.date"), sortable: true, sortValue: (r) => r.date, render: (r) => formatDate(r.date) },
-          { key: "category", header: t("common.category"), sortable: true, sortValue: (r) => r.category, render: (r) => <span className="font-medium">{r.category}</span> },
+          {
+            key: "date",
+            header: t("common.date"),
+            sortable: true,
+            sortValue: (r) => r.date,
+            render: (r) => formatDate(r.date),
+          },
+          {
+            key: "category",
+            header: t("common.category"),
+            sortable: true,
+            sortValue: (r) => r.category,
+            render: (r) => <span className="font-medium">{r.category}</span>,
+          },
           { key: "description", header: t("common.description"), render: (r) => r.description },
-          { key: "method", header: t("common.account"), sortable: true, sortValue: (r) => r.paymentMethod, render: (r) => r.paymentMethod },
-          { key: "amount", header: t("common.amount"), sortable: true, sortValue: (r) => r.amount, className: "text-right", render: (r) => formatCurrency(r.amount) },
+          {
+            key: "method",
+            header: t("common.account"),
+            sortable: true,
+            sortValue: (r) => r.paymentMethod,
+            render: (r) => r.paymentMethod,
+          },
+          {
+            key: "amount",
+            header: t("common.amount"),
+            sortable: true,
+            sortValue: (r) => r.amount,
+            className: "text-right",
+            render: (r) => formatCurrency(r.amount),
+          },
           {
             key: "actions",
             header: t("common.actions"),

@@ -26,8 +26,14 @@ export type ProductStockReport = {
 };
 
 export function isMovementIn(m: StockMovement): boolean {
+  // Pure reservation notes should not affect physical on hand
+  if (/^Reserved\b/i.test(m.notes || "")) return false;
   if (m.direction === "in") return true;
   if (m.direction === "out") return false;
+  // Supplier return means company stock is returned to supplier (outbound from company)
+  if (m.refType === "purchase" && (m.type === "return" || m.movementType === "RETURN")) {
+    return false;
+  }
   if (m.movementType) {
     return (
       m.movementType === "RECEIPT" ||
@@ -45,8 +51,14 @@ export function isMovementIn(m: StockMovement): boolean {
 }
 
 export function isMovementOut(m: StockMovement): boolean {
+  // Pure reservation notes should not affect physical on hand
+  if (/^Reserved\b/i.test(m.notes || "")) return false;
   if (m.direction === "out") return true;
   if (m.direction === "in") return false;
+  // Supplier return means company stock is returned to supplier (outbound from company)
+  if (m.refType === "purchase" && (m.type === "return" || m.movementType === "RETURN")) {
+    return true;
+  }
   if (m.movementType) {
     return (
       m.movementType === "SALE_ISSUE" ||
@@ -87,7 +99,8 @@ export function buildStockReport(
   movements: StockMovement[],
   range: DateRange,
 ): ProductStockReport[] {
-  const fromTs = range.preset !== "all" && range.from ? parseRecordTime(`${range.from}T00:00:00`) : null;
+  const fromTs =
+    range.preset !== "all" && range.from ? parseRecordTime(`${range.from}T00:00:00`) : null;
   const toTs = range.preset !== "all" && range.to ? parseRecordTime(`${range.to}T23:59:59`) : null;
 
   const byProduct = new Map<string, StockMovement[]>();
@@ -101,11 +114,30 @@ export function buildStockReport(
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((p) => {
-      const all = (byProduct.get(p.id) ?? []).slice().sort(
-        (a, b) => (parseRecordTime(a.date) ?? 0) - (parseRecordTime(b.date) ?? 0),
+      const all = (byProduct.get(p.id) ?? [])
+        .slice()
+        .sort((a, b) => (parseRecordTime(a.date) ?? 0) - (parseRecordTime(b.date) ?? 0));
+
+      // Check if an explicit initial stock adjustment exists
+      const hasInitMovement = all.some(
+        (m) =>
+          m.refType === "adjustment" &&
+          (m.refId?.startsWith("INIT-") || /initial/i.test(m.notes || "")),
       );
 
-      let openingQty = 0;
+      let baseOpening = 0;
+      if (!hasInitMovement) {
+        if (all.length === 0) {
+          baseOpening = p.stock ?? 0;
+        } else {
+          // Calculate historical opening stock from (current stored stock + totalOut - totalIn)
+          const totalIn = all.reduce((sum, m) => sum + getMovementQtyIn(m), 0);
+          const totalOut = all.reduce((sum, m) => sum + getMovementQtyOut(m), 0);
+          baseOpening = Math.max(0, (p.stock ?? 0) + totalOut - totalIn);
+        }
+      }
+
+      let openingQty = baseOpening;
       let effectiveCost = p.cost ?? 0;
       const period: StockMovement[] = [];
 
@@ -125,11 +157,6 @@ export function buildStockReport(
         }
 
         period.push(m);
-      }
-
-      // If no movements exist at all and range is all time, opening is 0, or fallback to p.stock if no movements
-      if (all.length === 0 && fromTs == null) {
-        openingQty = p.stock ?? 0;
       }
 
       const lines: StockLedgerLine[] = [];

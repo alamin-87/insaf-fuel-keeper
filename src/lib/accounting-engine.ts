@@ -1,7 +1,20 @@
 import type {
-  Account, BusinessAsset, ChartOfAccount, CostLayer, Customer, Expense,
-  JournalLine, LedgerEntry, PaymentMethod, PayrollRun, Product,
-  PurchaseOrder, SalesOrder, StockMovement, Supplier, Voucher,
+  Account,
+  BusinessAsset,
+  ChartOfAccount,
+  CostLayer,
+  Customer,
+  Expense,
+  JournalLine,
+  LedgerEntry,
+  PaymentMethod,
+  PayrollRun,
+  Product,
+  PurchaseOrder,
+  SalesOrder,
+  StockMovement,
+  Supplier,
+  Voucher,
 } from "../types/index.ts";
 import { parseRecordTime, type DateRange } from "./date-range.ts";
 import { customerOpeningSigned } from "./customer-balance.ts";
@@ -20,7 +33,13 @@ export function isPostedSalesStatus(status: SalesOrder["status"]): boolean {
 
 /** Check if a purchase status represents an active, posted transaction */
 export function isPostedPurchaseStatus(status: PurchaseOrder["status"]): boolean {
-  return status === "ordered" || status === "partial" || status === "received" || status === "billed" || status === "paid";
+  return (
+    status === "ordered" ||
+    status === "partial" ||
+    status === "received" ||
+    status === "billed" ||
+    status === "paid"
+  );
 }
 
 export type InvoicePaymentAllocation = {
@@ -76,7 +95,14 @@ export type CustomerArRow = {
   invoiced: number;
   collected: number;
   due: number;
-  orders: Array<{ id: string; orderNo: string; date: string; total: number; paid: number; due: number }>;
+  orders: Array<{
+    id: string;
+    orderNo: string;
+    date: string;
+    total: number;
+    paid: number;
+    due: number;
+  }>;
 };
 
 /**
@@ -138,11 +164,15 @@ export function computeCustomerReceivables(
 
   // Calculate collections from vouchers and payments without double counting
   for (const row of customerMap.values()) {
-    const custVouchers = vouchers.filter((v) => v.partyType === "customer" && v.partyId === row.id && v.type !== "journal");
+    const custVouchers = vouchers.filter(
+      (v) => v.partyType === "customer" && v.partyId === row.id && v.type !== "journal",
+    );
     let voucherCollections = 0;
     for (const v of custVouchers) {
-      if (v.type === "receipt") voucherCollections = roundMoney(voucherCollections + (v.amount || 0));
-      else if (v.type === "payment") voucherCollections = roundMoney(voucherCollections - (v.amount || 0));
+      if (v.type === "receipt")
+        voucherCollections = roundMoney(voucherCollections + (v.amount || 0));
+      else if (v.type === "payment")
+        voucherCollections = roundMoney(voucherCollections - (v.amount || 0));
     }
 
     // Unlinked payments directly recorded on sales without a voucher
@@ -160,10 +190,16 @@ export function computeCustomerReceivables(
     row.due = roundMoney(row.openingBalance + row.invoiced - totalCollected);
   }
 
-  const rows = Array.from(customerMap.values()).filter((r) => Math.abs(r.due) > 0.009 || r.orders.length > 0);
+  const rows = Array.from(customerMap.values()).filter(
+    (r) => Math.abs(r.due) > 0.009 || r.orders.length > 0,
+  );
   const totalDue = roundMoney(Array.from(customerMap.values()).reduce((sum, r) => sum + r.due, 0));
-  const totalInvoiced = roundMoney(Array.from(customerMap.values()).reduce((sum, r) => sum + r.invoiced, 0));
-  const totalCollected = roundMoney(Array.from(customerMap.values()).reduce((sum, r) => sum + r.collected, 0));
+  const totalInvoiced = roundMoney(
+    Array.from(customerMap.values()).reduce((sum, r) => sum + r.invoiced, 0),
+  );
+  const totalCollected = roundMoney(
+    Array.from(customerMap.values()).reduce((sum, r) => sum + r.collected, 0),
+  );
 
   return { rows, totalDue, totalInvoiced, totalCollected };
 }
@@ -175,7 +211,14 @@ export type SupplierApRow = {
   billed: number;
   paid: number;
   due: number;
-  orders: Array<{ id: string; orderNo: string; date: string; total: number; paid: number; due: number }>;
+  orders: Array<{
+    id: string;
+    orderNo: string;
+    date: string;
+    total: number;
+    paid: number;
+    due: number;
+  }>;
 };
 
 /**
@@ -230,7 +273,9 @@ export function computeSupplierPayables(
   }
 
   for (const row of supplierMap.values()) {
-    const suppVouchers = vouchers.filter((v) => v.partyType === "supplier" && v.partyId === row.id && v.type !== "journal");
+    const suppVouchers = vouchers.filter(
+      (v) => v.partyType === "supplier" && v.partyId === row.id && v.type !== "journal",
+    );
     let voucherPaid = 0;
     for (const v of suppVouchers) {
       if (v.type === "payment") voucherPaid = roundMoney(voucherPaid + (v.amount || 0));
@@ -251,16 +296,26 @@ export function computeSupplierPayables(
     row.due = roundMoney(row.openingBalance + row.billed - totalPaid);
   }
 
-  const rows = Array.from(supplierMap.values()).filter((r) => Math.abs(r.due) > 0.009 || r.orders.length > 0);
+  const rows = Array.from(supplierMap.values()).filter(
+    (r) => Math.abs(r.due) > 0.009 || r.orders.length > 0,
+  );
   const totalDue = roundMoney(Array.from(supplierMap.values()).reduce((sum, r) => sum + r.due, 0));
-  const totalBilled = roundMoney(Array.from(supplierMap.values()).reduce((sum, r) => sum + r.billed, 0));
-  const totalPaid = roundMoney(Array.from(supplierMap.values()).reduce((sum, r) => sum + r.paid, 0));
+  const totalBilled = roundMoney(
+    Array.from(supplierMap.values()).reduce((sum, r) => sum + r.billed, 0),
+  );
+  const totalPaid = roundMoney(
+    Array.from(supplierMap.values()).reduce((sum, r) => sum + r.paid, 0),
+  );
 
   return { rows, totalDue, totalBilled, totalPaid };
 }
 
 /** Output VAT / Tax Liability from posted sales */
-export function computeOutputVatLiability(sales: SalesOrder[]): { totalOutputTax: number; netSales: number; grossSales: number } {
+export function computeOutputVatLiability(sales: SalesOrder[]): {
+  totalOutputTax: number;
+  netSales: number;
+  grossSales: number;
+} {
   let totalOutputTax = 0;
   let netSales = 0;
   let grossSales = 0;
@@ -268,8 +323,8 @@ export function computeOutputVatLiability(sales: SalesOrder[]): { totalOutputTax
   for (const s of sales) {
     if (!isPostedSalesStatus(s.status)) continue;
     const tax = roundMoney(s.tax || 0);
-    const subtotal = roundMoney(s.subtotal || (s.total - tax) || 0);
-    const total = roundMoney(s.total || (subtotal + tax));
+    const subtotal = roundMoney(s.subtotal || s.total - tax || 0);
+    const total = roundMoney(s.total || subtotal + tax);
 
     totalOutputTax = roundMoney(totalOutputTax + tax);
     netSales = roundMoney(netSales + subtotal);
@@ -300,7 +355,8 @@ export function computeProfitAndLoss(opts: {
   const { sales, stockMovements, expenses, payroll = [], vouchers = [], range } = opts;
 
   const fromTs = range?.preset !== "all" && range?.from ? parseRecordTime(range.from) : null;
-  const toTs = range?.preset !== "all" && range?.to ? parseRecordTime(`${range.to}T23:59:59`) : null;
+  const toTs =
+    range?.preset !== "all" && range?.to ? parseRecordTime(`${range.to}T23:59:59`) : null;
 
   const isInRange = (dateStr: string) => {
     const t = parseRecordTime(dateStr);
@@ -315,16 +371,22 @@ export function computeProfitAndLoss(opts: {
   for (const s of sales) {
     if (!isPostedSalesStatus(s.status)) continue;
     if (!isInRange(s.date)) continue;
-    const net = roundMoney(s.subtotal || (s.total - (s.tax || 0)));
+    const net = roundMoney(s.subtotal || s.total - (s.tax || 0));
     revenue = roundMoney(revenue + net);
   }
 
   // 2. COGS from inventory stock movements (movementType: SALE_ISSUE or cogsAmount)
   let cogs = 0;
   for (const sm of stockMovements) {
-    if (sm.type !== "out" && sm.movementType !== "SALE_ISSUE" && sm.movementType !== "DAMAGE" && sm.movementType !== "LOSS") continue;
+    if (
+      sm.type !== "out" &&
+      sm.movementType !== "SALE_ISSUE" &&
+      sm.movementType !== "DAMAGE" &&
+      sm.movementType !== "LOSS"
+    )
+      continue;
     if (!isInRange(sm.date)) continue;
-    const cost = roundMoney(sm.cogsAmount || sm.totalCost || ((sm.unitCost || 0) * sm.quantity));
+    const cost = roundMoney(sm.cogsAmount || sm.totalCost || (sm.unitCost || 0) * sm.quantity);
     cogs = roundMoney(cogs + cost);
   }
 
@@ -431,9 +493,10 @@ export function computeBalanceSheet(opts: {
   const inventoryValue = roundMoney(
     products.reduce((sum, p) => {
       const open = costLayers.filter((l) => l.productId === p.id && (l.qtyRemaining || 0) > 0);
-      const val = open.length > 0
-        ? open.reduce((acc, l) => acc + l.qtyRemaining * (l.unitCost || 0), 0)
-        : (p.stock || 0) * (p.cost || 0);
+      const val =
+        open.length > 0
+          ? open.reduce((acc, l) => acc + l.qtyRemaining * (l.unitCost || 0), 0)
+          : (p.stock || 0) * (p.cost || 0);
       return sum + val;
     }, 0),
   );
@@ -529,9 +592,11 @@ export function computeCashFlow(opts: {
   const { ledger, accounts = [], range } = opts;
 
   const fromTs = range?.preset !== "all" && range?.from ? parseRecordTime(range.from) : null;
-  const toTs = range?.preset !== "all" && range?.to ? parseRecordTime(`${range.to}T23:59:59`) : null;
+  const toTs =
+    range?.preset !== "all" && range?.to ? parseRecordTime(`${range.to}T23:59:59`) : null;
 
-  const isCashOrBank = (account: string) => isCashBookAccount(account, accounts) || isBankBookAccount(account, accounts);
+  const isCashOrBank = (account: string) =>
+    isCashBookAccount(account, accounts) || isBankBookAccount(account, accounts);
   const cashLedger = ledger.filter((e) => isCashOrBank(e.account));
 
   // 1. Opening Cash & Bank (transactions before range.from)
@@ -595,7 +660,9 @@ export function computeCashFlow(opts: {
     }
   }
 
-  const netOperating = roundMoney(customerReceipts - supplierPayments - operatingExpenses - payrollPayments);
+  const netOperating = roundMoney(
+    customerReceipts - supplierPayments - operatingExpenses - payrollPayments,
+  );
   const netInvesting = roundMoney(assetSales - assetPurchases);
   const netFinancing = roundMoney(capitalContributions - ownerDrawings);
   const netCashFlow = roundMoney(netOperating + netInvesting + netFinancing);
@@ -682,11 +749,15 @@ export function reconcileFinancialIntegrity(opts: {
   const messages: string[] = [];
 
   // 1. Inventory Valuation
-  const layerVal = roundMoney(costLayers.reduce((s, l) => s + (l.qtyRemaining || 0) * (l.unitCost || 0), 0));
+  const layerVal = roundMoney(
+    costLayers.reduce((s, l) => s + (l.qtyRemaining || 0) * (l.unitCost || 0), 0),
+  );
   const productVal = roundMoney(products.reduce((s, p) => s + (p.stock || 0) * (p.cost || 0), 0));
   const inventoryBalanced = Math.abs(layerVal - productVal) < 0.01;
   if (!inventoryBalanced) {
-    messages.push(`Inventory layer valuation (${layerVal}) differs from product stock valuation (${productVal})`);
+    messages.push(
+      `Inventory layer valuation (${layerVal}) differs from product stock valuation (${productVal})`,
+    );
   }
 
   // 2. AR Reconciliation

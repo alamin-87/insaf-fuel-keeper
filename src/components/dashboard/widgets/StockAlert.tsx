@@ -39,9 +39,13 @@ export function StockAlerts() {
                 >
                   <div>
                     <p className="text-sm font-medium">{a.productName}</p>
-                    <p className="text-xs text-muted-foreground">{t("products.reorder")}: {a.reorderLevel}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {t("products.reorder")}: {a.reorderLevel}
+                    </p>
                   </div>
-                  <Badge variant={a.stock === 0 ? "destructive" : "outline"}>{a.stock} {t("products.stock")}</Badge>
+                  <Badge variant={a.stock === 0 ? "destructive" : "outline"}>
+                    {a.stock} {t("products.stock")}
+                  </Badge>
                 </Link>
               </li>
             ))}

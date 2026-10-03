@@ -6,11 +6,15 @@ import { cn } from "@/lib/utils";
 import { gsap, prefersReducedMotion } from "@/lib/gsap";
 
 type StatLink =
-  | string
-  | { to: string; params?: Record<string, string>; search?: Record<string, unknown> };
+  string | { to: string; params?: Record<string, string>; search?: Record<string, unknown> };
 
 export function StatCard({
-  title, value, icon: Icon, hint, tone = "default", to,
+  title,
+  value,
+  icon: Icon,
+  hint,
+  tone = "default",
+  to,
 }: {
   title: string;
   value: string;
@@ -51,11 +55,18 @@ export function StatCard({
       <CardContent className="p-4 sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
+            <p className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {title}
+            </p>
             <p className="mt-1.5 text-xl font-bold tracking-tight sm:text-2xl">{value}</p>
             {hint && <p className="mt-1 truncate text-xs text-muted-foreground">{hint}</p>}
           </div>
-          <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg", toneMap[tone])}>
+          <div
+            className={cn(
+              "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+              toneMap[tone],
+            )}
+          >
             <Icon className="h-5 w-5" />
           </div>
         </div>
@@ -67,7 +78,10 @@ export function StatCard({
 
   if (typeof to === "string") {
     return (
-      <Link to={to as "/"} className="block h-full outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl">
+      <Link
+        to={to as "/"}
+        className="block h-full outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xl"
+      >
         {body}
       </Link>
     );

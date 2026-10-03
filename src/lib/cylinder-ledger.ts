@@ -41,13 +41,19 @@ function productNameOf(cyl: Cylinder | undefined, products: Product[]) {
   return products.find((p) => p.id === cyl.productId)?.name ?? cyl.serialNumber;
 }
 
-function matchByName<T extends { id: string; name: string }>(loc: string | undefined, parties: T[]): T | undefined {
+function matchByName<T extends { id: string; name: string }>(
+  loc: string | undefined,
+  parties: T[],
+): T | undefined {
   const n = (loc || "").trim().toLowerCase();
   if (!n) return undefined;
   return parties.find((p) => {
     const pn = p.name.toLowerCase();
     if (n === pn || n.includes(pn) || pn.includes(n)) return true;
-    return pn.split(/[^a-z0-9]+/).filter((w) => w.length > 3).some((w) => n.includes(w));
+    return pn
+      .split(/[^a-z0-9]+/)
+      .filter((w) => w.length > 3)
+      .some((w) => n.includes(w));
   });
 }
 
@@ -107,7 +113,9 @@ export function buildCylinderLedger(opts: {
     });
   };
 
-  const sorted = movements.slice().sort((a, b) => (parseRecordTime(a.timestamp) ?? 0) - (parseRecordTime(b.timestamp) ?? 0));
+  const sorted = movements
+    .slice()
+    .sort((a, b) => (parseRecordTime(a.timestamp) ?? 0) - (parseRecordTime(b.timestamp) ?? 0));
 
   for (const m of sorted) {
     const cust =
@@ -136,8 +144,10 @@ export function buildCylinderLedger(opts: {
     } else if (m.type === "refilled" || m.type === "transferred") {
       if (fromWh) push(`wh:${fromWh}`, "warehouse", fromWh, m, 1, 0);
       if (toWh) push(`wh:${toWh}`, "warehouse", toWh, m, 0, 1);
-      if (supp && SUPPLIER_LOC.test(m.toLocation || "")) push(`s:${supp.id}`, "supplier", supp.name, m, 1, 0);
-      if (supp && SUPPLIER_LOC.test(m.fromLocation || "")) push(`s:${supp.id}`, "supplier", supp.name, m, 0, 1);
+      if (supp && SUPPLIER_LOC.test(m.toLocation || ""))
+        push(`s:${supp.id}`, "supplier", supp.name, m, 1, 0);
+      if (supp && SUPPLIER_LOC.test(m.fromLocation || ""))
+        push(`s:${supp.id}`, "supplier", supp.name, m, 0, 1);
     }
   }
 

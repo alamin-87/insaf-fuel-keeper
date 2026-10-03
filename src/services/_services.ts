@@ -1,22 +1,60 @@
 import type {
-  Customer, Supplier, Product, Cylinder, CylinderMovement, CylinderStatus, CylinderFillLevel,
-  SalesOrder, SalesStatus, Delivery, StockAlert, DashboardStats, LineItem,
-  Expense, LedgerEntry, PaymentMethod, PurchaseOrder, PurchaseStatus,
-  StockMovement, MovementTypeKind, Voucher, VoucherType, Employee, PayrollRun, Account,
-  ChartOfAccount, BusinessAsset, CostLayer, CostingMethod, LayerConsumption,
-  JournalLine, ProductCategory,
+  Customer,
+  Supplier,
+  Product,
+  Cylinder,
+  CylinderMovement,
+  CylinderStatus,
+  CylinderFillLevel,
+  SalesOrder,
+  SalesStatus,
+  Delivery,
+  StockAlert,
+  DashboardStats,
+  LineItem,
+  Expense,
+  LedgerEntry,
+  PaymentMethod,
+  PurchaseOrder,
+  PurchaseStatus,
+  StockMovement,
+  MovementTypeKind,
+  Voucher,
+  VoucherType,
+  Employee,
+  PayrollRun,
+  Account,
+  ChartOfAccount,
+  BusinessAsset,
+  CostLayer,
+  CostingMethod,
+  LayerConsumption,
+  JournalLine,
+  ProductCategory,
 } from "@/types";
 import { crudFn, dashboardFn, notificationsFn } from "@/lib/data.functions";
 import { updateProductFn } from "@/lib/products.functions";
 import { getCylinderTrackingFn } from "@/lib/settings.functions";
 import { receivePurchaseFn } from "@/lib/purchase.functions";
 import { genOrderNo } from "@/utils/helpers";
-import { cylinderIsEmpty, cylinderIsFullStock, isCylinderProduct, isCylinderSaleLine, isCylinderTrackedLine, pickFifo, suggestSerials } from "@/lib/cylinder-product";
+import {
+  cylinderIsEmpty,
+  cylinderIsFullStock,
+  isCylinderProduct,
+  isCylinderSaleLine,
+  isCylinderTrackedLine,
+  pickFifo,
+  suggestSerials,
+} from "@/lib/cylinder-product";
 import { remainingOrderQty, buildProductInventory } from "@/lib/cylinder-inventory";
 import { issueLockIsActive } from "@/lib/cylinder-lock";
-import { reconcileQuantityWithSerials, type SerialReconciliationItem, type StockMeta } from "@/lib/inventory-engine";
+import {
+  reconcileQuantityWithSerials,
+  type SerialReconciliationItem,
+  type StockMeta,
+} from "@/lib/inventory-engine";
 
-const call = async <T,>(op: any, coll: any, id?: string, payload?: any): Promise<T> => {
+const call = async <T>(op: any, coll: any, id?: string, payload?: any): Promise<T> => {
   return (await crudFn({ data: { op, coll, id, payload } })) as T;
 };
 
@@ -26,12 +64,13 @@ async function takeWarehouseFull(productId: string, qty: number, lotNumber?: str
   if (!product) throw new Error("Product not found");
   if (method === "lot" && !lotNumber?.trim()) throw new Error("Lot number required");
   const pool = (await call<Cylinder[]>("list", "cylinders"))
-    .filter((c) =>
-      c.productId === productId
-      && cylinderIsFullStock(c)
-      && c.ownedBy !== "customer"
-      && !issueLockIsActive(c.issueLock)
-      && (!lotNumber || c.lotNumber === lotNumber),
+    .filter(
+      (c) =>
+        c.productId === productId &&
+        cylinderIsFullStock(c) &&
+        c.ownedBy !== "customer" &&
+        !issueLockIsActive(c.issueLock) &&
+        (!lotNumber || c.lotNumber === lotNumber),
     )
     .sort((a, b) => a.lastMovementAt.localeCompare(b.lastMovementAt));
   if (pool.length < qty) {
@@ -41,13 +80,20 @@ async function takeWarehouseFull(productId: string, qty: number, lotNumber?: str
     );
   }
   const chosen = pool.slice(0, qty);
-  await claimCylinderIds(chosen.map((c) => c.id), ["in_stock", "in_transit"]);
+  await claimCylinderIds(
+    chosen.map((c) => c.id),
+    ["in_stock", "in_transit"],
+  );
   return chosen;
 }
 
 async function releaseIssueLocks(ids: string[]) {
   for (const id of ids) {
-    try { await call("update", "cylinders", id, { issueLock: null }); } catch { /* keep trying */ }
+    try {
+      await call("update", "cylinders", id, { issueLock: null });
+    } catch {
+      /* keep trying */
+    }
   }
 }
 
@@ -73,7 +119,11 @@ async function afterCylinderClaim<T>(ids: string[], work: () => Promise<T>): Pro
   }
 }
 
-function lastCustomerPurpose(movements: CylinderMovement[], cylinderId: string, customerId: string) {
+function lastCustomerPurpose(
+  movements: CylinderMovement[],
+  cylinderId: string,
+  customerId: string,
+) {
   return movements
     .filter((m) => m.cylinderId === cylinderId && m.customerId === customerId)
     .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
@@ -93,7 +143,9 @@ async function listOpenLayers(productId: string): Promise<CostLayer[]> {
   return all.filter((l) => l.productId === productId && (l.qtyRemaining || 0) > 0);
 }
 
-async function remainingValue(productId: string): Promise<{ qty: number; value: number; avg: number }> {
+async function remainingValue(
+  productId: string,
+): Promise<{ qty: number; value: number; avg: number }> {
   const layers = await listOpenLayers(productId);
   const qty = layers.reduce((a, l) => a + l.qtyRemaining, 0);
   const value = layers.reduce((a, l) => a + l.qtyRemaining * (l.unitCost || 0), 0);
@@ -144,7 +196,12 @@ async function consumeLayers(
 async function receiveStock(productId: string, qty: number, unitCost: number, meta?: StockMeta) {
   const product = await call<Product | null>("get", "products", productId);
   if (!product || qty <= 0) return;
-  if (meta?.refType && meta?.refId && await hasPostedStock(meta.refType, meta.refId, productId, "in")) return;
+  if (
+    meta?.refType &&
+    meta?.refId &&
+    (await hasPostedStock(meta.refType, meta.refId, productId, "in"))
+  )
+    return;
   await ensureOpeningLayer(product);
   const cost = Number.isFinite(unitCost) ? unitCost : (product.cost ?? 0);
   await call("create", "costLayers", undefined, {
@@ -172,7 +229,13 @@ async function receiveStock(productId: string, qty: number, unitCost: number, me
     productId: product.id,
     productName: product.name,
     type: "in",
-    movementType: meta?.movementType || (meta?.refType === "purchase" ? "RECEIPT" : meta?.refType === "adjustment" ? "ADJUSTMENT_IN" : "RECEIPT"),
+    movementType:
+      meta?.movementType ||
+      (meta?.refType === "purchase"
+        ? "RECEIPT"
+        : meta?.refType === "adjustment"
+          ? "ADJUSTMENT_IN"
+          : "RECEIPT"),
     direction: "in",
     quantity: qty,
     balanceAfter: nextStock,
@@ -190,7 +253,12 @@ async function receiveStock(productId: string, qty: number, unitCost: number, me
 async function issueStock(productId: string, qty: number, meta?: StockMeta) {
   const product = await call<Product | null>("get", "products", productId);
   if (!product || qty <= 0) return;
-  if (meta?.refType && meta?.refId && await hasPostedStock(meta.refType, meta.refId, productId, "out")) return;
+  if (
+    meta?.refType &&
+    meta?.refId &&
+    (await hasPostedStock(meta.refType, meta.refId, productId, "out"))
+  )
+    return;
   await ensureOpeningLayer(product);
   const available = product.stock ?? 0;
   if (available < qty) {
@@ -221,7 +289,13 @@ async function issueStock(productId: string, qty: number, meta?: StockMeta) {
     productId: product.id,
     productName: product.name,
     type: "out",
-    movementType: meta?.movementType || (meta?.refType === "sales" ? "SALE_ISSUE" : meta?.refType === "adjustment" ? "ADJUSTMENT_OUT" : "SALE_ISSUE"),
+    movementType:
+      meta?.movementType ||
+      (meta?.refType === "sales"
+        ? "SALE_ISSUE"
+        : meta?.refType === "adjustment"
+          ? "ADJUSTMENT_OUT"
+          : "SALE_ISSUE"),
     direction: "out",
     quantity: take,
     balanceAfter: nextStock,
@@ -237,14 +311,25 @@ async function issueStock(productId: string, qty: number, meta?: StockMeta) {
   });
 }
 
-async function restoreStock(productId: string, qty: number, meta?: StockMeta, fallbackUnitCost?: number) {
+async function restoreStock(
+  productId: string,
+  qty: number,
+  meta?: StockMeta,
+  fallbackUnitCost?: number,
+) {
   const product = await call<Product | null>("get", "products", productId);
   if (!product || qty <= 0) return;
   let consumptions: LayerConsumption[] | undefined;
   if (meta?.refId) {
     const moves = await call<StockMovement[]>("list", "stockMovements");
     const out = moves
-      .filter((m) => m.productId === productId && m.refType === meta.refType && m.refId === meta.refId && m.type === "out")
+      .filter(
+        (m) =>
+          m.productId === productId &&
+          m.refType === meta.refType &&
+          m.refId === meta.refId &&
+          m.type === "out",
+      )
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
     consumptions = out?.consumptions;
     if (fallbackUnitCost == null && out?.unitCost != null) fallbackUnitCost = out.unitCost;
@@ -296,7 +381,10 @@ async function hasPostedStock(
   type: "in" | "out",
 ) {
   const all = await call<StockMovement[]>("list", "stockMovements");
-  return all.some((m) => m.refType === refType && m.refId === refId && m.productId === productId && m.type === type);
+  return all.some(
+    (m) =>
+      m.refType === refType && m.refId === refId && m.productId === productId && m.type === type,
+  );
 }
 
 async function hasStockOut(refType: NonNullable<StockMovement["refType"]>, refId: string) {
@@ -306,7 +394,9 @@ async function hasStockOut(refType: NonNullable<StockMovement["refType"]>, refId
 
 async function hasStockIn(refType: NonNullable<StockMovement["refType"]>, refId: string) {
   const all = await call<StockMovement[]>("list", "stockMovements");
-  return all.some((m) => m.refType === refType && m.refId === refId && (m.type === "in" || m.type === "return"));
+  return all.some(
+    (m) => m.refType === refType && m.refId === refId && (m.type === "in" || m.type === "return"),
+  );
 }
 
 function productStockLines(items: LineItem[], products: Product[], treatAllAsGas: boolean) {
@@ -326,12 +416,16 @@ async function reversePostedStock(
   by: string,
 ) {
   const all = await call<StockMovement[]>("list", "stockMovements");
-  if (all.some((m) =>
-    m.refType === refType
-    && m.refId === refId
-    && (m.type === "in" || m.type === "return")
-    && /Reverse/i.test(m.notes || ""),
-  )) return;
+  if (
+    all.some(
+      (m) =>
+        m.refType === refType &&
+        m.refId === refId &&
+        (m.type === "in" || m.type === "return") &&
+        /Reverse/i.test(m.notes || ""),
+    )
+  )
+    return;
   const outs = all.filter((m) => m.refType === refType && m.refId === refId && m.type === "out");
   for (const m of outs) {
     await restoreStock(m.productId, m.quantity, { refType, refId, notes, by }, m.unitCost);
@@ -367,20 +461,32 @@ function defaultExpectedReturnAt() {
 
 async function gasLineItems(items: LineItem[]) {
   const products = await call<Product[]>("list", "products");
-  return items.filter((item) => !isCylinderTrackedLine(item, products.find((p) => p.id === item.productId)));
+  return items.filter(
+    (item) =>
+      !isCylinderTrackedLine(
+        item,
+        products.find((p) => p.id === item.productId),
+      ),
+  );
 }
 
 async function hasCylinderLines(items: LineItem[]) {
   const products = await call<Product[]>("list", "products");
-  return items.some((item) => isCylinderTrackedLine(item, products.find((p) => p.id === item.productId)));
+  return items.some((item) =>
+    isCylinderTrackedLine(
+      item,
+      products.find((p) => p.id === item.productId),
+    ),
+  );
 }
 
 async function deliveredForSales(salesOrderId: string, excludeDeliveryId?: string) {
   const deliveries = await call<Delivery[]>("list", "deliveries");
-  return deliveries.filter((d) =>
-    d.salesOrderId === salesOrderId
-    && d.id !== excludeDeliveryId
-    && (d.status === "delivered" || d.status === "confirmed"),
+  return deliveries.filter(
+    (d) =>
+      d.salesOrderId === salesOrderId &&
+      d.id !== excludeDeliveryId &&
+      (d.status === "delivered" || d.status === "confirmed"),
   );
 }
 
@@ -397,7 +503,9 @@ async function fulfillSalesOrder(order: SalesOrder) {
   if (!isOpenSalesStatus(order.status)) return;
   if (await salesAlreadyFulfilled(order)) return;
   const deliveries = await call<Delivery[]>("list", "deliveries");
-  const open = deliveries.find((d) => d.salesOrderId === order.id && (d.status === "pending" || d.status === "in_transit"));
+  const open = deliveries.find(
+    (d) => d.salesOrderId === order.id && (d.status === "pending" || d.status === "in_transit"),
+  );
   if (open) return;
   await call<Delivery>("create", "deliveries", undefined, {
     challanNo: genOrderNo("DC"),
@@ -448,35 +556,35 @@ async function unfulfillSalesOrder(order: SalesOrder) {
 
 async function hasReservation(orderId: string) {
   const all = await call<StockMovement[]>("list", "stockMovements");
-  return all.some((m) => m.refType === "sales" && m.refId === orderId && /^Reserved\b/i.test(m.notes || ""));
+  return all.some(
+    (m) => m.refType === "sales" && m.refId === orderId && /^Reserved\b/i.test(m.notes || ""),
+  );
 }
 
 async function postReservationMoves(order: SalesOrder, verb: "Reserved" | "Reservation released") {
   if (verb === "Reserved" && (await hasReservation(order.id))) return;
   const products = await call<Product[]>("list", "products");
   const byId = new Map(products.map((p) => [p.id, p]));
-  await Promise.all(order.items.map((item) => {
-    const product = byId.get(item.productId);
-    return call("create", "stockMovements", undefined, {
-      date: new Date().toISOString(),
-      productId: item.productId,
-      productName: item.productName,
-      type: verb === "Reserved" ? "adjust" : "return",
-      quantity: item.quantity,
-      balanceAfter: product?.stock ?? 0,
-      refType: "sales",
-      refId: order.id,
-      notes: `${verb} ${item.quantity} × ${item.productName} for ${order.orderNo}`,
-      by: order.receiverName || "Sales",
-    });
-  }));
+  await Promise.all(
+    order.items.map((item) => {
+      const product = byId.get(item.productId);
+      return call("create", "stockMovements", undefined, {
+        date: new Date().toISOString(),
+        productId: item.productId,
+        productName: item.productName,
+        type: verb === "Reserved" ? "adjust" : "return",
+        quantity: item.quantity,
+        balanceAfter: product?.stock ?? 0,
+        refType: "sales",
+        refId: order.id,
+        notes: `${verb} ${item.quantity} × ${item.productName} for ${order.orderNo}`,
+        by: order.receiverName || "Sales",
+      });
+    }),
+  );
 }
 
-async function adjustStock(
-  items: LineItem[],
-  direction: 1 | -1,
-  meta?: StockMeta,
-) {
+async function adjustStock(items: LineItem[], direction: 1 | -1, meta?: StockMeta) {
   for (const item of items) {
     if (direction < 0) {
       await issueStock(item.productId, item.quantity, meta);
@@ -490,17 +598,27 @@ async function adjustStock(
 
 function statusFromMovement(type: CylinderMovement["type"]): CylinderStatus {
   switch (type) {
-    case "issued": return "at_customer";
-    case "returned": return "in_stock";
+    case "issued":
+      return "at_customer";
+    case "returned":
+      return "in_stock";
     case "received":
-    case "refilled": return "in_stock";
-    case "transferred": return "in_transit";
-    case "damaged": return "damaged";
-    case "lost": return "lost";
-    case "stock_out": return "stock_out";
-    case "scrapped": return "scrapped";
-    case "written_off": return "written_off";
-    default: return "in_stock";
+    case "refilled":
+      return "in_stock";
+    case "transferred":
+      return "in_transit";
+    case "damaged":
+      return "damaged";
+    case "lost":
+      return "lost";
+    case "stock_out":
+      return "stock_out";
+    case "scrapped":
+      return "scrapped";
+    case "written_off":
+      return "written_off";
+    default:
+      return "in_stock";
   }
 }
 
@@ -544,7 +662,8 @@ function assertJournalLines(raw: JournalLine[]) {
   let debit = 0;
   let credit = 0;
   for (const line of lines) {
-    if (line.debit > 0 && line.credit > 0) throw new Error("A line cannot have both debit and credit");
+    if (line.debit > 0 && line.credit > 0)
+      throw new Error("A line cannot have both debit and credit");
     debit += line.debit;
     credit += line.credit;
   }
@@ -557,7 +676,10 @@ export const customerService = {
   list: () => call<Customer[]>("list", "customers"),
   get: (id: string) => call<Customer | null>("get", "customers", id),
   create: (data: Omit<Customer, "id" | "createdAt">) =>
-    call<Customer>("create", "customers", undefined, { ...data, createdAt: new Date().toISOString() }),
+    call<Customer>("create", "customers", undefined, {
+      ...data,
+      createdAt: new Date().toISOString(),
+    }),
   update: (id: string, data: Partial<Customer>) => {
     const { createdAt: _createdAt, ...rest } = data;
     return call<Customer>("update", "customers", id, rest);
@@ -569,7 +691,10 @@ export const supplierService = {
   list: () => call<Supplier[]>("list", "suppliers"),
   get: (id: string) => call<Supplier | null>("get", "suppliers", id),
   create: (data: Omit<Supplier, "id" | "createdAt">) =>
-    call<Supplier>("create", "suppliers", undefined, { ...data, createdAt: new Date().toISOString() }),
+    call<Supplier>("create", "suppliers", undefined, {
+      ...data,
+      createdAt: new Date().toISOString(),
+    }),
   update: (id: string, data: Partial<Supplier>) => call<Supplier>("update", "suppliers", id, data),
   remove: (id: string) => call<{ ok: true }>("remove", "suppliers", id),
 };
@@ -625,23 +750,37 @@ export const productService = {
     const list = await call<Product[]>("list", "products");
     return list
       .filter((p) => (p.stock ?? 0) <= (p.reorderLevel ?? 0))
-      .map((p) => ({ productId: p.id, productName: p.name, stock: p.stock, reorderLevel: p.reorderLevel }));
+      .map((p) => ({
+        productId: p.id,
+        productName: p.name,
+        stock: p.stock,
+        reorderLevel: p.reorderLevel,
+      }));
   },
 };
 
 export const cylinderService = {
   list: () => call<Cylinder[]>("list", "cylinders"),
   get: (id: string) => call<Cylinder | null>("get", "cylinders", id),
-  create: async (data: Omit<Cylinder, "id" | "createdAt" | "lastMovementAt"> & { skipIntakeMovement?: boolean }) => {
+  create: async (
+    data: Omit<Cylinder, "id" | "createdAt" | "lastMovementAt"> & { skipIntakeMovement?: boolean },
+  ) => {
     const now = new Date().toISOString();
     const { skipIntakeMovement, ...rest } = data;
     if (!skipIntakeMovement) {
       rest.status = "in_stock";
     } else if (rest.status && rest.status !== "in_stock" && rest.status !== "in_transit") {
-      throw new Error("New cylinders must start in warehouse. Use Inventory movements to change status.");
+      throw new Error(
+        "New cylinders must start in warehouse. Use Inventory movements to change status.",
+      );
     }
     const fillLevel = rest.fillLevel ?? "full";
-    const created = await call<Cylinder>("create", "cylinders", undefined, { ...rest, fillLevel, createdAt: now, lastMovementAt: now });
+    const created = await call<Cylinder>("create", "cylinders", undefined, {
+      ...rest,
+      fillLevel,
+      createdAt: now,
+      lastMovementAt: now,
+    });
     if (!skipIntakeMovement) {
       await cylinderService.addMovement({
         cylinderId: created.id,
@@ -667,7 +806,9 @@ export const cylinderService = {
   listMovements: () => call<CylinderMovement[]>("list", "movements"),
   getMovements: async (cylinderId: string) => {
     const all = await call<CylinderMovement[]>("list", "movements");
-    return all.filter((m) => m.cylinderId === cylinderId).sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+    return all
+      .filter((m) => m.cylinderId === cylinderId)
+      .sort((a, b) => b.timestamp.localeCompare(a.timestamp));
   },
   addMovement: async (data: Omit<CylinderMovement, "id" | "timestamp">) => {
     const current = await call<Cylinder | null>("get", "cylinders", data.cylinderId);
@@ -676,15 +817,27 @@ export const cylinderService = {
       throw new Error("Cylinder is already marked lost");
     }
     if (data.type === "returned" && data.customerId) {
-      if (current.status !== "at_customer" || (current.customerId && current.customerId !== data.customerId)) {
-        throw new Error(`Cannot return cylinder ${current.serialNumber}: it is not currently issued to this customer.`);
+      if (
+        current.status !== "at_customer" ||
+        (current.customerId && current.customerId !== data.customerId)
+      ) {
+        throw new Error(
+          `Cannot return cylinder ${current.serialNumber}: it is not currently issued to this customer.`,
+        );
       }
     }
     const now = new Date().toISOString();
-    const mv = await call<CylinderMovement>("create", "movements", undefined, { ...data, timestamp: now });
+    const mv = await call<CylinderMovement>("create", "movements", undefined, {
+      ...data,
+      timestamp: now,
+    });
     const status = statusFromMovement(data.type);
     const fillLevel = fillLevelFromMovement(data.type);
-    const patch: Record<string, unknown> = { lastMovementAt: mv.timestamp, status, issueLock: null };
+    const patch: Record<string, unknown> = {
+      lastMovementAt: mv.timestamp,
+      status,
+      issueLock: null,
+    };
     if (fillLevel) patch.fillLevel = fillLevel;
     if (data.toLocation) patch.location = data.toLocation;
     if (data.sold === false) patch.ownedBy = "company";
@@ -697,8 +850,15 @@ export const cylinderService = {
       patch.customerId = null;
     } else if (data.type === "returned" || data.type === "received" || data.type === "refilled") {
       patch.customerId = null;
-      if (data.supplierId || data.type === "received" || data.type === "refilled") patch.supplierId = null;
-    } else if (data.type === "damaged" || data.type === "lost" || data.type === "stock_out" || data.type === "scrapped" || data.type === "written_off") {
+      if (data.supplierId || data.type === "received" || data.type === "refilled")
+        patch.supplierId = null;
+    } else if (
+      data.type === "damaged" ||
+      data.type === "lost" ||
+      data.type === "stock_out" ||
+      data.type === "scrapped" ||
+      data.type === "written_off"
+    ) {
       patch.customerId = null;
       patch.supplierId = null;
     } else if (data.customerId) patch.customerId = data.customerId;
@@ -743,10 +903,16 @@ export const salesService = {
       await unfulfillSalesOrder(existing);
     } else if (await hasStockOut("sales", id)) {
       await adjustStock(existing.items, 1, {
-        refType: "sales", refId: id, notes: `Edit reverse ${existing.orderNo}`, by: "Sales",
+        refType: "sales",
+        refId: id,
+        notes: `Edit reverse ${existing.orderNo}`,
+        by: "Sales",
       });
       await adjustStock(data.items || existing.items, -1, {
-        refType: "sales", refId: id, notes: `Edit apply ${existing.orderNo}`, by: "Sales",
+        refType: "sales",
+        refId: id,
+        notes: `Edit apply ${existing.orderNo}`,
+        by: "Sales",
       });
     }
     const paid = existing.paid || 0;
@@ -757,17 +923,28 @@ export const salesService = {
     let status = data.status ?? existing.status;
     const becomingOpen = isOpenSalesStatus(status) && !isOpenSalesStatus(existing.status);
     if (becomingOpen || (data.items && isOpenSalesStatus(status))) {
-      await assertSalesStock(data.items || existing.items, { sellGasOnly: data.sellGasOnly ?? existing.sellGasOnly, excludeOrderId: id });
+      await assertSalesStock(data.items || existing.items, {
+        sellGasOnly: data.sellGasOnly ?? existing.sellGasOnly,
+        excludeOrderId: id,
+      });
     }
     if (status !== "draft" && status !== "cancelled") {
       if (paid + 0.009 >= total && total > 0) status = "paid";
       else if (paid > 0 && status === "paid") status = "invoiced";
     }
     const { paid: _ignorePaid, ...rest } = data;
-    const updated = await call<SalesOrder>("update", "sales", id, { ...rest, paid, status, tax: 0 });
+    const updated = await call<SalesOrder>("update", "sales", id, {
+      ...rest,
+      paid,
+      status,
+      tax: 0,
+    });
     if (data.items && isOpenSalesStatus(updated.status)) {
       for (const item of updated.items) {
-        if (Number(item.quantity) > 0 && !(await hasPostedStock("sales", updated.id, item.productId, "out"))) {
+        if (
+          Number(item.quantity) > 0 &&
+          !(await hasPostedStock("sales", updated.id, item.productId, "out"))
+        ) {
           await issueStock(item.productId, Number(item.quantity), {
             refType: "sales",
             refId: updated.id,
@@ -801,7 +978,10 @@ export const salesService = {
     if (order.status === "cancelled" || order.status === "paid") {
       throw new Error(`Cannot change status from ${order.status}`);
     }
-    if (order.status === "draft" && (status === "confirmed" || status === "invoiced" || status === "paid")) {
+    if (
+      order.status === "draft" &&
+      (status === "confirmed" || status === "invoiced" || status === "paid")
+    ) {
       await assertSalesStock(order.items, { sellGasOnly: order.sellGasOnly, excludeOrderId: id });
     }
     if ((order.status === "confirmed" || order.status === "invoiced") && status === "cancelled") {
@@ -810,7 +990,10 @@ export const salesService = {
     const updated = await call<SalesOrder>("update", "sales", id, { status });
     if (order.status === "draft" && isOpenSalesStatus(status)) {
       for (const item of order.items) {
-        if (Number(item.quantity) > 0 && !(await hasPostedStock("sales", order.id, item.productId, "out"))) {
+        if (
+          Number(item.quantity) > 0 &&
+          !(await hasPostedStock("sales", order.id, item.productId, "out"))
+        ) {
           await issueStock(item.productId, Number(item.quantity), {
             refType: "sales",
             refId: order.id,
@@ -834,7 +1017,10 @@ export const salesService = {
       orderNo: order.orderNo.startsWith("QT") ? order.orderNo.replace(/^QT/, "SO") : order.orderNo,
     });
     for (const item of order.items) {
-      if (Number(item.quantity) > 0 && !(await hasPostedStock("sales", order.id, item.productId, "out"))) {
+      if (
+        Number(item.quantity) > 0 &&
+        !(await hasPostedStock("sales", order.id, item.productId, "out"))
+      ) {
         await issueStock(item.productId, Number(item.quantity), {
           refType: "sales",
           refId: order.id,
@@ -847,7 +1033,12 @@ export const salesService = {
     await fulfillSalesOrder(updated);
     return updated;
   },
-  recordPayment: async (id: string, amount: number, method: PaymentMethod = "cash", accountName?: string) => {
+  recordPayment: async (
+    id: string,
+    amount: number,
+    method: PaymentMethod = "cash",
+    accountName?: string,
+  ) => {
     const order = await call<SalesOrder | null>("get", "sales", id);
     if (!order) throw new Error("order not found");
     if (order.status === "cancelled") throw new Error("Cannot pay a cancelled order");
@@ -899,7 +1090,7 @@ export const salesService = {
 export const notificationsService = {
   getNotifications: async () => {
     return await notificationsFn();
-  }
+  },
 };
 
 export const deliveryService = {
@@ -918,7 +1109,17 @@ export const deliveryService = {
     if (existing.status !== "pending") throw new Error("Only pending deliveries can be deleted");
     return call<{ ok: true }>("remove", "deliveries", id);
   },
-  confirm: async (id: string, payload?: { issuedIdsByItem?: string[][]; returnedIds?: string[]; lotNumber?: string; expectedReturnAt?: string; skipCylinders?: boolean; asExchange?: boolean }) => {
+  confirm: async (
+    id: string,
+    payload?: {
+      issuedIdsByItem?: string[][];
+      returnedIds?: string[];
+      lotNumber?: string;
+      expectedReturnAt?: string;
+      skipCylinders?: boolean;
+      asExchange?: boolean;
+    },
+  ) => {
     const delivery = await call<Delivery | null>("get", "deliveries", id);
     if (!delivery) throw new Error("Delivery not found");
     if (delivery.status !== "pending" && delivery.status !== "in_transit") {
@@ -927,16 +1128,17 @@ export const deliveryService = {
 
     const productsEarly = await call<Product[]>("list", "products");
     const hasCylLines = delivery.items.some((item) =>
-      isCylinderTrackedLine(item, productsEarly.find((p) => p.id === item.productId)),
+      isCylinderTrackedLine(
+        item,
+        productsEarly.find((p) => p.id === item.productId),
+      ),
     );
-    const confirmPayload = !hasCylLines
-      ? { ...payload, skipCylinders: true as const }
-      : payload;
+    const confirmPayload = !hasCylLines ? { ...payload, skipCylinders: true as const } : payload;
     const expectedReturnAt = confirmPayload?.expectedReturnAt || defaultExpectedReturnAt();
 
     if (delivery.salesOrderId) {
       const so = await call<SalesOrder | null>("get", "sales", delivery.salesOrderId);
-      if (so && await salesAlreadyFulfilled(so, id)) {
+      if (so && (await salesAlreadyFulfilled(so, id))) {
         return call<Delivery>("update", "deliveries", id, {
           status: "delivered",
           confirmedAt: new Date().toISOString(),
@@ -954,11 +1156,16 @@ export const deliveryService = {
 
     if (confirmPayload?.skipCylinders) {
       const alreadyOut = await hasStockOut("delivery", id);
-      const soAlreadyOut = delivery.salesOrderId ? await hasStockOut("sales", delivery.salesOrderId) : false;
+      const soAlreadyOut = delivery.salesOrderId
+        ? await hasStockOut("sales", delivery.salesOrderId)
+        : false;
       const stockItems = productStockLines(nextItems, products, true);
       if (!alreadyOut && !soAlreadyOut && stockItems.length) {
         await adjustStock(stockItems, -1, {
-          refType: "delivery", refId: id, notes: delivery.challanNo, by: delivery.receiverName || "Delivery",
+          refType: "delivery",
+          refId: id,
+          notes: delivery.challanNo,
+          by: delivery.receiverName || "Delivery",
         });
       }
       if (delivery.salesOrderId) {
@@ -1006,97 +1213,108 @@ export const deliveryService = {
 
     const claimedIds: string[] = [];
     try {
-    for (let i = 0; i < nextItems.length; i += 1) {
-      const item = nextItems[i];
-      const p = products.find((x) => x.id === item.productId);
-      if (!isCylinderTrackedLine(item, p)) continue;
-      let ids = item.cylinderIds || [];
-      if (ids.length !== item.quantity) {
-        const picked = await takeWarehouseFull(item.productId, item.quantity, confirmPayload?.lotNumber);
-        ids = picked.map((c) => c.id);
-        nextItems[i] = { ...item, cylinderIds: ids };
-      } else {
-        await claimCylinderIds(ids, ["in_stock", "in_transit"]);
+      for (let i = 0; i < nextItems.length; i += 1) {
+        const item = nextItems[i];
+        const p = products.find((x) => x.id === item.productId);
+        if (!isCylinderTrackedLine(item, p)) continue;
+        let ids = item.cylinderIds || [];
+        if (ids.length !== item.quantity) {
+          const picked = await takeWarehouseFull(
+            item.productId,
+            item.quantity,
+            confirmPayload?.lotNumber,
+          );
+          ids = picked.map((c) => c.id);
+          nextItems[i] = { ...item, cylinderIds: ids };
+        } else {
+          await claimCylinderIds(ids, ["in_stock", "in_transit"]);
+        }
+        claimedIds.push(...ids);
       }
-      claimedIds.push(...ids);
-    }
 
-    const alreadyOut = await hasStockOut("delivery", id);
-    const soAlreadyOut = delivery.salesOrderId ? await hasStockOut("sales", delivery.salesOrderId) : false;
-    const stockItems = productStockLines(nextItems, products, false);
-    if (!alreadyOut && !soAlreadyOut && stockItems.length) {
-      await adjustStock(stockItems, -1, {
-        refType: "delivery", refId: id, notes: delivery.challanNo, by: delivery.receiverName || "Delivery",
-      });
-    }
-    if (delivery.salesOrderId) {
-      const so = await call<SalesOrder | null>("get", "sales", delivery.salesOrderId);
-      if (so && so.status === "confirmed") {
-        await call("update", "sales", so.id, { status: "invoiced" });
-      }
-    }
-
-    const issuedCount = nextItems.reduce((n, item) => n + (item.cylinderIds?.length || 0), 0);
-    const returnedCount = confirmPayload?.returnedIds?.length || 0;
-    if (confirmPayload?.asExchange) {
-      if (issuedCount <= 0 || returnedCount <= 0) {
-        throw new Error("Exchange requires empty returns and full issues");
-      }
-      if (issuedCount !== returnedCount) {
-        throw new Error("Exchange requires equal empty returns and full issues");
-      }
-    }
-    const exchange = confirmPayload?.asExchange === true;
-
-    for (const item of nextItems) {
-      const p = products.find((x) => x.id === item.productId);
-      const sold = isCylinderSaleLine(item, p);
-      for (const cid of item.cylinderIds || []) {
-        await cylinderService.addMovement({
-          cylinderId: cid,
-          type: "issued",
-          customerId: delivery.customerId,
-          fromLocation: "Warehouse",
-          toLocation: delivery.customerName,
-          notes: sold
-            ? `Sold — ownership transferred (${delivery.challanNo})`
-            : exchange
-              ? `Exchange in from Delivery ${delivery.challanNo}`
-              : `Auto-issued from Delivery ${delivery.challanNo}`,
-          by: "Delivery",
-          sold,
-          purpose: sold ? "sale" : exchange ? "exchange_out" : "sent",
-          expectedReturnAt: sold ? undefined : expectedReturnAt,
+      const alreadyOut = await hasStockOut("delivery", id);
+      const soAlreadyOut = delivery.salesOrderId
+        ? await hasStockOut("sales", delivery.salesOrderId)
+        : false;
+      const stockItems = productStockLines(nextItems, products, false);
+      if (!alreadyOut && !soAlreadyOut && stockItems.length) {
+        await adjustStock(stockItems, -1, {
+          refType: "delivery",
+          refId: id,
+          notes: delivery.challanNo,
+          by: delivery.receiverName || "Delivery",
         });
       }
-    }
-
-    const priorMoves = await call<CylinderMovement[]>("list", "movements");
-    for (const cid of confirmPayload?.returnedIds || []) {
-      const cyl = allCyl.find((c) => c.id === cid);
-      if (!cyl) throw new Error("Return cylinder not found");
-      if (cyl.customerId && cyl.customerId !== delivery.customerId) {
-        throw new Error(`${cyl.serialNumber} belongs to another customer`);
+      if (delivery.salesOrderId) {
+        const so = await call<SalesOrder | null>("get", "sales", delivery.salesOrderId);
+        if (so && so.status === "confirmed") {
+          await call("update", "sales", so.id, { status: "invoiced" });
+        }
       }
-      const loaned = lastCustomerPurpose(priorMoves, cid, delivery.customerId) === "loan";
-      await cylinderService.addMovement({
-        cylinderId: cid,
-        type: "returned",
-        customerId: delivery.customerId,
-        fromLocation: delivery.customerName,
-        toLocation: "Warehouse",
-        notes: exchange ? `Exchange return with Delivery ${delivery.challanNo}` : `Empty returned with Delivery ${delivery.challanNo}`,
-        by: "Delivery",
-        purpose: exchange ? "exchange_in" : loaned ? "loan_return" : "return",
-      });
-    }
 
-    return call<Delivery>("update", "deliveries", id, {
-      status: "delivered",
-      confirmedAt: new Date().toISOString(),
-      emptyReturned: confirmPayload?.returnedIds?.length || 0,
-      items: nextItems,
-    });
+      const issuedCount = nextItems.reduce((n, item) => n + (item.cylinderIds?.length || 0), 0);
+      const returnedCount = confirmPayload?.returnedIds?.length || 0;
+      if (confirmPayload?.asExchange) {
+        if (issuedCount <= 0 || returnedCount <= 0) {
+          throw new Error("Exchange requires empty returns and full issues");
+        }
+        if (issuedCount !== returnedCount) {
+          throw new Error("Exchange requires equal empty returns and full issues");
+        }
+      }
+      const exchange = confirmPayload?.asExchange === true;
+
+      for (const item of nextItems) {
+        const p = products.find((x) => x.id === item.productId);
+        const sold = isCylinderSaleLine(item, p);
+        for (const cid of item.cylinderIds || []) {
+          await cylinderService.addMovement({
+            cylinderId: cid,
+            type: "issued",
+            customerId: delivery.customerId,
+            fromLocation: "Warehouse",
+            toLocation: delivery.customerName,
+            notes: sold
+              ? `Sold — ownership transferred (${delivery.challanNo})`
+              : exchange
+                ? `Exchange in from Delivery ${delivery.challanNo}`
+                : `Auto-issued from Delivery ${delivery.challanNo}`,
+            by: "Delivery",
+            sold,
+            purpose: sold ? "sale" : exchange ? "exchange_out" : "sent",
+            expectedReturnAt: sold ? undefined : expectedReturnAt,
+          });
+        }
+      }
+
+      const priorMoves = await call<CylinderMovement[]>("list", "movements");
+      for (const cid of confirmPayload?.returnedIds || []) {
+        const cyl = allCyl.find((c) => c.id === cid);
+        if (!cyl) throw new Error("Return cylinder not found");
+        if (cyl.customerId && cyl.customerId !== delivery.customerId) {
+          throw new Error(`${cyl.serialNumber} belongs to another customer`);
+        }
+        const loaned = lastCustomerPurpose(priorMoves, cid, delivery.customerId) === "loan";
+        await cylinderService.addMovement({
+          cylinderId: cid,
+          type: "returned",
+          customerId: delivery.customerId,
+          fromLocation: delivery.customerName,
+          toLocation: "Warehouse",
+          notes: exchange
+            ? `Exchange return with Delivery ${delivery.challanNo}`
+            : `Empty returned with Delivery ${delivery.challanNo}`,
+          by: "Delivery",
+          purpose: exchange ? "exchange_in" : loaned ? "loan_return" : "return",
+        });
+      }
+
+      return call<Delivery>("update", "deliveries", id, {
+        status: "delivered",
+        confirmedAt: new Date().toISOString(),
+        emptyReturned: confirmPayload?.returnedIds?.length || 0,
+        items: nextItems,
+      });
     } catch (err) {
       for (const cid of claimedIds) {
         try {
@@ -1112,7 +1330,9 @@ export const deliveryService = {
               sold: false,
             });
           }
-        } catch { /* keep trying remaining cylinders */ }
+        } catch {
+          /* keep trying remaining cylinders */
+        }
       }
       await releaseIssueLocks(claimedIds);
       throw err;
@@ -1125,8 +1345,14 @@ export const expenseService = {
   get: (id: string) => call<Expense | null>("get", "expenses", id),
   create: async (data: Omit<Expense, "id" | "createdAt">) => {
     const now = new Date().toISOString();
-    const expense = await call<Expense>("create", "expenses", undefined, { ...data, createdAt: now });
-    const account = data.paymentMethod === "cheque" || data.paymentMethod === "mobile" ? "bank" : data.paymentMethod;
+    const expense = await call<Expense>("create", "expenses", undefined, {
+      ...data,
+      createdAt: now,
+    });
+    const account =
+      data.paymentMethod === "cheque" || data.paymentMethod === "mobile"
+        ? "bank"
+        : data.paymentMethod;
     await postLedger({
       date: data.date || now,
       account,
@@ -1160,7 +1386,8 @@ export const expenseService = {
     }
     const updated = await call<Expense>("update", "expenses", id, data);
     const paymentMethod = updated.paymentMethod ?? existing.paymentMethod;
-    const account = paymentMethod === "cheque" || paymentMethod === "mobile" ? "bank" : paymentMethod;
+    const account =
+      paymentMethod === "cheque" || paymentMethod === "mobile" ? "bank" : paymentMethod;
     await postLedger({
       date: updated.date || existing.date,
       account,
@@ -1189,7 +1416,8 @@ export const purchaseService = {
   update: async (id: string, data: Partial<PurchaseOrder>) => {
     const existing = await call<PurchaseOrder | null>("get", "purchases", id);
     if (!existing) throw new Error("Purchase order not found");
-    if (existing.status === "cancelled") throw new Error("Cancelled purchase orders cannot be edited");
+    if (existing.status === "cancelled")
+      throw new Error("Cancelled purchase orders cannot be edited");
     const paid = existing.paid || 0;
     const total = data.total != null ? Number(data.total) : existing.total;
     if (total + 0.009 < paid) {
@@ -1197,7 +1425,10 @@ export const purchaseService = {
     }
     let status = data.status ?? existing.status;
     if (status === "paid" && paid + 0.009 < total) {
-      status = existing.status === "partial" || existing.status === "received" ? existing.status : "ordered";
+      status =
+        existing.status === "partial" || existing.status === "received"
+          ? existing.status
+          : "ordered";
     }
     const { paid: _ignorePaid, ...rest } = data;
     return call<PurchaseOrder>("update", "purchases", id, { ...rest, paid, status, tax: 0 });
@@ -1224,15 +1455,31 @@ export const purchaseService = {
     if (po.status === "cancelled") {
       throw new Error(`Cannot change status from ${po.status}`);
     }
-    if (status === "cancelled" && (po.status === "received" || po.status === "billed" || po.status === "partial")) {
+    if (
+      status === "cancelled" &&
+      (po.status === "received" || po.status === "billed" || po.status === "partial")
+    ) {
       throw new Error("Cannot cancel after goods received");
     }
     return call<PurchaseOrder>("update", "purchases", id, { status });
   },
-  receive: async (id: string, payload?: { serialsByItem?: string[][]; lotNumber?: string; qtyByItem?: number[]; requestId?: string }) => {
+  receive: async (
+    id: string,
+    payload?: {
+      serialsByItem?: string[][];
+      lotNumber?: string;
+      qtyByItem?: number[];
+      requestId?: string;
+    },
+  ) => {
     return receivePurchaseFn({ data: { id, payload } });
   },
-  recordPayment: async (id: string, amount: number, method: PaymentMethod = "cash", accountName?: string) => {
+  recordPayment: async (
+    id: string,
+    amount: number,
+    method: PaymentMethod = "cash",
+    accountName?: string,
+  ) => {
     const po = await call<PurchaseOrder | null>("get", "purchases", id);
     if (!po) throw new Error("Purchase order not found");
     if (po.status === "cancelled") throw new Error("Cannot pay a cancelled purchase order");
@@ -1283,9 +1530,16 @@ export const inventoryService = {
     if (quantity <= 0) throw new Error("Quantity must be positive");
     const cylinders = await call<Cylinder[]>("list", "cylinders");
     const empties = cylinders
-      .filter((c) => c.productId === productId && !c.supplierId && (c.status === "refilling" || (cylinderIsEmpty(c) && c.status !== "at_customer" && c.status !== "in_transit")))
+      .filter(
+        (c) =>
+          c.productId === productId &&
+          !c.supplierId &&
+          (c.status === "refilling" ||
+            (cylinderIsEmpty(c) && c.status !== "at_customer" && c.status !== "in_transit")),
+      )
       .sort((a, b) => a.lastMovementAt.localeCompare(b.lastMovementAt));
-    if (empties.length < quantity) throw new Error(`Only ${empties.length} empty cylinder(s) ready to refill`);
+    if (empties.length < quantity)
+      throw new Error(`Only ${empties.length} empty cylinder(s) ready to refill`);
     const picked = empties.slice(0, quantity);
     for (const c of picked) {
       await cylinderService.addMovement({
@@ -1327,47 +1581,51 @@ export const inventoryService = {
     if (!Number.isFinite(qty) || qty <= 0) throw new Error("Quantity must be positive");
     const cylinders = await call<Cylinder[]>("list", "cylinders");
     const pool = cylinders
-      .filter((c) =>
-        c.productId === data.productId
-        && !c.supplierId
-        && !issueLockIsActive(c.issueLock)
-        && c.status !== "at_customer"
-        && c.status !== "damaged"
-        && c.status !== "lost"
-        && (c.status === "refilling" || cylinderIsEmpty(c)),
+      .filter(
+        (c) =>
+          c.productId === data.productId &&
+          !c.supplierId &&
+          !issueLockIsActive(c.issueLock) &&
+          c.status !== "at_customer" &&
+          c.status !== "damaged" &&
+          c.status !== "lost" &&
+          (c.status === "refilling" || cylinderIsEmpty(c)),
       )
       .sort((a, b) => a.lastMovementAt.localeCompare(b.lastMovementAt));
-    if (pool.length < qty) throw new Error(`Only ${pool.length} empty cylinder(s) available to send`);
+    if (pool.length < qty)
+      throw new Error(`Only ${pool.length} empty cylinder(s) available to send`);
     const chosen = pool.slice(0, qty);
     const claimedIds = chosen.map((c) => c.id);
     await claimCylinderIds(claimedIds, ["in_stock", "refilling", "in_transit"]);
     const expectedReturnAt = data.expectedReturnDate || undefined;
-    const when = data.date ? new Date(`${data.date}T12:00:00`).toISOString() : new Date().toISOString();
+    const when = data.date
+      ? new Date(`${data.date}T12:00:00`).toISOString()
+      : new Date().toISOString();
     await afterCylinderClaim(claimedIds, async () => {
-    for (const c of chosen) {
-      await cylinderService.addMovement({
-        cylinderId: c.id,
-        type: "transferred",
-        supplierId: supplier.id,
-        fromLocation: "Warehouse",
-        toLocation: supplier.name,
-        notes: data.notes?.trim() || `Sent to supplier for refill · ${product.name}`,
+      for (const c of chosen) {
+        await cylinderService.addMovement({
+          cylinderId: c.id,
+          type: "transferred",
+          supplierId: supplier.id,
+          fromLocation: "Warehouse",
+          toLocation: supplier.name,
+          notes: data.notes?.trim() || `Sent to supplier for refill · ${product.name}`,
+          by: "Warehouse",
+          expectedReturnAt,
+          purpose: "refill_sent",
+        });
+      }
+      await call("create", "stockMovements", undefined, {
+        date: when,
+        productId: product.id,
+        productName: product.name,
+        type: "out",
+        quantity: qty,
+        balanceAfter: product.stock,
+        refType: "refill",
+        notes: `Sent to ${supplier.name} × ${qty}${data.notes ? ` · ${data.notes}` : ""}`,
         by: "Warehouse",
-        expectedReturnAt,
-        purpose: "refill_sent",
       });
-    }
-    await call("create", "stockMovements", undefined, {
-      date: when,
-      productId: product.id,
-      productName: product.name,
-      type: "out",
-      quantity: qty,
-      balanceAfter: product.stock,
-      refType: "refill",
-      notes: `Sent to ${supplier.name} × ${qty}${data.notes ? ` · ${data.notes}` : ""}`,
-      by: "Warehouse",
-    });
     });
   },
   receiveFromSupplier: async (data: {
@@ -1385,10 +1643,22 @@ export const inventoryService = {
     if (!Number.isFinite(qty) || qty <= 0) throw new Error("Quantity must be positive");
     const cylinders = await call<Cylinder[]>("list", "cylinders");
     const pool = cylinders
-      .filter((c) => c.productId === data.productId && c.supplierId === supplier.id && c.status !== "damaged" && c.status !== "lost")
+      .filter(
+        (c) =>
+          c.productId === data.productId &&
+          c.supplierId === supplier.id &&
+          c.status !== "damaged" &&
+          c.status !== "lost",
+      )
       .sort((a, b) => a.lastMovementAt.localeCompare(b.lastMovementAt));
-    if (pool.length < qty) throw new Error(`Only ${pool.length} cylinder(s) still with ${supplier.name}`);
-    const mvType = data.condition === "damaged" ? "damaged" : data.condition === "empty" ? "returned" : "refilled";
+    if (pool.length < qty)
+      throw new Error(`Only ${pool.length} cylinder(s) still with ${supplier.name}`);
+    const mvType =
+      data.condition === "damaged"
+        ? "damaged"
+        : data.condition === "empty"
+          ? "returned"
+          : "refilled";
     for (const c of pool.slice(0, qty)) {
       await cylinderService.addMovement({
         cylinderId: c.id,
@@ -1428,14 +1698,18 @@ export const inventoryService = {
     const qty = Number(data.quantity);
     if (qty <= 0) throw new Error("Quantity must be positive");
     const cylinders = await call<Cylinder[]>("list", "cylinders");
-    const pool = cylinders.filter((c) => {
-      if (c.productId !== data.productId || c.status === "lost" || c.ownedBy === "customer") return false;
-      if (data.partyKind === "warehouse") {
-        return c.status === "in_stock" && !c.supplierId;
-      }
-      if (data.partyKind === "customer") return c.status === "at_customer" && c.customerId === data.partyId;
-      return Boolean(data.partyId) && c.supplierId === data.partyId && c.status !== "damaged";
-    }).sort((a, b) => a.lastMovementAt.localeCompare(b.lastMovementAt));
+    const pool = cylinders
+      .filter((c) => {
+        if (c.productId !== data.productId || c.status === "lost" || c.ownedBy === "customer")
+          return false;
+        if (data.partyKind === "warehouse") {
+          return c.status === "in_stock" && !c.supplierId;
+        }
+        if (data.partyKind === "customer")
+          return c.status === "at_customer" && c.customerId === data.partyId;
+        return Boolean(data.partyId) && c.supplierId === data.partyId && c.status !== "damaged";
+      })
+      .sort((a, b) => a.lastMovementAt.localeCompare(b.lastMovementAt));
     if (pool.length < qty) {
       throw new Error(
         data.partyKind === "warehouse"
@@ -1446,9 +1720,10 @@ export const inventoryService = {
     let partyName = "Warehouse";
     if (data.partyKind !== "warehouse") {
       if (!data.partyId) throw new Error("Select the customer or supplier who holds the cylinder");
-      const party = data.partyKind === "customer"
-        ? await call<Customer | null>("get", "customers", data.partyId)
-        : await call<Supplier | null>("get", "suppliers", data.partyId);
+      const party =
+        data.partyKind === "customer"
+          ? await call<Customer | null>("get", "customers", data.partyId)
+          : await call<Supplier | null>("get", "suppliers", data.partyId);
       if (!party) throw new Error("Party not found");
       partyName = party.name;
     }
@@ -1470,21 +1745,25 @@ export const inventoryService = {
     }
     const penalty = Number(data.penaltyAmount) || 0;
     if (data.partyKind !== "warehouse" && penalty > 0 && data.accountingTreatment === "charge") {
-      const now = data.lostDate ? new Date(`${data.lostDate}T12:00:00`).toISOString() : new Date().toISOString();
+      const now = data.lostDate
+        ? new Date(`${data.lostDate}T12:00:00`).toISOString()
+        : new Date().toISOString();
       if (data.partyKind === "customer") {
         await call("create", "sales", undefined, {
           orderNo: genOrderNo("SO"),
           customerId: data.partyId,
           customerName: partyName,
           date: now,
-          items: [{
-            productId: product.id,
-            productName: `Lost cylinder penalty · ${product.name}`,
-            quantity: 1,
-            price: penalty,
-            taxRate: 0,
-            sellCylinder: false,
-          }],
+          items: [
+            {
+              productId: product.id,
+              productName: `Lost cylinder penalty · ${product.name}`,
+              quantity: 1,
+              price: penalty,
+              taxRate: 0,
+              sellCylinder: false,
+            },
+          ],
           subtotal: penalty,
           tax: 0,
           total: penalty,
@@ -1527,7 +1806,9 @@ export const inventoryService = {
     if (isCyl) {
       const cylinders = await call<Cylinder[]>("list", "cylinders");
       const pool = cylinders
-        .filter((c) => c.productId === productId && cylinderIsFullStock(c) && c.ownedBy !== "customer")
+        .filter(
+          (c) => c.productId === productId && cylinderIsFullStock(c) && c.ownedBy !== "customer",
+        )
         .sort((a, b) => a.lastMovementAt.localeCompare(b.lastMovementAt));
       if (pool.length < qty) throw new Error(`Only ${pool.length} full cylinder(s) in warehouse`);
       for (const c of pool.slice(0, qty)) {
@@ -1551,7 +1832,12 @@ export const inventoryService = {
       by: "Warehouse",
     });
   },
-  resolveDamage: async (productId: string, quantity: number, action: "repair" | "scrap" | "writeoff", notes?: string) => {
+  resolveDamage: async (
+    productId: string,
+    quantity: number,
+    action: "repair" | "scrap" | "writeoff",
+    notes?: string,
+  ) => {
     const product = await call<Product | null>("get", "products", productId);
     if (!product) throw new Error("Product not found");
     const qty = Number(quantity);
@@ -1595,7 +1881,12 @@ export const inventoryService = {
       });
     }
   },
-  returnEmpty: async (data: { customerId: string; productId: string; quantity: number; notes?: string }) => {
+  returnEmpty: async (data: {
+    customerId: string;
+    productId: string;
+    quantity: number;
+    notes?: string;
+  }) => {
     const product = await call<Product | null>("get", "products", data.productId);
     if (!product) throw new Error("Product not found");
     const customer = await call<Customer | null>("get", "customers", data.customerId);
@@ -1604,31 +1895,50 @@ export const inventoryService = {
     if (qty <= 0) throw new Error("Quantity must be positive");
     const cylinders = await call<Cylinder[]>("list", "cylinders");
     const pool = cylinders
-      .filter((c) => c.productId === data.productId && c.status === "at_customer" && c.customerId === data.customerId && c.ownedBy !== "customer" && !issueLockIsActive(c.issueLock))
+      .filter(
+        (c) =>
+          c.productId === data.productId &&
+          c.status === "at_customer" &&
+          c.customerId === data.customerId &&
+          c.ownedBy !== "customer" &&
+          !issueLockIsActive(c.issueLock),
+      )
       .sort((a, b) => a.lastMovementAt.localeCompare(b.lastMovementAt));
-    if (pool.length === 0) throw new Error(`Cannot return cylinder: customer has no issued cylinders for ${product.name}`);
+    if (pool.length === 0)
+      throw new Error(
+        `Cannot return cylinder: customer has no issued cylinders for ${product.name}`,
+      );
     if (pool.length < qty) throw new Error(`Only ${pool.length} cylinder(s) with this customer`);
     const chosen = pool.slice(0, qty);
     const claimedIds = chosen.map((c) => c.id);
     await claimCylinderIds(claimedIds, ["at_customer"]);
     const priorMoves = await call<CylinderMovement[]>("list", "movements");
     await afterCylinderClaim(claimedIds, async () => {
-    for (const c of chosen) {
-      const loaned = lastCustomerPurpose(priorMoves, c.id, customer.id) === "loan";
-      await cylinderService.addMovement({
-        cylinderId: c.id,
-        type: "returned",
-        customerId: customer.id,
-        fromLocation: customer.name,
-        toLocation: "Warehouse",
-        notes: data.notes?.trim() || (loaned ? `Loan return · ${product.name}` : `Return empty only · ${product.name}`),
-        by: "Warehouse",
-        purpose: loaned ? "loan_return" : "return",
-      });
-    }
+      for (const c of chosen) {
+        const loaned = lastCustomerPurpose(priorMoves, c.id, customer.id) === "loan";
+        await cylinderService.addMovement({
+          cylinderId: c.id,
+          type: "returned",
+          customerId: customer.id,
+          fromLocation: customer.name,
+          toLocation: "Warehouse",
+          notes:
+            data.notes?.trim() ||
+            (loaned ? `Loan return · ${product.name}` : `Return empty only · ${product.name}`),
+          by: "Warehouse",
+          purpose: loaned ? "loan_return" : "return",
+        });
+      }
     });
   },
-  exchangeWithCustomer: async (data: { customerId: string; productId: string; quantity: number; lotNumber?: string; expectedReturnDate?: string; notes?: string }) => {
+  exchangeWithCustomer: async (data: {
+    customerId: string;
+    productId: string;
+    quantity: number;
+    lotNumber?: string;
+    expectedReturnDate?: string;
+    notes?: string;
+  }) => {
     const product = await call<Product | null>("get", "products", data.productId);
     if (!product) throw new Error("Product not found");
     const customer = await call<Customer | null>("get", "customers", data.customerId);
@@ -1638,41 +1948,49 @@ export const inventoryService = {
     if (!data.expectedReturnDate) throw new Error("Expected return date is required");
     const cylinders = await call<Cylinder[]>("list", "cylinders");
     const empties = cylinders
-      .filter((c) => c.productId === data.productId && c.status === "at_customer" && c.customerId === customer.id && c.ownedBy !== "customer" && !issueLockIsActive(c.issueLock))
+      .filter(
+        (c) =>
+          c.productId === data.productId &&
+          c.status === "at_customer" &&
+          c.customerId === customer.id &&
+          c.ownedBy !== "customer" &&
+          !issueLockIsActive(c.issueLock),
+      )
       .sort((a, b) => a.lastMovementAt.localeCompare(b.lastMovementAt));
-    if (empties.length < qty) throw new Error(`Only ${empties.length} empty cylinder(s) with this customer to exchange`);
+    if (empties.length < qty)
+      throw new Error(`Only ${empties.length} empty cylinder(s) with this customer to exchange`);
     const back = empties.slice(0, qty);
     const claimedIds = back.map((c) => c.id);
     await claimCylinderIds(claimedIds, ["at_customer"]);
     try {
-    for (const c of back) {
-      await cylinderService.addMovement({
-        cylinderId: c.id,
-        type: "returned",
-        customerId: customer.id,
-        fromLocation: customer.name,
-        toLocation: "Warehouse",
-        notes: data.notes?.trim() || `Exchange return · ${product.name}`,
-        by: "Warehouse",
-        purpose: "exchange_in",
-      });
-    }
-    const fulls = await takeWarehouseFull(data.productId, qty, data.lotNumber);
-    claimedIds.push(...fulls.map((c) => c.id));
-    for (const c of fulls) {
-      await cylinderService.addMovement({
-        cylinderId: c.id,
-        type: "issued",
-        customerId: customer.id,
-        fromLocation: "Warehouse",
-        toLocation: customer.name,
-        notes: data.notes?.trim() || `Exchange issue · ${product.name}`,
-        by: "Warehouse",
-        purpose: "exchange_out",
-        expectedReturnAt: data.expectedReturnDate,
-        lotNumber: data.lotNumber,
-      });
-    }
+      for (const c of back) {
+        await cylinderService.addMovement({
+          cylinderId: c.id,
+          type: "returned",
+          customerId: customer.id,
+          fromLocation: customer.name,
+          toLocation: "Warehouse",
+          notes: data.notes?.trim() || `Exchange return · ${product.name}`,
+          by: "Warehouse",
+          purpose: "exchange_in",
+        });
+      }
+      const fulls = await takeWarehouseFull(data.productId, qty, data.lotNumber);
+      claimedIds.push(...fulls.map((c) => c.id));
+      for (const c of fulls) {
+        await cylinderService.addMovement({
+          cylinderId: c.id,
+          type: "issued",
+          customerId: customer.id,
+          fromLocation: "Warehouse",
+          toLocation: customer.name,
+          notes: data.notes?.trim() || `Exchange issue · ${product.name}`,
+          by: "Warehouse",
+          purpose: "exchange_out",
+          expectedReturnAt: data.expectedReturnDate,
+          lotNumber: data.lotNumber,
+        });
+      }
     } catch (err) {
       await releaseIssueLocks(claimedIds);
       throw err;
@@ -1696,22 +2014,29 @@ export const inventoryService = {
     const pool = await takeWarehouseFull(data.productId, qty);
     const claimedIds = pool.slice(0, qty).map((c) => c.id);
     await afterCylinderClaim(claimedIds, async () => {
-    for (const c of pool.slice(0, qty)) {
-      await cylinderService.addMovement({
-        cylinderId: c.id,
-        type: "issued",
-        customerId: customer.id,
-        fromLocation: "Warehouse",
-        toLocation: customer.name,
-        notes: data.notes?.trim() || `Loan · ${product.name}`,
-        by: "Warehouse",
-        purpose: "loan",
-        expectedReturnAt: data.expectedReturnDate,
-      });
-    }
+      for (const c of pool.slice(0, qty)) {
+        await cylinderService.addMovement({
+          cylinderId: c.id,
+          type: "issued",
+          customerId: customer.id,
+          fromLocation: "Warehouse",
+          toLocation: customer.name,
+          notes: data.notes?.trim() || `Loan · ${product.name}`,
+          by: "Warehouse",
+          purpose: "loan",
+          expectedReturnAt: data.expectedReturnDate,
+        });
+      }
     });
   },
-  sendToCustomer: async (data: { customerId: string; productId: string; quantity: number; lotNumber?: string; notes?: string; expectedReturnDate?: string }) => {
+  sendToCustomer: async (data: {
+    customerId: string;
+    productId: string;
+    quantity: number;
+    lotNumber?: string;
+    notes?: string;
+    expectedReturnDate?: string;
+  }) => {
     const product = await call<Product | null>("get", "products", data.productId);
     if (!product) throw new Error("Product not found");
     const customer = await call<Customer | null>("get", "customers", data.customerId);
@@ -1722,23 +2047,28 @@ export const inventoryService = {
     const pool = await takeWarehouseFull(data.productId, qty, data.lotNumber);
     const claimedIds = pool.map((c) => c.id);
     await afterCylinderClaim(claimedIds, async () => {
-    for (const c of pool) {
-      await cylinderService.addMovement({
-        cylinderId: c.id,
-        type: "issued",
-        customerId: customer.id,
-        fromLocation: "Warehouse",
-        toLocation: customer.name,
-        notes: data.notes?.trim() || `Customer sent · ${product.name}`,
-        by: "Warehouse",
-        purpose: "sent",
-        lotNumber: data.lotNumber,
-        expectedReturnAt: data.expectedReturnDate,
-      });
-    }
+      for (const c of pool) {
+        await cylinderService.addMovement({
+          cylinderId: c.id,
+          type: "issued",
+          customerId: customer.id,
+          fromLocation: "Warehouse",
+          toLocation: customer.name,
+          notes: data.notes?.trim() || `Customer sent · ${product.name}`,
+          by: "Warehouse",
+          purpose: "sent",
+          lotNumber: data.lotNumber,
+          expectedReturnAt: data.expectedReturnDate,
+        });
+      }
     });
   },
-  sellCylinders: async (data: { customerId: string; productId: string; quantity: number; notes?: string }) => {
+  sellCylinders: async (data: {
+    customerId: string;
+    productId: string;
+    quantity: number;
+    notes?: string;
+  }) => {
     const product = await call<Product | null>("get", "products", data.productId);
     if (!product) throw new Error("Product not found");
     const customer = await call<Customer | null>("get", "customers", data.customerId);
@@ -1751,54 +2081,65 @@ export const inventoryService = {
     const total = price * qty;
     const now = new Date().toISOString();
     const orderNo = genOrderNo("SO");
-    const items = [{
-      productId: product.id,
-      productName: product.name,
-      quantity: qty,
-      price,
-      taxRate: 0,
-      sellCylinder: true,
-      cylinderIds: soldIds,
-    }];
+    const items = [
+      {
+        productId: product.id,
+        productName: product.name,
+        quantity: qty,
+        price,
+        taxRate: 0,
+        sellCylinder: true,
+        cylinderIds: soldIds,
+      },
+    ];
     let createdSaleId: string | undefined;
     try {
-    const created = await call<SalesOrder>("create", "sales", undefined, {
-      orderNo,
-      customerId: customer.id,
-      customerName: customer.name,
-      date: now,
-      items,
-      subtotal: total,
-      tax: 0,
-      total,
-      paid: 0,
-      status: "invoiced",
-      notes: data.notes?.trim() || `Cylinder sale · ${product.name}`,
-      createdAt: now,
-    });
-    createdSaleId = created.id;
-    for (const cid of soldIds) {
-      await cylinderService.addMovement({
-        cylinderId: cid,
-        type: "issued",
+      const created = await call<SalesOrder>("create", "sales", undefined, {
+        orderNo,
         customerId: customer.id,
-        fromLocation: "Warehouse",
-        toLocation: customer.name,
-        notes: data.notes?.trim() || `Cylinder sale · ${product.name} · ${orderNo}`,
-        by: "Warehouse",
-        purpose: "sale",
-        sold: true,
+        customerName: customer.name,
+        date: now,
+        items,
+        subtotal: total,
+        tax: 0,
+        total,
+        paid: 0,
+        status: "invoiced",
+        notes: data.notes?.trim() || `Cylinder sale · ${product.name}`,
+        createdAt: now,
       });
-    }
+      createdSaleId = created.id;
+      for (const cid of soldIds) {
+        await cylinderService.addMovement({
+          cylinderId: cid,
+          type: "issued",
+          customerId: customer.id,
+          fromLocation: "Warehouse",
+          toLocation: customer.name,
+          notes: data.notes?.trim() || `Cylinder sale · ${product.name} · ${orderNo}`,
+          by: "Warehouse",
+          purpose: "sale",
+          sold: true,
+        });
+      }
     } catch (err) {
       await releaseIssueLocks(soldIds);
       if (createdSaleId) {
-        try { await call("remove", "sales", createdSaleId); } catch { /* compensating this attempt only */ }
+        try {
+          await call("remove", "sales", createdSaleId);
+        } catch {
+          /* compensating this attempt only */
+        }
       }
       throw err;
     }
   },
-  adjust: async (productId: string, quantity: number, type: "in" | "out" | "adjust", notes?: string) => {
+  adjust: async (
+    productId: string,
+    quantity: number,
+    type: "in" | "out" | "adjust",
+    notes?: string,
+  ) => {
     const product = await call<Product | null>("get", "products", productId);
     if (!product) throw new Error("Product not found");
     if (!Number.isFinite(quantity) || quantity < 0) throw new Error("Quantity cannot be negative");
@@ -1809,7 +2150,10 @@ export const inventoryService = {
     else if (type === "out") delta = -quantity;
     else delta = quantity - current;
     if (delta === 0) return;
-    if (current + delta < 0) throw new Error(`Insufficient stock for ${product.name} (available ${current}, delta ${delta})`);
+    if (current + delta < 0)
+      throw new Error(
+        `Insufficient stock for ${product.name} (available ${current}, delta ${delta})`,
+      );
     const refId = genOrderNo("ADJ");
     const meta: StockMeta = {
       refType: "adjustment",
@@ -1827,7 +2171,9 @@ export const inventoryService = {
     if (isCyl) {
       const cylinders = await call<Cylinder[]>("list", "cylinders");
       if (delta > 0) {
-        const serials = suggestSerials(product.code, delta).map((s) => `${s}-${Math.random().toString(36).slice(2, 6)}`);
+        const serials = suggestSerials(product.code, delta).map(
+          (s) => `${s}-${Math.random().toString(36).slice(2, 6)}`,
+        );
         for (const serial of serials) {
           await cylinderService.create({
             serialNumber: serial,
@@ -1840,8 +2186,13 @@ export const inventoryService = {
           });
         }
       } else {
-        const ids = pickFifo(cylinders.filter((c) => !issueLockIsActive(c.issueLock)), productId, -delta);
-        if (ids.length < -delta) throw new Error(`Only ${ids.length} full cylinder(s) available to decrease`);
+        const ids = pickFifo(
+          cylinders.filter((c) => !issueLockIsActive(c.issueLock)),
+          productId,
+          -delta,
+        );
+        if (ids.length < -delta)
+          throw new Error(`Only ${ids.length} full cylinder(s) available to decrease`);
         await claimCylinderIds(ids, ["in_stock", "in_transit"]);
         await afterCylinderClaim(ids, async () => {
           for (const cid of ids) {
@@ -1871,8 +2222,12 @@ export const inventoryService = {
 export const accountingService = {
   listAccounts: () => call<Account[]>("list", "accounts"),
   createAccount: (data: Omit<Account, "id" | "createdAt">) =>
-    call<Account>("create", "accounts", undefined, { ...data, createdAt: new Date().toISOString() }),
-  updateAccount: (id: string, data: Partial<Account>) => call<Account>("update", "accounts", id, data),
+    call<Account>("create", "accounts", undefined, {
+      ...data,
+      createdAt: new Date().toISOString(),
+    }),
+  updateAccount: (id: string, data: Partial<Account>) =>
+    call<Account>("update", "accounts", id, data),
   removeAccount: (id: string) => call<{ ok: true }>("remove", "accounts", id),
   listLedger: () => call<LedgerEntry[]>("list", "ledger"),
   listVouchers: () => call<Voucher[]>("list", "vouchers"),
@@ -1990,20 +2345,20 @@ export const accountingService = {
       const ledger = await call<LedgerEntry[]>("list", "ledger");
       const byVoucherNo = ledger.filter(
         (e) =>
-          e.refType === "sales"
-          && e.refId === voucher.refId
-          && e.direction === "in"
-          && e.amount === voucher.amount
-          && (e.notes || "").includes(voucher.voucherNo),
+          e.refType === "sales" &&
+          e.refId === voucher.refId &&
+          e.direction === "in" &&
+          e.amount === voucher.amount &&
+          (e.notes || "").includes(voucher.voucherNo),
       );
       const byOrderNo = ledger
         .filter(
           (e) =>
-            e.refType === "sales"
-            && e.refId === voucher.refId
-            && e.direction === "in"
-            && e.amount === voucher.amount
-            && (e.notes || "").includes(voucher.refNo || ""),
+            e.refType === "sales" &&
+            e.refId === voucher.refId &&
+            e.direction === "in" &&
+            e.amount === voucher.amount &&
+            (e.notes || "").includes(voucher.refNo || ""),
         )
         .sort((a, b) => b.date.localeCompare(a.date));
       const toRemove = byVoucherNo.length
@@ -2025,14 +2380,22 @@ export const accountingService = {
   },
   listCoa: () => call<ChartOfAccount[]>("list", "chartOfAccounts"),
   createCoa: (data: Omit<ChartOfAccount, "id" | "createdAt">) =>
-    call<ChartOfAccount>("create", "chartOfAccounts", undefined, { ...data, createdAt: new Date().toISOString() }),
-  updateCoa: (id: string, data: Partial<ChartOfAccount>) => call<ChartOfAccount>("update", "chartOfAccounts", id, data),
+    call<ChartOfAccount>("create", "chartOfAccounts", undefined, {
+      ...data,
+      createdAt: new Date().toISOString(),
+    }),
+  updateCoa: (id: string, data: Partial<ChartOfAccount>) =>
+    call<ChartOfAccount>("update", "chartOfAccounts", id, data),
   removeCoa: (id: string) => call<{ ok: true }>("remove", "chartOfAccounts", id),
-  
+
   listAssets: () => call<BusinessAsset[]>("list", "assets"),
   createAsset: (data: Omit<BusinessAsset, "id" | "createdAt">) =>
-    call<BusinessAsset>("create", "assets", undefined, { ...data, createdAt: new Date().toISOString() }),
-  updateAsset: (id: string, data: Partial<BusinessAsset>) => call<BusinessAsset>("update", "assets", id, data),
+    call<BusinessAsset>("create", "assets", undefined, {
+      ...data,
+      createdAt: new Date().toISOString(),
+    }),
+  updateAsset: (id: string, data: Partial<BusinessAsset>) =>
+    call<BusinessAsset>("update", "assets", id, data),
   removeAsset: (id: string) => call<{ ok: true }>("remove", "assets", id),
 };
 
@@ -2060,7 +2423,10 @@ export const hrService = {
       createdAt: new Date().toISOString(),
     });
   },
-  updatePayroll: async (id: string, data: Partial<Pick<PayrollRun, "bonus" | "allowance" | "deduction" | "basic" | "month">>) => {
+  updatePayroll: async (
+    id: string,
+    data: Partial<Pick<PayrollRun, "bonus" | "allowance" | "deduction" | "basic" | "month">>,
+  ) => {
     const run = await call<PayrollRun | null>("get", "payroll", id);
     if (!run) throw new Error("Payroll not found");
     if (run.status !== "draft") throw new Error("Only draft payslips can be edited");

@@ -196,23 +196,10 @@
   "pageErrors": [],
   "httpFails": [],
   "created": {
-    "products": [
-      "18hsssa8",
-      "sdfgxp7g",
-      "08bdvje7"
-    ],
-    "purchases": [
-      "m2xm3tfs",
-      "ghutjpr4",
-      "bz3vnrp5"
-    ],
-    "sales": [
-      "st2kpie8",
-      "9s9lcha4"
-    ],
-    "deliveries": [
-      "sneahy48"
-    ],
+    "products": ["18hsssa8", "sdfgxp7g", "08bdvje7"],
+    "purchases": ["m2xm3tfs", "ghutjpr4", "bz3vnrp5"],
+    "sales": ["st2kpie8", "9s9lcha4"],
+    "deliveries": ["sneahy48"],
     "cylinders": [],
     "category": ""
   }

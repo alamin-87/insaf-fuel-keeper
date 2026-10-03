@@ -17,7 +17,12 @@ export function PrintDocHeader({
 }) {
   const t = useT();
   return (
-    <div className={cn("flex flex-wrap items-start justify-between gap-4 border-b pb-4 print-doc-header", className)}>
+    <div
+      className={cn(
+        "flex flex-wrap items-start justify-between gap-4 border-b pb-4 print-doc-header",
+        className,
+      )}
+    >
       <div className="flex items-start gap-3">
         <BrandLogo size="lg" className="rounded-lg print:block" />
         <div>

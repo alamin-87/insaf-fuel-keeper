@@ -19,7 +19,9 @@ export function isDemoLoginEnabled() {
 export function validateSessionSecret(secret: string | undefined, isProd: boolean): string {
   if (secret && secret.length >= 32) return secret;
   if (isProd) {
-    throw new Error("SESSION_SECRET is required in production and must be at least 32 characters long.");
+    throw new Error(
+      "SESSION_SECRET is required in production and must be at least 32 characters long.",
+    );
   }
   return "insaf-gas-corp-dev-session-secret-32chars";
 }
@@ -50,7 +52,11 @@ export async function requireUser(): Promise<AuthUser> {
 }
 
 /** Explicit AUTH_* only. Production never falls back to operator/insaf123. */
-export function getAuthCredentials(): { username: string; password: string; displayName: string } | null {
+export function getAuthCredentials(): {
+  username: string;
+  password: string;
+  displayName: string;
+} | null {
   const username = process.env.AUTH_USER?.trim();
   const password = process.env.AUTH_PASSWORD;
   if (username && password) {

@@ -30,7 +30,9 @@ export function StockReport({ range }: { range: DateRange }) {
   }
 
   if (rows.length === 0) {
-    return <p className="py-8 text-center text-sm text-muted-foreground">{t("common.noRecords")}</p>;
+    return (
+      <p className="py-8 text-center text-sm text-muted-foreground">{t("common.noRecords")}</p>
+    );
   }
 
   return (
@@ -40,7 +42,11 @@ export function StockReport({ range }: { range: DateRange }) {
         <section key={p.id} className="overflow-hidden rounded-xl border">
           <div className="grid grid-cols-2 gap-3 border-b bg-muted/40 p-3 sm:grid-cols-6 sm:items-center">
             <div className="col-span-2 flex min-w-0 items-center gap-2.5 sm:col-span-1">
-              <ProductImage src={products.find((x) => x.id === p.id)?.image} alt={p.name} size="sm" />
+              <ProductImage
+                src={products.find((x) => x.id === p.id)?.image}
+                alt={p.name}
+                size="sm"
+              />
               <div className="min-w-0">
                 <Link
                   to="/products/$id"
@@ -76,12 +82,18 @@ export function StockReport({ range }: { range: DateRange }) {
                 {p.lines.map((line) => (
                   <tr key={line.id} className="border-b last:border-0">
                     <td className="whitespace-nowrap px-3 py-2 text-xs">{formatDate(line.date)}</td>
-                    <td className="px-3 py-2">{line.particulars === "Opening" ? t("statement.opening") : line.particulars}</td>
+                    <td className="px-3 py-2">
+                      {line.particulars === "Opening" ? t("statement.opening") : line.particulars}
+                    </td>
                     <td className="px-3 py-2 text-right tabular-nums">{line.qtyIn || "—"}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{line.qtyOut || "—"}</td>
                     <td className="px-3 py-2 text-right tabular-nums font-medium">{line.inHand}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(line.unitCost)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums font-medium">{formatCurrency(line.valuation)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">
+                      {formatCurrency(line.unitCost)}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums font-medium">
+                      {formatCurrency(line.valuation)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -96,8 +108,12 @@ export function StockReport({ range }: { range: DateRange }) {
 function Stat({ label, value, emphasize }: { label: string; value: string; emphasize?: boolean }) {
   return (
     <div>
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className={emphasize ? "font-display text-sm font-semibold" : "text-sm font-medium"}>{value}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p className={emphasize ? "font-display text-sm font-semibold" : "text-sm font-medium"}>
+        {value}
+      </p>
     </div>
   );
 }

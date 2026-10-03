@@ -26,11 +26,44 @@ export function SupplierLiveReport() {
         searchKeys={["name", "phone"]}
         dateKey="createdAt"
         columns={[
-          { key: "since", header: t("common.date"), sortable: true, sortValue: (r) => r.createdAt, render: (r) => <span className="whitespace-nowrap text-xs text-muted-foreground">{formatOpenedOn(r.createdAt)}</span> },
-          { key: "name", header: t("common.name"), sortable: true, sortValue: (r) => r.name, render: (r) => <PartyNameLink kind="supplier" id={r.id} name={r.name} /> },
-          { key: "phone", header: t("common.phone"), sortable: true, sortValue: (r) => r.phone, render: (r) => r.phone },
-          { key: "address", header: t("common.address"), render: (r) => <span className="text-muted-foreground">{r.address}</span> },
-          { key: "bal", header: t("suppliers.payable"), sortable: true, sortValue: (r) => r.openingBalance, render: (r) => formatCurrency(r.openingBalance), className: "text-right" },
+          {
+            key: "since",
+            header: t("common.date"),
+            sortable: true,
+            sortValue: (r) => r.createdAt,
+            render: (r) => (
+              <span className="whitespace-nowrap text-xs text-muted-foreground">
+                {formatOpenedOn(r.createdAt)}
+              </span>
+            ),
+          },
+          {
+            key: "name",
+            header: t("common.name"),
+            sortable: true,
+            sortValue: (r) => r.name,
+            render: (r) => <PartyNameLink kind="supplier" id={r.id} name={r.name} />,
+          },
+          {
+            key: "phone",
+            header: t("common.phone"),
+            sortable: true,
+            sortValue: (r) => r.phone,
+            render: (r) => r.phone,
+          },
+          {
+            key: "address",
+            header: t("common.address"),
+            render: (r) => <span className="text-muted-foreground">{r.address}</span>,
+          },
+          {
+            key: "bal",
+            header: t("suppliers.payable"),
+            sortable: true,
+            sortValue: (r) => r.openingBalance,
+            render: (r) => formatCurrency(r.openingBalance),
+            className: "text-right",
+          },
         ]}
       />
     </div>

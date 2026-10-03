@@ -121,8 +121,13 @@ export async function exportLedgerExcel(payload: LedgerExportPayload) {
   ];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws["!cols"] = [
-    { wch: 16 }, { wch: 16 }, { wch: 22 }, { wch: 36 },
-    { wch: 16 }, { wch: 16 }, { wch: 20 },
+    { wch: 16 },
+    { wch: 16 },
+    { wch: 22 },
+    { wch: 36 },
+    { wch: 16 },
+    { wch: 16 },
+    { wch: 20 },
   ];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Ledger");
@@ -157,15 +162,17 @@ export async function exportLedgerPdf(payload: LedgerExportPayload) {
   }
   autoTable(doc, {
     startY: y + 2,
-    head: [[
-      payload.columns.date,
-      payload.columns.type,
-      payload.columns.reference,
-      payload.columns.description,
-      payload.columns.debit,
-      payload.columns.credit,
-      payload.columns.balance,
-    ]],
+    head: [
+      [
+        payload.columns.date,
+        payload.columns.type,
+        payload.columns.reference,
+        payload.columns.description,
+        payload.columns.debit,
+        payload.columns.credit,
+        payload.columns.balance,
+      ],
+    ],
     body: payload.rows.map((row) => [
       row.date,
       row.type,

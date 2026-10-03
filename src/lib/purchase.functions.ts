@@ -1,10 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
-import type {
-  CostLayer, Cylinder, LineItem, Product, PurchaseOrder, StockMovement,
-} from "@/types";
+import type { CostLayer, Cylinder, LineItem, Product, PurchaseOrder, StockMovement } from "@/types";
 import { isCylinderProduct } from "@/lib/cylinder-product";
 import { normalizeSerialKey, trackingEnforcesSerialUnique } from "@/lib/cylinder-serial";
-import { lineOrderedQty, lineReceivedQty, nextPurchaseStatus, poCanReceive } from "@/lib/purchase-qty";
+import {
+  lineOrderedQty,
+  lineReceivedQty,
+  nextPurchaseStatus,
+  poCanReceive,
+} from "@/lib/purchase-qty";
 import { genOrderNo } from "@/utils/helpers";
 
 export type ReceivePayload = {
@@ -14,7 +17,7 @@ export type ReceivePayload = {
   requestId?: string;
 };
 
-const clean = <T,>(doc: any): T => {
+const clean = <T>(doc: any): T => {
   if (!doc) return doc;
   const { _id, ...rest } = doc;
   return rest as T;
@@ -68,7 +71,9 @@ export const receivePurchaseFn = createServerFn({ method: "POST" })
           partialFilterExpression: { serialKey: { $type: "string", $gt: "" } },
         },
       );
-    } catch { /* Existing duplicate serials are left in place. */ }
+    } catch {
+      /* Existing duplicate serials are left in place. */
+    }
 
     const session = client.startSession();
     try {
@@ -82,7 +87,11 @@ export const receivePurchaseFn = createServerFn({ method: "POST" })
         });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        if (/Transaction numbers are only allowed|replica set member|Transactions are not supported/i.test(msg)) {
+        if (
+          /Transaction numbers are only allowed|replica set member|Transactions are not supported/i.test(
+            msg,
+          )
+        ) {
           await run(null);
         } else {
           throw asError(e, "Could not complete goods receipt.");
@@ -104,7 +113,7 @@ async function receivePurchaseInDb(
   payload: ReceivePayload | undefined,
   method: "quantity" | "lot" | "serial",
 ): Promise<PurchaseOrder> {
-  const opt = session ? { session } as { session: object } : {};
+  const opt = session ? ({ session } as { session: object }) : {};
   const poDoc = await db.collection("purchases").findOne({ id: String(id) }, opt);
   const po = poDoc ? clean<PurchaseOrder>(poDoc) : null;
   if (!po) throw new Error("Purchase order not found");
@@ -118,8 +127,12 @@ async function receivePurchaseInDb(
     return po;
   }
 
-  const products = (await db.collection("products").find({}, opt).toArray()).map((d: Product) => clean<Product>(d));
-  const cylinders = (await db.collection("cylinders").find({}, opt).toArray()).map((d: Cylinder) => clean<Cylinder>(d));
+  const products = (await db.collection("products").find({}, opt).toArray()).map((d: Product) =>
+    clean<Product>(d),
+  );
+  const cylinders = (await db.collection("cylinders").find({}, opt).toArray()).map((d: Cylinder) =>
+    clean<Cylinder>(d),
+  );
   const nextItems = [...po.items];
   const receiveNow = nextItems.map((item, i) => {
     const remaining = Math.max(0, lineOrderedQty(item) - lineReceivedQty(item, po));
@@ -155,10 +168,18 @@ async function receivePurchaseInDb(
     if (method === "quantity" || method === "lot") {
       if (method === "lot" && !payload?.lotNumber?.trim()) throw new Error("Lot number required");
       for (let n = 0; n < qty; n += 1) {
-        const serial = method === "lot"
-          ? `${payload!.lotNumber!.trim()}-${stamp}-${String(n + 1).padStart(3, "0")}`
-          : `QTY-${(p?.code || "CYL").replace(/\s+/g, "")}-${stamp}-${n + 1}`;
-        const created = stageNewCylinder(item, po, serial, payload?.lotNumber?.trim(), now, newCylinders);
+        const serial =
+          method === "lot"
+            ? `${payload!.lotNumber!.trim()}-${stamp}-${String(n + 1).padStart(3, "0")}`
+            : `QTY-${(p?.code || "CYL").replace(/\s+/g, "")}-${stamp}-${n + 1}`;
+        const created = stageNewCylinder(
+          item,
+          po,
+          serial,
+          payload?.lotNumber?.trim(),
+          now,
+          newCylinders,
+        );
         liveCylinders.push(created);
         ids.push(created.id);
         stageReceiveMovement(created.id, po, now, movements, cylinderPatches);
@@ -190,7 +211,11 @@ async function receivePurchaseInDb(
         if (found.productId !== item.productId) {
           throw new Error(`Cylinder ${serial} does not match ${item.productName}`);
         }
-        if (found.status === "in_stock" || found.status === "at_customer" || found.ownedBy === "customer") {
+        if (
+          found.status === "in_stock" ||
+          found.status === "at_customer" ||
+          found.ownedBy === "customer"
+        ) {
           throw new Error("Serial number already exists.");
         }
       }
@@ -249,10 +274,12 @@ async function receivePurchaseInDb(
     const qty = receiveNow[i];
     if (qty <= 0) continue;
     const item = nextItems[i];
-    const dup = await db.collection("stockMovements").findOne(
-      { refType: "purchase", refId: id, productId: item.productId, type: "in", notes: grnNo },
-      opt,
-    );
+    const dup = await db
+      .collection("stockMovements")
+      .findOne(
+        { refType: "purchase", refId: id, productId: item.productId, type: "in", notes: grnNo },
+        opt,
+      );
     if (dup) continue;
     await receiveStockInDb(
       db,
@@ -268,7 +295,9 @@ async function receivePurchaseInDb(
     id: grnId,
     grnNo,
     receivedAt: now,
-    items: nextItems.map((it, i) => ({ productId: it.productId, quantity: receiveNow[i] })).filter((r) => r.quantity > 0),
+    items: nextItems
+      .map((it, i) => ({ productId: it.productId, quantity: receiveNow[i] }))
+      .filter((r) => r.quantity > 0),
   };
 
   const updated = await db.collection("purchases").findOneAndUpdate(
@@ -367,42 +396,48 @@ async function receiveStockInDb(
   if (!product) return;
   const cost = Number.isFinite(item.price) ? item.price : (product.cost ?? 0);
 
-  const openLayers = (await db.collection("costLayers").find(
-    { productId: product.id, qtyRemaining: { $gt: 0 } },
-    opt,
-  ).toArray()).map((d: CostLayer) => clean<CostLayer>(d));
+  const openLayers = (
+    await db
+      .collection("costLayers")
+      .find({ productId: product.id, qtyRemaining: { $gt: 0 } }, opt)
+      .toArray()
+  ).map((d: CostLayer) => clean<CostLayer>(d));
   const layerQty = openLayers.reduce((a: number, l: CostLayer) => a + (l.qtyRemaining || 0), 0);
   const stock = product.stock ?? 0;
   if (stock > 0 && layerQty <= 0) {
-    await db.collection("costLayers").insertOne({
-      id: newId(),
-      productId: product.id,
-      qtyRemaining: stock,
-      unitCost: product.cost ?? 0,
-      receivedAt: product.createdAt || now,
-      refType: "adjustment",
-    }, opt);
+    await db.collection("costLayers").insertOne(
+      {
+        id: newId(),
+        productId: product.id,
+        qtyRemaining: stock,
+        unitCost: product.cost ?? 0,
+        receivedAt: product.createdAt || now,
+        refType: "adjustment",
+      },
+      opt,
+    );
   }
 
-  await db.collection("costLayers").insertOne({
-    id: newId(),
-    productId: product.id,
-    qtyRemaining: qty,
-    unitCost: cost,
-    receivedAt: now,
-    refType: meta.refType,
-    refId: meta.refId,
-  }, opt);
+  await db.collection("costLayers").insertOne(
+    {
+      id: newId(),
+      productId: product.id,
+      qtyRemaining: qty,
+      unitCost: cost,
+      receivedAt: now,
+      refType: meta.refType,
+      refId: meta.refId,
+    },
+    opt,
+  );
 
   const oldStock = product.stock ?? 0;
   const oldCost = product.cost ?? cost;
   const nextStock = oldStock + qty;
   const nextCost = nextStock > 0 ? (oldStock * oldCost + qty * cost) / nextStock : cost;
-  await db.collection("products").updateOne(
-    { id: product.id },
-    { $set: { stock: nextStock, cost: nextCost } },
-    opt,
-  );
+  await db
+    .collection("products")
+    .updateOne({ id: product.id }, { $set: { stock: nextStock, cost: nextCost } }, opt);
 
   const movement: StockMovement = {
     id: newId(),
@@ -434,11 +469,10 @@ export async function issueStockInDb(
   meta: { refType: StockMovement["refType"]; refId: string; notes: string; by: string },
 ) {
   if (qty <= 0) return;
-  const opt = session ? { session } as { session: object } : {};
-  const dup = await db.collection("stockMovements").findOne(
-    { refType: meta.refType, refId: meta.refId, productId, type: "out" },
-    opt,
-  );
+  const opt = session ? ({ session } as { session: object }) : {};
+  const dup = await db
+    .collection("stockMovements")
+    .findOne({ refType: meta.refType, refId: meta.refId, productId, type: "out" }, opt);
   if (dup) return;
   const productDoc = await db.collection("products").findOne({ id: productId }, opt);
   const product = productDoc ? clean<Product>(productDoc) : null;

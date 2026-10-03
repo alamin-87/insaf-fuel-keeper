@@ -1,7 +1,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
-  Outlet, Link, createRootRouteWithContext, useRouter, useRouterState,
-  HeadContent, Scripts, redirect,
+  Outlet,
+  Link,
+  createRootRouteWithContext,
+  useRouter,
+  useRouterState,
+  HeadContent,
+  Scripts,
+  redirect,
 } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
@@ -37,7 +43,11 @@ function NotFoundInner() {
         <h2 className="mt-4 text-xl font-semibold">{t("error.404")}</h2>
         <p className="mt-2 text-sm text-muted-foreground">{t("error.404hint")}</p>
         <div className="mt-6">
-          <Link to="/login" search={{ redirect: "/" }} className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+          <Link
+            to="/login"
+            search={{ redirect: "/" }}
+            className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
             {t("common.home")}
           </Link>
         </div>
@@ -57,7 +67,9 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 function ErrorInner({ error, reset }: { error: Error; reset: () => void }) {
   const t = useT();
   const router = useRouter();
-  useEffect(() => { reportLovableError(error, { boundary: "tanstack_root_error_component" }); }, [error]);
+  useEffect(() => {
+    reportLovableError(error, { boundary: "tanstack_root_error_component" });
+  }, [error]);
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
@@ -71,12 +83,20 @@ function ErrorInner({ error, reset }: { error: Error; reset: () => void }) {
         <div className="mt-6 flex justify-center gap-2">
           <button
             type="button"
-            onClick={() => { router.invalidate(); reset(); }}
+            onClick={() => {
+              router.invalidate();
+              reset();
+            }}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           >
             {t("common.tryAgain")}
           </button>
-          <a href="/login" className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent">{t("common.home")}</a>
+          <a
+            href="/login"
+            className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-accent"
+          >
+            {t("common.home")}
+          </a>
         </div>
       </div>
     </div>
@@ -88,7 +108,12 @@ export type RouterContext = {
   user: AuthUser | null;
 };
 
-function redirectPathFromLocation(location: { href: string; pathname: string; searchStr?: string; hash?: string }) {
+function redirectPathFromLocation(location: {
+  href: string;
+  pathname: string;
+  searchStr?: string;
+  hash?: string;
+}) {
   try {
     const url = new URL(location.href, "http://localhost");
     const path = `${url.pathname}${url.search}${url.hash}`;
@@ -124,13 +149,25 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Insaf Gas Corp ERP" },
-      { name: "description", content: "Enterprise resource planning for Insaf Gas Corp — sales, cylinders, deliveries and master data." },
+      {
+        name: "description",
+        content:
+          "Enterprise resource planning for Insaf Gas Corp — sales, cylinders, deliveries and master data.",
+      },
       { property: "og:title", content: "Insaf Gas Corp ERP" },
-      { property: "og:description", content: "Enterprise resource planning for Insaf Gas Corp — sales, cylinders, deliveries and master data." },
+      {
+        property: "og:description",
+        content:
+          "Enterprise resource planning for Insaf Gas Corp — sales, cylinders, deliveries and master data.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "Insaf Gas Corp ERP" },
-      { name: "twitter:description", content: "Enterprise resource planning for Insaf Gas Corp — sales, cylinders, deliveries and master data." },
+      {
+        name: "twitter:description",
+        content:
+          "Enterprise resource planning for Insaf Gas Corp — sales, cylinders, deliveries and master data.",
+      },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -154,13 +191,13 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="bn">
-      <head><HeadContent /></head>
+      <head>
+        <HeadContent />
+      </head>
       <body>
         <QueryClientProvider client={fallbackQueryClient}>
           <I18nProvider>
-            <ThemeProvider>
-              {children}
-            </ThemeProvider>
+            <ThemeProvider>{children}</ThemeProvider>
           </I18nProvider>
         </QueryClientProvider>
         <Scripts />
@@ -180,10 +217,16 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
-      <SmoothScrollProvider>
-        {isLogin ? <Outlet /> : <Layout><Outlet /></Layout>}
-        {mounted && <Toaster richColors position={isLogin ? "bottom-center" : "top-right"} />}
-      </SmoothScrollProvider>
+        <SmoothScrollProvider>
+          {isLogin ? (
+            <Outlet />
+          ) : (
+            <Layout>
+              <Outlet />
+            </Layout>
+          )}
+          {mounted && <Toaster richColors position={isLogin ? "bottom-center" : "top-right"} />}
+        </SmoothScrollProvider>
       </I18nProvider>
     </QueryClientProvider>
   );

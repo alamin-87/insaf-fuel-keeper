@@ -5,9 +5,13 @@ const BASE = "https://insaf-corporation.vercel.app";
 mkdirSync("scripts/sqa-shots", { recursive: true });
 
 const browser = await chromium.launch({ headless: true });
-const page = await browser.newContext({ viewport: { width: 1440, height: 900 } }).then((c) => c.newPage());
+const page = await browser
+  .newContext({ viewport: { width: 1440, height: 900 } })
+  .then((c) => c.newPage());
 const cons = [];
-page.on("console", (m) => { if (m.type() === "error") cons.push(m.text()); });
+page.on("console", (m) => {
+  if (m.type() === "error") cons.push(m.text());
+});
 page.on("pageerror", (e) => cons.push(e.message));
 
 await page.goto(`${BASE}/login`, { waitUntil: "networkidle", timeout: 60000 });
@@ -15,7 +19,11 @@ await page.locator('input[type="password"]').waitFor();
 const inputs = page.locator("input");
 await inputs.nth(0).fill("operator");
 await page.locator('input[type="password"]').fill("insaf123");
-await page.locator("button[type=submit], button").filter({ hasText: /ইন|Sign/ }).first().click();
+await page
+  .locator("button[type=submit], button")
+  .filter({ hasText: /ইন|Sign/ })
+  .first()
+  .click();
 await page.waitForURL((u) => !u.pathname.includes("login"), { timeout: 25000 });
 
 await page.goto(`${BASE}/products/categories`, { waitUntil: "networkidle" });

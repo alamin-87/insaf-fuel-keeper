@@ -3,7 +3,7 @@ export type DatePreset = "all" | "today" | "week" | "month" | "custom";
 export type DateRange = {
   preset: DatePreset;
   from: string; // YYYY-MM-DD or ""
-  to: string;   // YYYY-MM-DD or ""
+  to: string; // YYYY-MM-DD or ""
 };
 
 export const EMPTY_DATE_RANGE: DateRange = { preset: "all", from: "", to: "" };
@@ -27,7 +27,9 @@ function endOfDay(isoDate: string): number {
   return new Date(y, m - 1, d, 23, 59, 59, 999).getTime();
 }
 
-export function rangeForPreset(preset: Exclude<DatePreset, "custom" | "all">): Pick<DateRange, "from" | "to"> {
+export function rangeForPreset(
+  preset: Exclude<DatePreset, "custom" | "all">,
+): Pick<DateRange, "from" | "to"> {
   const now = new Date();
   const to = toDateInputValue(now);
   if (preset === "today") return { from: to, to };
@@ -76,7 +78,10 @@ export function parseRecordTime(value: string | number | Date | null | undefined
   return Number.isNaN(t) ? null : t;
 }
 
-export function isInDateRange(value: string | number | Date | null | undefined, range: DateRange): boolean {
+export function isInDateRange(
+  value: string | number | Date | null | undefined,
+  range: DateRange,
+): boolean {
   if (range.preset === "all" || (!range.from && !range.to)) return true;
   const t = parseRecordTime(value);
   if (t == null) return false;

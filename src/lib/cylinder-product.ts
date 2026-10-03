@@ -32,13 +32,19 @@ export function isCylinderTrackedLine(
 }
 
 /** Company cylinder on a sales line that should not hit the invoice. */
-export function isCylinderMovementOnly(item: Pick<LineItem, "price" | "sellCylinder" | "itemType">, p?: Pick<Product, "uom" | "productType"> | null) {
+export function isCylinderMovementOnly(
+  item: Pick<LineItem, "price" | "sellCylinder" | "itemType">,
+  p?: Pick<Product, "uom" | "productType"> | null,
+) {
   if (!isCylinderTrackedLine(item, p)) return false;
   if (item.sellCylinder) return false;
   return !(Number(item.price) > 0);
 }
 
-export function isCylinderSaleLine(item: Pick<LineItem, "price" | "sellCylinder" | "itemType">, p?: Pick<Product, "uom" | "productType"> | null) {
+export function isCylinderSaleLine(
+  item: Pick<LineItem, "price" | "sellCylinder" | "itemType">,
+  p?: Pick<Product, "uom" | "productType"> | null,
+) {
   if (!isCylinderTrackedLine(item, p)) return false;
   if (p?.productType !== "cylinder") return false;
   return Boolean(item.sellCylinder) || Number(item.price) > 0;
@@ -77,16 +83,23 @@ export function cylinderAtCustomer(c: Pick<Cylinder, "status">) {
 }
 
 export function cylinderAtSupplier(c: Pick<Cylinder, "status" | "supplierId">) {
-  return Boolean(c.supplierId) && c.status !== "damaged" && c.status !== "lost" && c.status !== "at_customer";
+  return (
+    Boolean(c.supplierId) &&
+    c.status !== "damaged" &&
+    c.status !== "lost" &&
+    c.status !== "at_customer"
+  );
 }
 
 export function cylinderWarehouseEmpty(c: Pick<Cylinder, "status" | "fillLevel" | "supplierId">) {
-  return !c.supplierId
-    && c.status !== "at_customer"
-    && c.status !== "damaged"
-    && c.status !== "lost"
-    && c.status !== "in_transit"
-    && cylinderIsEmpty(c);
+  return (
+    !c.supplierId &&
+    c.status !== "at_customer" &&
+    c.status !== "damaged" &&
+    c.status !== "lost" &&
+    c.status !== "in_transit" &&
+    cylinderIsEmpty(c)
+  );
 }
 
 /** Map existing cylinder statuses into overview buckets. */
@@ -100,7 +113,9 @@ export function isInactiveCompanyCylinder(c: Pick<Cylinder, "status">) {
 }
 
 /** Company-owned cylinders by location — never typed in. */
-export function companyOwnedLocations(cylinders: Pick<Cylinder, "status" | "fillLevel" | "supplierId" | "ownedBy">[]) {
+export function companyOwnedLocations(
+  cylinders: Pick<Cylinder, "status" | "fillLevel" | "supplierId" | "ownedBy">[],
+) {
   const company = cylinders.filter((c) => isCompanyOwned(c) && !isInactiveCompanyCylinder(c));
   let warehouse = 0;
   let customers = 0;
@@ -120,7 +135,9 @@ export function companyOwnedLocations(cylinders: Pick<Cylinder, "status" | "fill
   return { owned: company.length, warehouse, customers, suppliers, inRefill, lost, damaged };
 }
 
-export function cylinderOverviewCounts(cylinders: Pick<Cylinder, "status" | "fillLevel" | "supplierId">[]) {
+export function cylinderOverviewCounts(
+  cylinders: Pick<Cylinder, "status" | "fillLevel" | "supplierId">[],
+) {
   let full = 0;
   let empty = 0;
   let refillPending = 0;
@@ -130,7 +147,13 @@ export function cylinderOverviewCounts(cylinders: Pick<Cylinder, "status" | "fil
     if (c.status === "in_transit") inTransit += 1;
     if (cylinderAtSupplier(c)) refillPending += 1;
     if (cylinderIsFullStock(c)) full += 1;
-    else if (cylinderIsEmpty(c) && c.status !== "at_customer" && c.status !== "in_transit" && !cylinderAtSupplier(c)) empty += 1;
+    else if (
+      cylinderIsEmpty(c) &&
+      c.status !== "at_customer" &&
+      c.status !== "in_transit" &&
+      !cylinderAtSupplier(c)
+    )
+      empty += 1;
   }
   return { total: active.length, full, empty, refillPending, inTransit };
 }
@@ -141,7 +164,9 @@ export function cylinderStatusCounts(cylinders: Pick<Cylinder, "status">[]) {
   return { total: c.total, filled: c.full, empty: c.empty, refillPending: c.refillPending };
 }
 
-export function cylinderFillBucket(status: CylinderStatus): "filled" | "empty" | "refill" | "transit" {
+export function cylinderFillBucket(
+  status: CylinderStatus,
+): "filled" | "empty" | "refill" | "transit" {
   if (status === "refilling") return "refill";
   if (status === "in_transit") return "transit";
   if (status === "in_stock") return "filled";
@@ -173,7 +198,13 @@ export function pickFifo(
   exclude = new Set<string>(),
 ) {
   return cylinders
-    .filter((c) => c.productId === productId && c.status === "in_stock" && !cylinderIsEmpty(c) && !exclude.has(c.id))
+    .filter(
+      (c) =>
+        c.productId === productId &&
+        c.status === "in_stock" &&
+        !cylinderIsEmpty(c) &&
+        !exclude.has(c.id),
+    )
     .sort((a, b) => a.lastMovementAt.localeCompare(b.lastMovementAt))
     .slice(0, qty)
     .map((c) => c.id);
@@ -185,10 +216,15 @@ export function suggestSerials(code: string, qty: number, existingSerials: strin
   const namespace = `${prefix}-${stamp}-`;
   let max = 0;
   for (const raw of existingSerials) {
-    const serial = String(raw || "").trim().toUpperCase();
+    const serial = String(raw || "")
+      .trim()
+      .toUpperCase();
     if (!serial.startsWith(namespace)) continue;
     const n = Number.parseInt(serial.slice(namespace.length), 10);
     if (Number.isFinite(n) && n > max) max = n;
   }
-  return Array.from({ length: qty }, (_, i) => `${prefix}-${stamp}-${String(max + i + 1).padStart(3, "0")}`);
+  return Array.from(
+    { length: qty },
+    (_, i) => `${prefix}-${stamp}-${String(max + i + 1).padStart(3, "0")}`,
+  );
 }

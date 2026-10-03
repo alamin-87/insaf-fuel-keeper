@@ -16,7 +16,13 @@ import { receivingStatus } from "@/lib/purchase-qty";
 import { useT } from "@/i18n";
 
 const statusVariant: Record<PurchaseStatus, "default" | "secondary" | "destructive" | "outline"> = {
-  draft: "secondary", ordered: "outline", partial: "outline", received: "default", billed: "default", paid: "default", cancelled: "destructive",
+  draft: "secondary",
+  ordered: "outline",
+  partial: "outline",
+  received: "default",
+  billed: "default",
+  paid: "default",
+  cancelled: "destructive",
 };
 
 export function PurchaseList() {
@@ -41,7 +47,13 @@ export function PurchaseList() {
       <PageHeader
         title={t("purchases.title")}
         description={t("purchases.desc")}
-        actions={<Button asChild><Link to="/purchases/new"><Plus className="mr-1 h-4 w-4" /> {t("purchases.new")}</Link></Button>}
+        actions={
+          <Button asChild>
+            <Link to="/purchases/new">
+              <Plus className="mr-1 h-4 w-4" /> {t("purchases.new")}
+            </Link>
+          </Button>
+        }
       />
       <DataTable<PurchaseOrder>
         rows={data}
@@ -49,18 +61,85 @@ export function PurchaseList() {
         dateKey="date"
         onRowClick={(r) => navigate({ to: "/purchases/$id", params: { id: r.id } })}
         columns={[
-          { key: "no", header: t("purchases.poNo"), sortable: true, sortValue: (r) => r.orderNo, render: (r) => <span className="font-mono text-xs">{r.orderNo}</span> },
-          { key: "date", header: t("common.date"), sortable: true, sortValue: (r) => r.date, render: (r) => formatDate(r.date) },
-          { key: "sup", header: t("common.supplier"), sortable: true, sortValue: (r) => r.supplierName, render: (r) => <PartyNameLink kind="supplier" id={r.supplierId} name={r.supplierName} /> },
-          { key: "total", header: t("common.total"), sortable: true, sortValue: (r) => r.total, render: (r) => formatCurrency(r.total), className: "text-right" },
-          { key: "paid", header: t("common.paid"), sortable: true, sortValue: (r) => r.paid, render: (r) => formatCurrency(r.paid), className: "text-right" },
-          { key: "due", header: t("common.due"), sortable: true, sortValue: (r) => r.total - r.paid, render: (r) => formatCurrency(r.total - r.paid), className: "text-right" },
-          { key: "pay", header: t("sales.paymentStatus"), sortable: true, sortValue: (r) => paymentStatus(r.total, r.paid), render: (r) => t(`sales.${paymentStatus(r.total, r.paid)}`) },
-          { key: "recv", header: t("purchases.receivingStatus"), sortable: true, sortValue: (r) => receivingStatus(r.items, r), render: (r) => {
-            const recv = receivingStatus(r.items, r);
-            return t(recv === "received" ? "purchases.recv.full" : recv === "partial" ? "purchases.recv.partial" : "purchases.recv.none");
-          } },
-          { key: "st", header: t("common.status"), sortable: true, sortValue: (r) => r.status, render: (r) => <Badge variant={statusVariant[r.status]}>{t(`status.${r.status}` as any)}</Badge> },
+          {
+            key: "no",
+            header: t("purchases.poNo"),
+            sortable: true,
+            sortValue: (r) => r.orderNo,
+            render: (r) => <span className="font-mono text-xs">{r.orderNo}</span>,
+          },
+          {
+            key: "date",
+            header: t("common.date"),
+            sortable: true,
+            sortValue: (r) => r.date,
+            render: (r) => formatDate(r.date),
+          },
+          {
+            key: "sup",
+            header: t("common.supplier"),
+            sortable: true,
+            sortValue: (r) => r.supplierName,
+            render: (r) => (
+              <PartyNameLink kind="supplier" id={r.supplierId} name={r.supplierName} />
+            ),
+          },
+          {
+            key: "total",
+            header: t("common.total"),
+            sortable: true,
+            sortValue: (r) => r.total,
+            render: (r) => formatCurrency(r.total),
+            className: "text-right",
+          },
+          {
+            key: "paid",
+            header: t("common.paid"),
+            sortable: true,
+            sortValue: (r) => r.paid,
+            render: (r) => formatCurrency(r.paid),
+            className: "text-right",
+          },
+          {
+            key: "due",
+            header: t("common.due"),
+            sortable: true,
+            sortValue: (r) => r.total - r.paid,
+            render: (r) => formatCurrency(r.total - r.paid),
+            className: "text-right",
+          },
+          {
+            key: "pay",
+            header: t("sales.paymentStatus"),
+            sortable: true,
+            sortValue: (r) => paymentStatus(r.total, r.paid),
+            render: (r) => t(`sales.${paymentStatus(r.total, r.paid)}`),
+          },
+          {
+            key: "recv",
+            header: t("purchases.receivingStatus"),
+            sortable: true,
+            sortValue: (r) => receivingStatus(r.items, r),
+            render: (r) => {
+              const recv = receivingStatus(r.items, r);
+              return t(
+                recv === "received"
+                  ? "purchases.recv.full"
+                  : recv === "partial"
+                    ? "purchases.recv.partial"
+                    : "purchases.recv.none",
+              );
+            },
+          },
+          {
+            key: "st",
+            header: t("common.status"),
+            sortable: true,
+            sortValue: (r) => r.status,
+            render: (r) => (
+              <Badge variant={statusVariant[r.status]}>{t(`status.${r.status}` as any)}</Badge>
+            ),
+          },
           {
             key: "actions",
             header: t("common.actions"),
@@ -68,12 +147,18 @@ export function PurchaseList() {
             render: (r) => (
               <RowActions
                 onView={() => navigate({ to: "/purchases/$id", params: { id: r.id } })}
-                onEdit={r.status !== "cancelled"
-                  ? () => navigate({ to: "/purchases/$id/edit", params: { id: r.id } })
-                  : undefined}
-                onDelete={r.status === "draft" || r.status === "cancelled" ? () => {
-                  if (confirm(t("purchases.deleteConfirm"))) remove.mutate(r.id);
-                } : undefined}
+                onEdit={
+                  r.status !== "cancelled"
+                    ? () => navigate({ to: "/purchases/$id/edit", params: { id: r.id } })
+                    : undefined
+                }
+                onDelete={
+                  r.status === "draft" || r.status === "cancelled"
+                    ? () => {
+                        if (confirm(t("purchases.deleteConfirm"))) remove.mutate(r.id);
+                      }
+                    : undefined
+                }
                 deleteDisabled={remove.isPending}
               />
             ),

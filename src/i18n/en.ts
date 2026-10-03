@@ -223,8 +223,10 @@ export const en = {
   "customers.cylOverdue": "Overdue",
   "customers.cylLost": "Lost",
   "customers.cylDamaged": "Damaged",
-  "customers.cylMissingMoves": "Some historical cylinder records do not have corresponding movement entries.",
-  "customers.cylRemainingHint": "Remaining = Sent − Returned. Lost is counted separately and does not reduce Remaining.",
+  "customers.cylMissingMoves":
+    "Some historical cylinder records do not have corresponding movement entries.",
+  "customers.cylRemainingHint":
+    "Remaining = Sent − Returned. Lost is counted separately and does not reduce Remaining.",
   "customers.cylHistory": "Cylinder movement",
 
   "suppliers.title": "Suppliers",
@@ -306,10 +308,12 @@ export const en = {
   "products.imageRemove": "Remove image",
   "products.imageInvalid": "Could not use that image. Try another file.",
   "products.accounting": "Accounting",
-  "products.accountingHint": "Map income and expense accounts from Chart of Accounts. Costing method controls how inventory is issued.",
+  "products.accountingHint":
+    "Map income and expense accounts from Chart of Accounts. Costing method controls how inventory is issued.",
   "products.incomeAccount": "Income Account",
   "products.expenseAccount": "Expense Account",
-  "products.coaEmpty": "No COA accounts yet. Add Income/Expense accounts under Accounting → Chart of Accounts.",
+  "products.coaEmpty":
+    "No COA accounts yet. Add Income/Expense accounts under Accounting → Chart of Accounts.",
   "products.costingMethod": "Costing Method",
   "products.costing.fifo": "FIFO",
   "products.costing.fifoHint": "First In First Out — oldest stock is delivered first.",
@@ -343,7 +347,8 @@ export const en = {
   "sales.markInvoiced": "Mark Invoiced",
   "sales.cancelOrder": "Cancel Order",
   "sales.cancelQuotation": "Cancel Quotation",
-  "sales.stockNote": "A sales order reserves stock. Delivery updates full / empty cylinders. Invoice does not deduct stock again.",
+  "sales.stockNote":
+    "A sales order reserves stock. Delivery updates full / empty cylinders. Invoice does not deduct stock again.",
   "sales.sellGasOnly": "Sell Gas Only",
   "sales.sellGasOnlyHint": "Invoice gas only. No cylinder movement.",
   "sales.recordPayment": "Record Payment",
@@ -381,7 +386,8 @@ export const en = {
   "sales.quotationNo": "Quotation #",
   "sales.validity": "Valid until",
   "sales.validityDays": "Valid for 15 days from issue date",
-  "sales.quoteTerms": "Prices are estimates and subject to confirmation. Stock availability may change.",
+  "sales.quoteTerms":
+    "Prices are estimates and subject to confirmation. Stock availability may change.",
   "sales.notes": "Notes",
   "sales.grandTotal": "Grand Total",
 
@@ -418,8 +424,10 @@ export const en = {
   "purchases.totalBelowPaid": "Purchase total cannot be less than amount already paid",
   "purchases.unpaid": "Unpaid / Credit",
   "purchases.credit": "Credit",
-  "purchases.creditHint": "Credit purchase — no payment is recorded. The remaining amount stays payable on the supplier ledger.",
-  "purchases.paymentHint": "Each payment updates cash/bank and the supplier ledger. Previous payments are kept.",
+  "purchases.creditHint":
+    "Credit purchase — no payment is recorded. The remaining amount stays payable on the supplier ledger.",
+  "purchases.paymentHint":
+    "Each payment updates cash/bank and the supplier ledger. Previous payments are kept.",
   "purchases.priorPayment": "Previous payment",
   "purchases.notFound": "Purchase order not found.",
   "purchases.receive": "Receive Goods (GRN)",
@@ -428,9 +436,11 @@ export const en = {
   "purchases.remainingQty": "Remaining",
   "purchases.receiveNow": "Receive now",
   "purchases.cancel": "Cancel PO",
-  "purchases.receiveHint": "Receiving updates warehouse stock. Cylinder products also post serial tracking.",
+  "purchases.receiveHint":
+    "Receiving updates warehouse stock. Cylinder products also post serial tracking.",
   "purchases.receiveCylinders": "Receive cylinders",
-  "purchases.serialHint": "Optional. Enter {qty} serial numbers (one per line or comma-separated) or leave blank to receive quantity only. Generate serials is not required. Do not invent placeholder serials.",
+  "purchases.serialHint":
+    "Optional. Enter {qty} serial numbers (one per line or comma-separated) or leave blank to receive quantity only. Generate serials is not required. Do not invent placeholder serials.",
   "purchases.generateSerials": "Generate serials",
   "purchases.supplierPayment": "Supplier Payment",
   "purchases.paidFrom": "Paid From",
@@ -588,7 +598,8 @@ export const en = {
   "cylinders.gasCategory": "Gas Category",
   "cylinders.filterSize": "Product / Size",
   "cylinders.filterWarehouse": "Warehouse",
-  "cylinders.ledgerHint": "Customer, supplier and warehouse heads. Under each: Date → Product → Delivered → Received → Balance.",
+  "cylinders.ledgerHint":
+    "Customer, supplier and warehouse heads. Under each: Date → Product → Delivered → Received → Balance.",
   "cylinders.ledgerEmpty": "No cylinder movements yet.",
   "cylinders.delivered": "Delivered",
   "cylinders.received": "Received",
@@ -718,7 +729,8 @@ export const en = {
   "reports.sales": "Sales Report",
   "reports.purchase": "Purchase Report",
   "reports.stock": "Stock Report",
-  "reports.stockHint": "Each product is a stock account. Summary first, then date-wise in / out / in-hand.",
+  "reports.stockHint":
+    "Each product is a stock account. Summary first, then date-wise in / out / in-hand.",
   "reports.stockIn": "In",
   "reports.stockOut": "Out",
   "reports.inHand": "In Hand",
@@ -799,7 +811,8 @@ export const en = {
   "settings.reset": "Reset to defaults",
   "settings.saved": "Settings updated",
   "settings.usersTitle": "App Users",
-  "settings.usersHint": "Edit username, role, password and active status. Changes apply to login immediately.",
+  "settings.usersHint":
+    "Edit username, role, password and active status. Changes apply to login immediately.",
   "settings.addUser": "Add User",
   "settings.username": "Username",
   "settings.displayName": "Display Name",

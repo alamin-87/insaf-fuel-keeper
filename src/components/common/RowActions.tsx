@@ -1,9 +1,7 @@
 import type { ReactNode } from "react";
 import { Eye, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useT } from "@/i18n";
 
@@ -92,7 +90,13 @@ export function RowActions({
 }
 
 function Action({
-  label, onClick, icon, variant = "outline", disabled, danger, emphasize,
+  label,
+  onClick,
+  icon,
+  variant = "outline",
+  disabled,
+  danger,
+  emphasize,
 }: {
   label: string;
   onClick: () => void;
@@ -112,7 +116,9 @@ function Action({
           disabled={disabled}
           className={cn(
             "h-8 gap-1.5 px-2.5 shadow-sm",
-            emphasize && !danger && "border-primary/40 bg-primary/5 text-primary hover:bg-primary/10",
+            emphasize &&
+              !danger &&
+              "border-primary/40 bg-primary/5 text-primary hover:bg-primary/10",
             danger && "px-2",
           )}
           onClick={(e) => {
@@ -122,7 +128,9 @@ function Action({
           }}
         >
           {icon}
-          <span className={cn("hidden text-xs font-medium sm:inline", danger && "sm:hidden")}>{label}</span>
+          <span className={cn("hidden text-xs font-medium sm:inline", danger && "sm:hidden")}>
+            {label}
+          </span>
           <span className="sr-only sm:hidden">{label}</span>
         </Button>
       </TooltipTrigger>
@@ -132,4 +140,5 @@ function Action({
 }
 
 /** Sticky actions column header/cell helpers */
-export const actionsColumnClass = "w-[1%] whitespace-nowrap text-right sticky right-0 bg-card/95 backdrop-blur-sm";
+export const actionsColumnClass =
+  "w-[1%] whitespace-nowrap text-right sticky right-0 bg-card/95 backdrop-blur-sm";

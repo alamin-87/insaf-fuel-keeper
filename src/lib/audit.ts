@@ -38,7 +38,7 @@ let inMemoryAuditLogs: AuditRecord[] = [];
 
 export async function logAudit(
   dbOrNull: any,
-  entry: Omit<AuditRecord, "id" | "timestamp"> & { id?: string; timestamp?: string }
+  entry: Omit<AuditRecord, "id" | "timestamp"> & { id?: string; timestamp?: string },
 ): Promise<AuditRecord> {
   const record: AuditRecord = {
     id: entry.id || `aud-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -68,7 +68,7 @@ export async function logAudit(
 
 export async function getAuditLogs(
   dbOrNull: any,
-  filter?: { entityType?: string; entityId?: string; userId?: string; limit?: number }
+  filter?: { entityType?: string; entityId?: string; userId?: string; limit?: number },
 ): Promise<AuditRecord[]> {
   const limit = filter?.limit || 100;
   if (dbOrNull && typeof dbOrNull.collection === "function") {
@@ -77,7 +77,12 @@ export async function getAuditLogs(
       if (filter?.entityType) q.entityType = filter.entityType;
       if (filter?.entityId) q.entityId = filter.entityId;
       if (filter?.userId) q.userId = filter.userId;
-      const docs = await dbOrNull.collection("auditLogs").find(q).sort({ timestamp: -1 }).limit(limit).toArray();
+      const docs = await dbOrNull
+        .collection("auditLogs")
+        .find(q)
+        .sort({ timestamp: -1 })
+        .limit(limit)
+        .toArray();
       return docs.map((d: any) => {
         const { _id, ...rest } = d;
         return rest as AuditRecord;

@@ -65,7 +65,9 @@ export function MoneyReceiptPrint({
             subtitle={`${t("doc.receiptNo")}: ${receipt.receiptNo}`}
             right={
               <div className="text-right text-sm">
-                <p className="text-xl font-bold uppercase tracking-wider">{t("doc.moneyReceipt")}</p>
+                <p className="text-xl font-bold uppercase tracking-wider">
+                  {t("doc.moneyReceipt")}
+                </p>
                 <p className="mt-1 font-mono">{receipt.receiptNo}</p>
               </div>
             }
@@ -75,7 +77,10 @@ export function MoneyReceiptPrint({
             items={[
               { label: t("common.date"), value: formatDate(receipt.date) },
               { label: t("doc.receivedFrom"), value: receipt.partyName },
-              { label: t("doc.method"), value: METHOD_KEY[receipt.method] ? t(METHOD_KEY[receipt.method]) : receipt.method },
+              {
+                label: t("doc.method"),
+                value: METHOD_KEY[receipt.method] ? t(METHOD_KEY[receipt.method]) : receipt.method,
+              },
               { label: t("doc.reference"), value: receipt.reference || "—" },
               { label: t("doc.paymentFor"), value: receipt.notes || "—" },
             ]}
@@ -92,7 +97,9 @@ export function MoneyReceiptPrint({
 
           <p className="text-sm text-muted-foreground">{t("doc.thankYou")}</p>
           <PrintSignatures left={t("doc.authorizedSign")} right={t("doc.customerSign")} />
-          <p className="pt-4 text-center text-[10px] text-muted-foreground">{t("doc.pageFooter")}</p>
+          <p className="pt-4 text-center text-[10px] text-muted-foreground">
+            {t("doc.pageFooter")}
+          </p>
         </div>
       </DialogContent>
     </Dialog>

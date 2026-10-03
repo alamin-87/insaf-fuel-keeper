@@ -10,7 +10,12 @@ import { DetailOrOutlet } from "@/components/common/DetailOrOutlet";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/utils/formatters";
 import { supplierCylinderHistory } from "@/lib/customer-cylinders";
@@ -34,13 +39,26 @@ function SupplierDetailBody() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { data: s, isLoading, isFetched } = useQuery({
+  const {
+    data: s,
+    isLoading,
+    isFetched,
+  } = useQuery({
     queryKey: ["suppliers", id],
     queryFn: () => supplierService.get(id),
   });
-  const { data: cylinders = [] } = useQuery({ queryKey: ["cylinders"], queryFn: cylinderService.list });
-  const { data: movements = [] } = useQuery({ queryKey: ["cylinderMovements"], queryFn: cylinderService.listMovements });
-  const { data: products = [] } = useQuery({ queryKey: ["products"], queryFn: productService.list });
+  const { data: cylinders = [] } = useQuery({
+    queryKey: ["cylinders"],
+    queryFn: cylinderService.list,
+  });
+  const { data: movements = [] } = useQuery({
+    queryKey: ["cylinderMovements"],
+    queryFn: cylinderService.listMovements,
+  });
+  const { data: products = [] } = useQuery({
+    queryKey: ["products"],
+    queryFn: productService.list,
+  });
   const { data: cylAcc } = useQuery({
     queryKey: ["cylAccountability", "supplier", id],
     queryFn: () => getCylinderAccountabilityFn({ data: { kind: "supplier", partyId: id } }),
@@ -56,11 +74,21 @@ function SupplierDetailBody() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  if (isLoading) return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
-  if (isFetched && !s) return <div className="p-6 text-sm text-destructive">{t("suppliers.notFound")}</div>;
+  if (isLoading)
+    return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
+  if (isFetched && !s)
+    return <div className="p-6 text-sm text-destructive">{t("suppliers.notFound")}</div>;
   if (!s) return null;
 
-  const cylBal = cylAcc?.parties[0] ?? { sent: 0, returned: 0, remaining: 0, overdue: 0, lost: 0, damaged: 0, missingMoves: 0 };
+  const cylBal = cylAcc?.parties[0] ?? {
+    sent: 0,
+    returned: 0,
+    remaining: 0,
+    overdue: 0,
+    lost: 0,
+    damaged: 0,
+    missingMoves: 0,
+  };
   const cylHist = supplierCylinderHistory(id, cylinders, movements, products);
 
   return (
@@ -78,37 +106,75 @@ function SupplierDetailBody() {
               </Link>
             </Button>
             <Button variant="outline" asChild>
-              <Link to="/suppliers/$id/edit" params={{ id }}><Pencil className="mr-1 h-4 w-4" /> {t("common.edit")}</Link>
+              <Link to="/suppliers/$id/edit" params={{ id }}>
+                <Pencil className="mr-1 h-4 w-4" /> {t("common.edit")}
+              </Link>
             </Button>
             <Button
               variant="destructive"
               disabled={remove.isPending}
-              onClick={() => { if (confirm(`${t("common.delete")} ${s.name}?`)) remove.mutate(); }}
+              onClick={() => {
+                if (confirm(`${t("common.delete")} ${s.name}?`)) remove.mutate();
+              }}
             >
               <Trash2 className="mr-1 h-4 w-4" /> {t("common.delete")}
             </Button>
           </div>
         }
       />
-      <Card><CardContent className="pt-6 grid gap-4 md:grid-cols-2 text-sm">
-        <div><p className="text-xs uppercase text-muted-foreground">{t("common.phone")}</p><p className="font-medium">{s.phone}</p></div>
-        <div><p className="text-xs uppercase text-muted-foreground">{t("suppliers.payable")}</p><p className="font-medium">{formatCurrency(s.openingBalance)}</p></div>
-        <p className="md:col-span-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("customers.cylBalanceTitle")}</p>
-        <div><p className="text-xs uppercase text-muted-foreground">{t("customers.cylSent")}</p><p className="font-medium">{cylBal.sent}</p></div>
-        <div><p className="text-xs uppercase text-muted-foreground">{t("customers.cylReturned")}</p><p className="font-medium">{cylBal.returned}</p></div>
-        <div><p className="text-xs uppercase text-muted-foreground">{t("customers.cylRemaining")}</p><p className="font-medium">{cylBal.remaining}</p></div>
-        <div><p className="text-xs uppercase text-muted-foreground">{t("customers.cylOverdue")}</p><p className="font-medium">{cylBal.overdue}</p></div>
-        <div><p className="text-xs uppercase text-muted-foreground">{t("customers.cylLost")}</p><p className="font-medium">{cylBal.lost}</p></div>
-        <div><p className="text-xs uppercase text-muted-foreground">{t("customers.cylDamaged")}</p><p className="font-medium">{cylBal.damaged}</p></div>
-        <p className="md:col-span-2 text-xs text-muted-foreground">{t("customers.cylRemainingHint")}</p>
-        {(cylBal.missingMoves || 0) > 0 && (
-          <p className="md:col-span-2 text-xs text-amber-700 dark:text-amber-400">{t("customers.cylMissingMoves")}</p>
-        )}
-      </CardContent></Card>
+      <Card>
+        <CardContent className="pt-6 grid gap-4 md:grid-cols-2 text-sm">
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">{t("common.phone")}</p>
+            <p className="font-medium">{s.phone}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">{t("suppliers.payable")}</p>
+            <p className="font-medium">{formatCurrency(s.openingBalance)}</p>
+          </div>
+          <p className="md:col-span-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {t("customers.cylBalanceTitle")}
+          </p>
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">{t("customers.cylSent")}</p>
+            <p className="font-medium">{cylBal.sent}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">{t("customers.cylReturned")}</p>
+            <p className="font-medium">{cylBal.returned}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">{t("customers.cylRemaining")}</p>
+            <p className="font-medium">{cylBal.remaining}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">{t("customers.cylOverdue")}</p>
+            <p className="font-medium">{cylBal.overdue}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">{t("customers.cylLost")}</p>
+            <p className="font-medium">{cylBal.lost}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase text-muted-foreground">{t("customers.cylDamaged")}</p>
+            <p className="font-medium">{cylBal.damaged}</p>
+          </div>
+          <p className="md:col-span-2 text-xs text-muted-foreground">
+            {t("customers.cylRemainingHint")}
+          </p>
+          {(cylBal.missingMoves || 0) > 0 && (
+            <p className="md:col-span-2 text-xs text-amber-700 dark:text-amber-400">
+              {t("customers.cylMissingMoves")}
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="mt-4">
         <CardContent className="pt-6">
-          <p className="mb-3 text-xs uppercase text-muted-foreground">{t("customers.cylHistory")}</p>
+          <p className="mb-3 text-xs uppercase text-muted-foreground">
+            {t("customers.cylHistory")}
+          </p>
           {cylHist.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t("common.noItems")}</p>
           ) : (
@@ -127,15 +193,25 @@ function SupplierDetailBody() {
                 <TableBody>
                   {cylHist.map((row) => (
                     <TableRow key={row.id}>
-                      <TableCell className="text-muted-foreground">{formatDate(row.date)}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {formatDate(row.date)}
+                      </TableCell>
                       <TableCell>
                         {t(row.typeKey)}
-                        {row.serial ? <span className="ml-1 font-mono text-xs text-muted-foreground">{row.serial}</span> : null}
+                        {row.serial ? (
+                          <span className="ml-1 font-mono text-xs text-muted-foreground">
+                            {row.serial}
+                          </span>
+                        ) : null}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{row.sent || "—"}</TableCell>
-                      <TableCell className="text-right tabular-nums">{row.returned || "—"}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {row.returned || "—"}
+                      </TableCell>
                       <TableCell className="text-right tabular-nums">{row.lost || "—"}</TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">{row.remaining}</TableCell>
+                      <TableCell className="text-right tabular-nums font-medium">
+                        {row.remaining}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

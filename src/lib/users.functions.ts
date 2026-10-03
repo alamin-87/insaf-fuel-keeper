@@ -5,13 +5,15 @@ import { assertPermission } from "./rbac";
 
 export type { AppUserDoc, PublicAppUser } from "./users.types";
 
-export const listAppUsersFn = createServerFn({ method: "POST" }).handler(async (): Promise<PublicAppUser[]> => {
-  const { requireUser } = await import("./session.server");
-  const { listAppUsers } = await import("./users.server");
-  const user = await requireUser();
-  assertPermission(user, "users.read");
-  return listAppUsers();
-});
+export const listAppUsersFn = createServerFn({ method: "POST" }).handler(
+  async (): Promise<PublicAppUser[]> => {
+    const { requireUser } = await import("./session.server");
+    const { listAppUsers } = await import("./users.server");
+    const user = await requireUser();
+    assertPermission(user, "users.read");
+    return listAppUsers();
+  },
+);
 
 export const listLoginDirectoryFn = createServerFn({ method: "GET" }).handler(async () => {
   const { requireUser } = await import("./session.server");
@@ -22,14 +24,16 @@ export const listLoginDirectoryFn = createServerFn({ method: "GET" }).handler(as
 });
 
 export const upsertAppUserFn = createServerFn({ method: "POST" })
-  .inputValidator((d: {
-    id?: string;
-    username: string;
-    displayName: string;
-    role: AppRole;
-    password?: string;
-    active?: boolean;
-  }) => d)
+  .inputValidator(
+    (d: {
+      id?: string;
+      username: string;
+      displayName: string;
+      role: AppRole;
+      password?: string;
+      active?: boolean;
+    }) => d,
+  )
   .handler(async ({ data }): Promise<PublicAppUser> => {
     const { requireUser } = await import("./session.server");
     const { upsertAppUser } = await import("./users.server");
@@ -37,7 +41,7 @@ export const upsertAppUserFn = createServerFn({ method: "POST" })
     const { getDb } = await import("./mongo.server");
     const user = await requireUser();
     assertPermission(user, data.id ? "users.update" : "users.create");
-    
+
     try {
       const res = await upsertAppUser(data);
       try {

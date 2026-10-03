@@ -1,9 +1,5 @@
 import type { AppModule, AppRole, PowerMatrix } from "./settings-store";
-import {
-  APP_MODULES,
-  APP_ROLES,
-  defaultMatrix,
-} from "./settings-store";
+import { APP_MODULES, APP_ROLES, defaultMatrix } from "./settings-store";
 
 /** Map URL path prefix → app module for RBAC */
 export const PATH_MODULE_MAP: { prefix: string; module: AppModule }[] = [

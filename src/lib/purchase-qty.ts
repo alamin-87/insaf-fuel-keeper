@@ -30,7 +30,10 @@ export function poHasAnyReceived(items: LineItem[], po: Pick<PurchaseOrder, "sta
 
 export type ReceivingStatus = "none" | "partial" | "received";
 
-export function receivingStatus(items: LineItem[], po: Pick<PurchaseOrder, "status">): ReceivingStatus {
+export function receivingStatus(
+  items: LineItem[],
+  po: Pick<PurchaseOrder, "status">,
+): ReceivingStatus {
   if (poIsFullyReceived(items, po)) return "received";
   if (poHasAnyReceived(items, po)) return "partial";
   return "none";
@@ -41,7 +44,10 @@ export function poCanReceive(items: LineItem[], po: Pick<PurchaseOrder, "status"
   return items.some((it) => lineRemainingQty(it, po) > 0);
 }
 
-export function nextPurchaseStatus(items: LineItem[], po: Pick<PurchaseOrder, "status" | "paid" | "total">): PurchaseStatus {
+export function nextPurchaseStatus(
+  items: LineItem[],
+  po: Pick<PurchaseOrder, "status" | "paid" | "total">,
+): PurchaseStatus {
   if (po.status === "cancelled") return po.status;
   const fully = poIsFullyReceived(items, { status: "ordered" });
   if (fully) return "received";

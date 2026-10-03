@@ -6,7 +6,15 @@ import type { PayrollRun } from "@/types";
 import { useT } from "@/i18n";
 import { Printer } from "lucide-react";
 
-export function PayslipPrint({ run, open, onOpenChange }: { run: PayrollRun | null; open: boolean; onOpenChange: (open: boolean) => void }) {
+export function PayslipPrint({
+  run,
+  open,
+  onOpenChange,
+}: {
+  run: PayrollRun | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const t = useT();
   if (!run) return null;
 
@@ -42,7 +50,12 @@ export function PayslipPrint({ run, open, onOpenChange }: { run: PayrollRun | nu
             <div className="text-right">
               <p className="mb-1 font-semibold text-muted-foreground">Payment Info</p>
               <p>Date: {run.paidAt ? formatDate(run.paidAt) : "—"}</p>
-              <p>Method: {run.paymentMethod ? (t(`common.${run.paymentMethod}` as any) || run.paymentMethod) : "—"}</p>
+              <p>
+                Method:{" "}
+                {run.paymentMethod
+                  ? t(`common.${run.paymentMethod}` as any) || run.paymentMethod
+                  : "—"}
+              </p>
             </div>
           </div>
 
@@ -61,17 +74,23 @@ export function PayslipPrint({ run, open, onOpenChange }: { run: PayrollRun | nu
                   <td className="px-4 py-2">{t("hr.basicSalary")}</td>
                   <td className="px-4 py-2 text-right">{formatCurrency(run.basic)}</td>
                   <td className="border-l px-4 py-2">{t("hr.deduction")}</td>
-                  <td className="px-4 py-2 text-right">{run.deduction > 0 ? formatCurrency(run.deduction) : "—"}</td>
+                  <td className="px-4 py-2 text-right">
+                    {run.deduction > 0 ? formatCurrency(run.deduction) : "—"}
+                  </td>
                 </tr>
                 <tr>
                   <td className="px-4 py-2">{t("hr.bonus")}</td>
-                  <td className="px-4 py-2 text-right">{run.bonus > 0 ? formatCurrency(run.bonus) : "—"}</td>
+                  <td className="px-4 py-2 text-right">
+                    {run.bonus > 0 ? formatCurrency(run.bonus) : "—"}
+                  </td>
                   <td className="border-l px-4 py-2" />
                   <td className="px-4 py-2 text-right" />
                 </tr>
                 <tr>
                   <td className="px-4 py-2">{t("hr.allowance")}</td>
-                  <td className="px-4 py-2 text-right">{run.allowance > 0 ? formatCurrency(run.allowance) : "—"}</td>
+                  <td className="px-4 py-2 text-right">
+                    {run.allowance > 0 ? formatCurrency(run.allowance) : "—"}
+                  </td>
                   <td className="border-l px-4 py-2" />
                   <td className="px-4 py-2 text-right" />
                 </tr>
@@ -79,7 +98,9 @@ export function PayslipPrint({ run, open, onOpenChange }: { run: PayrollRun | nu
               <tfoot className="border-t bg-muted/30 font-bold">
                 <tr>
                   <td className="px-4 py-3 text-right">Gross Earnings</td>
-                  <td className="px-4 py-3 text-right">{formatCurrency(run.basic + run.bonus + run.allowance)}</td>
+                  <td className="px-4 py-3 text-right">
+                    {formatCurrency(run.basic + run.bonus + run.allowance)}
+                  </td>
                   <td className="border-l px-4 py-3 text-right">Total Deductions</td>
                   <td className="px-4 py-3 text-right">{formatCurrency(run.deduction)}</td>
                 </tr>
@@ -97,8 +118,12 @@ export function PayslipPrint({ run, open, onOpenChange }: { run: PayrollRun | nu
           </div>
 
           <div className="flex justify-between px-8 pb-8 pt-16">
-            <div className="w-40 border-t border-muted-foreground pt-2 text-center text-sm">Employer Signature</div>
-            <div className="w-40 border-t border-muted-foreground pt-2 text-center text-sm">Employee Signature</div>
+            <div className="w-40 border-t border-muted-foreground pt-2 text-center text-sm">
+              Employer Signature
+            </div>
+            <div className="w-40 border-t border-muted-foreground pt-2 text-center text-sm">
+              Employee Signature
+            </div>
           </div>
         </div>
       </DialogContent>

@@ -1,8 +1,14 @@
-import type { Cylinder, Delivery, Product, SalesOrder, StockMovement } from "@/types";
+import type { Cylinder, Delivery, Product, SalesOrder, StockMovement } from "../types/index.ts";
 import {
-  cylinderAtCustomer, cylinderAtSupplier, cylinderIsEmpty, cylinderIsFullStock,
-  cylinderWarehouseEmpty, isCylinderProduct, isInactiveCompanyCylinder,
-} from "@/lib/cylinder-product";
+  cylinderAtCustomer,
+  cylinderAtSupplier,
+  cylinderIsEmpty,
+  cylinderIsFullStock,
+  cylinderWarehouseEmpty,
+  isCylinderProduct,
+  isInactiveCompanyCylinder,
+} from "./cylinder-product.ts";
+import { buildStockReport } from "./stock-report.ts";
 
 export type InventoryStockStatus = "normal" | "low" | "out";
 
@@ -30,7 +36,11 @@ export type ProductInventoryRow = {
 const OPEN_SO = new Set(["confirmed", "invoiced", "paid"]);
 const DONE_DELIVERY = new Set(["delivered", "confirmed"]);
 
-export function deliveredQtyByProduct(deliveries: Delivery[], productId: string, salesOrderId?: string) {
+export function deliveredQtyByProduct(
+  deliveries: Delivery[],
+  productId: string,
+  salesOrderId?: string,
+) {
   let qty = 0;
   for (const d of deliveries) {
     if (!DONE_DELIVERY.has(d.status)) continue;
@@ -50,7 +60,9 @@ export function reservedQtyForProduct(
   movements: StockMovement[],
 ) {
   const deductedSo = new Set(
-    movements.filter((m) => m.refType === "sales" && m.type === "out" && m.refId).map((m) => m.refId as string),
+    movements
+      .filter((m) => m.refType === "sales" && m.type === "out" && m.refId)
+      .map((m) => m.refId as string),
   );
   let reserved = 0;
   for (const so of sales) {
@@ -67,7 +79,9 @@ export function reservedQtyForProduct(
 }
 
 export function remainingOrderQty(so: SalesOrder, deliveries: Delivery[], productId: string) {
-  const ordered = so.items.filter((i) => i.productId === productId).reduce((a, i) => a + (Number(i.quantity) || 0), 0);
+  const ordered = so.items
+    .filter((i) => i.productId === productId)
+    .reduce((a, i) => a + (Number(i.quantity) || 0), 0);
   return Math.max(0, ordered - deliveredQtyByProduct(deliveries, productId, so.id));
 }
 
@@ -78,12 +92,18 @@ export function buildProductInventory(
   deliveries: Delivery[],
   movements: StockMovement[],
 ): ProductInventoryRow[] {
+  const stockReport = buildStockReport(products, movements, { preset: "all", from: "", to: "" });
+  const stockMap = new Map(stockReport.map((r) => [r.id, r]));
+
   return products.map((p, idx) => {
     const all = cylinders.filter((c) => c.productId === p.id && !isInactiveCompanyCylinder(c));
     const isCyl = isCylinderProduct(p) || (p.productType !== "gas" && all.length > 0);
     const reserved = reservedQtyForProduct(p.id, sales, deliveries, movements);
+    const sr = stockMap.get(p.id);
+    const onHand = sr ? sr.inHand : (p.stock ?? 0);
+
     let total: number;
-    let full: number;
+    let full = onHand;
     let delivered: number;
     let empty: number;
     let refillPending: number;
@@ -91,29 +111,27 @@ export function buildProductInventory(
     let withSupplier = 0;
     let damaged = 0;
     let lost = 0;
-    if (isCyl) {
+
+    if (isCyl && all.length > 0) {
       withCustomer = all.filter(cylinderAtCustomer).length;
       withSupplier = all.filter(cylinderAtSupplier).length;
       damaged = all.filter((c) => c.status === "damaged").length;
       lost = all.filter((c) => c.status === "lost").length;
       total = all.length;
-      full = all.filter(cylinderIsFullStock).length;
       delivered = withCustomer;
       empty = all.filter(cylinderWarehouseEmpty).length;
       refillPending = all.filter((c) => cylinderAtSupplier(c)).length;
     } else {
-      total = Math.max(0, (p.stock || 0) + reserved);
-      full = Math.max(0, p.stock || 0);
+      total = onHand + reserved;
       delivered = deliveredQtyByProduct(deliveries, p.id);
       empty = 0;
       refillPending = 0;
     }
-    const available = Math.max(0, full - reserved);
-    const status: InventoryStockStatus = available <= 0
-      ? "out"
-      : available <= (p.reorderLevel || 0)
-        ? "low"
-        : "normal";
+
+    const available = Math.max(0, onHand - reserved);
+    const status: InventoryStockStatus =
+      available <= 0 ? "out" : available <= (p.reorderLevel || 0) ? "low" : "normal";
+
     return {
       id: p.id,
       sl: idx + 1,
@@ -121,7 +139,7 @@ export function buildProductInventory(
       name: p.name,
       category: p.category,
       total,
-      full,
+      full: onHand,
       reserved,
       delivered,
       empty,
@@ -152,6 +170,18 @@ export function sumInventory(rows: ProductInventoryRow[]) {
       lost: a.lost + r.lost,
       available: a.available + r.available,
     }),
-    { total: 0, full: 0, reserved: 0, delivered: 0, empty: 0, refillPending: 0, withCustomer: 0, withSupplier: 0, damaged: 0, lost: 0, available: 0 },
+    {
+      total: 0,
+      full: 0,
+      reserved: 0,
+      delivered: 0,
+      empty: 0,
+      refillPending: 0,
+      withCustomer: 0,
+      withSupplier: 0,
+      damaged: 0,
+      lost: 0,
+      available: 0,
+    },
   );
 }

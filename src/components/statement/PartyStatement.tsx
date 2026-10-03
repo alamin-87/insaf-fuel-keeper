@@ -15,7 +15,13 @@ import { PrintDocHeader } from "@/components/common/PrintDocHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableFooter,
 } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/utils/formatters";
 import { EMPTY_DATE_RANGE, formatPeriodLabel, type DateRange } from "@/lib/date-range";
@@ -25,7 +31,11 @@ import {
   type PartyKind,
   type StatementLine,
 } from "@/lib/party-statement";
-import { buildLedgerExportPayload, exportLedgerExcel, exportLedgerPdf } from "@/lib/statement-export";
+import {
+  buildLedgerExportPayload,
+  exportLedgerExcel,
+  exportLedgerPdf,
+} from "@/lib/statement-export";
 import { useI18n, useT, type MessageKey } from "@/i18n";
 import { cn } from "@/lib/utils";
 
@@ -61,7 +71,8 @@ export function PartyStatement({ kind, id }: { kind: PartyKind; id: string }) {
     queryFn: () => hrService.getEmployee(id),
     enabled: kind === "employee",
   });
-  const partyQuery = kind === "customer" ? customerQuery : kind === "supplier" ? supplierQuery : employeeQuery;
+  const partyQuery =
+    kind === "customer" ? customerQuery : kind === "supplier" ? supplierQuery : employeeQuery;
   const { data: sales = [] } = useQuery({
     queryKey: ["sales"],
     queryFn: salesService.list,
@@ -89,7 +100,8 @@ export function PartyStatement({ kind, id }: { kind: PartyKind; id: string }) {
     kind === "customer" ? customer?.name : kind === "supplier" ? supplier?.name : employee?.name;
   const partyPhone =
     kind === "customer" ? customer?.phone : kind === "supplier" ? supplier?.phone : employee?.phone;
-  const partyAddress = kind === "customer" ? customer?.address : kind === "supplier" ? supplier?.address : undefined;
+  const partyAddress =
+    kind === "customer" ? customer?.address : kind === "supplier" ? supplier?.address : undefined;
   const statement = useMemo(() => {
     if (kind === "customer") {
       if (!customer) return null;
@@ -114,50 +126,66 @@ export function PartyStatement({ kind, id }: { kind: PartyKind; id: string }) {
   if (partyQuery.isFetched && !partyName) {
     return (
       <div className="p-6 text-sm text-destructive">
-        {kind === "customer" ? t("customers.notFound") : kind === "supplier" ? t("suppliers.notFound") : t("hr.notFound")}
+        {kind === "customer"
+          ? t("customers.notFound")
+          : kind === "supplier"
+            ? t("suppliers.notFound")
+            : t("hr.notFound")}
       </div>
     );
   }
   if (!partyName || !statement) return null;
 
-  const closingLabel = kind === "customer"
-    ? (statement.closingBalance >= 0 ? t("statement.receivable") : t("statement.advance"))
-    : (statement.closingBalance >= 0 ? t("statement.payable") : t("statement.advance"));
-  const currentLabel = kind === "customer" ? t("statement.currentDue") : t("statement.currentPayable");
+  const closingLabel =
+    kind === "customer"
+      ? statement.closingBalance >= 0
+        ? t("statement.receivable")
+        : t("statement.advance")
+      : statement.closingBalance >= 0
+        ? t("statement.payable")
+        : t("statement.advance");
+  const currentLabel =
+    kind === "customer" ? t("statement.currentDue") : t("statement.currentPayable");
   const period = formatPeriodLabel(range, t("filter.all"));
   const pageTitle = kind === "employee" ? t("statement.title") : t("statement.ledger");
 
-  const backTo = kind === "customer"
-    ? { to: "/customers/$id" as const, params: { id } }
-    : kind === "supplier"
-      ? { to: "/suppliers/$id" as const, params: { id } }
-      : { to: "/hr/$id" as const, params: { id } };
+  const backTo =
+    kind === "customer"
+      ? { to: "/customers/$id" as const, params: { id } }
+      : kind === "supplier"
+        ? { to: "/suppliers/$id" as const, params: { id } }
+        : { to: "/hr/$id" as const, params: { id } };
 
-  const exportPayload = () => buildLedgerExportPayload({
-    company: t("brand.name"),
-    title: pageTitle,
-    statement,
-    period,
-    openingLabel: t("statement.opening"),
-    totalDebitLabel: t("statement.totalDebit"),
-    totalCreditLabel: t("statement.totalCredit"),
-    closingLabel: `${t("statement.closing")} · ${closingLabel}`,
-    columns: {
-      date: t("common.date"),
-      type: t("common.type"),
-      reference: t("statement.reference"),
-      description: t("statement.description"),
-      debit: t("statement.debit"),
-      credit: t("statement.credit"),
-      balance: t("statement.balance"),
-    },
-    typeLabel: (line) => t(LINE_LABEL[line.type]),
-    formatDate,
-    balanceSuffix: (line) =>
-      kind === "customer"
-        ? (line.balance >= 0 ? t("statement.dr") : t("statement.cr"))
-        : (line.balance >= 0 ? t("statement.cr") : t("statement.dr")),
-  });
+  const exportPayload = () =>
+    buildLedgerExportPayload({
+      company: t("brand.name"),
+      title: pageTitle,
+      statement,
+      period,
+      openingLabel: t("statement.opening"),
+      totalDebitLabel: t("statement.totalDebit"),
+      totalCreditLabel: t("statement.totalCredit"),
+      closingLabel: `${t("statement.closing")} · ${closingLabel}`,
+      columns: {
+        date: t("common.date"),
+        type: t("common.type"),
+        reference: t("statement.reference"),
+        description: t("statement.description"),
+        debit: t("statement.debit"),
+        credit: t("statement.credit"),
+        balance: t("statement.balance"),
+      },
+      typeLabel: (line) => t(LINE_LABEL[line.type]),
+      formatDate,
+      balanceSuffix: (line) =>
+        kind === "customer"
+          ? line.balance >= 0
+            ? t("statement.dr")
+            : t("statement.cr")
+          : line.balance >= 0
+            ? t("statement.cr")
+            : t("statement.dr"),
+    });
 
   const runExport = async (mode: "excel" | "pdf") => {
     try {
@@ -186,10 +214,18 @@ export function PartyStatement({ kind, id }: { kind: PartyKind; id: string }) {
             </Button>
             {kind !== "employee" && (
               <>
-                <Button variant="outline" disabled={exporting !== null} onClick={() => void runExport("excel")}>
+                <Button
+                  variant="outline"
+                  disabled={exporting !== null}
+                  onClick={() => void runExport("excel")}
+                >
                   <FileSpreadsheet className="mr-1 h-4 w-4" /> {t("statement.excel")}
                 </Button>
-                <Button variant="outline" disabled={exporting !== null} onClick={() => void runExport("pdf")}>
+                <Button
+                  variant="outline"
+                  disabled={exporting !== null}
+                  onClick={() => void runExport("pdf")}
+                >
                   <FileDown className="mr-1 h-4 w-4" /> {t("statement.pdf")}
                 </Button>
               </>
@@ -217,9 +253,18 @@ export function PartyStatement({ kind, id }: { kind: PartyKind; id: string }) {
           />
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <SummaryTile label={t("statement.opening")} value={formatCurrency(Math.abs(statement.openingBalance))} />
-            <SummaryTile label={t("statement.totalDebit")} value={formatCurrency(statement.totalDebit)} />
-            <SummaryTile label={t("statement.totalCredit")} value={formatCurrency(statement.totalCredit)} />
+            <SummaryTile
+              label={t("statement.opening")}
+              value={formatCurrency(Math.abs(statement.openingBalance))}
+            />
+            <SummaryTile
+              label={t("statement.totalDebit")}
+              value={formatCurrency(statement.totalDebit)}
+            />
+            <SummaryTile
+              label={t("statement.totalCredit")}
+              value={formatCurrency(statement.totalCredit)}
+            />
             <SummaryTile
               label={`${currentLabel} · ${closingLabel}`}
               value={formatCurrency(Math.abs(statement.closingBalance))}
@@ -230,19 +275,37 @@ export function PartyStatement({ kind, id }: { kind: PartyKind; id: string }) {
           {kind !== "employee" && (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {kind === "customer" ? (
-                <SummaryTile label={t("statement.totalSales")} value={formatCurrency(statement.periodSales)} />
+                <SummaryTile
+                  label={t("statement.totalSales")}
+                  value={formatCurrency(statement.periodSales)}
+                />
               ) : (
-                <SummaryTile label={t("statement.totalPurchases")} value={formatCurrency(statement.periodPurchases)} />
+                <SummaryTile
+                  label={t("statement.totalPurchases")}
+                  value={formatCurrency(statement.periodPurchases)}
+                />
               )}
               <SummaryTile
-                label={kind === "customer" ? t("statement.totalCollections") : t("statement.totalPayments")}
-                value={formatCurrency(kind === "customer" ? statement.periodCollections : statement.periodPayments)}
+                label={
+                  kind === "customer"
+                    ? t("statement.totalCollections")
+                    : t("statement.totalPayments")
+                }
+                value={formatCurrency(
+                  kind === "customer" ? statement.periodCollections : statement.periodPayments,
+                )}
               />
               {statement.periodReturns > 0 && (
-                <SummaryTile label={t("statement.returns")} value={formatCurrency(statement.periodReturns)} />
+                <SummaryTile
+                  label={t("statement.returns")}
+                  value={formatCurrency(statement.periodReturns)}
+                />
               )}
               {statement.periodAdjustments > 0 && (
-                <SummaryTile label={t("statement.adjustments")} value={formatCurrency(statement.periodAdjustments)} />
+                <SummaryTile
+                  label={t("statement.adjustments")}
+                  value={formatCurrency(statement.periodAdjustments)}
+                />
               )}
             </div>
           )}
@@ -266,7 +329,9 @@ export function PartyStatement({ kind, id }: { kind: PartyKind; id: string }) {
                         {formatCurrency(group.payable)}
                       </p>
                     </div>
-                    <p className="shrink-0 font-display text-base font-semibold sm:text-lg">{group.label}</p>
+                    <p className="shrink-0 font-display text-base font-semibold sm:text-lg">
+                      {group.label}
+                    </p>
                   </summary>
                   <div className="statement-month-body border-t">
                     <div className="overflow-x-auto">
@@ -283,7 +348,13 @@ export function PartyStatement({ kind, id }: { kind: PartyKind; id: string }) {
                         </TableHeader>
                         <TableBody>
                           {group.lines.map((line) => (
-                            <StatementLineRow key={line.id} line={line} kind={kind} t={t} detailed={false} />
+                            <StatementLineRow
+                              key={line.id}
+                              line={line}
+                              kind={kind}
+                              t={t}
+                              detailed={false}
+                            />
                           ))}
                         </TableBody>
                       </Table>
@@ -303,7 +374,9 @@ export function PartyStatement({ kind, id }: { kind: PartyKind; id: string }) {
                   <span>{formatCurrency(statement.totalCredit)}</span>
                   <span>
                     {formatCurrency(Math.abs(statement.closingBalance))}{" "}
-                    <span className="text-xs font-normal text-muted-foreground">{closingLabel}</span>
+                    <span className="text-xs font-normal text-muted-foreground">
+                      {closingLabel}
+                    </span>
                   </span>
                 </div>
               </div>
@@ -328,7 +401,10 @@ export function PartyStatement({ kind, id }: { kind: PartyKind; id: string }) {
                   ))}
                   {statement.lines.length <= 1 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                      <TableCell
+                        colSpan={7}
+                        className="py-8 text-center text-sm text-muted-foreground"
+                      >
                         {t("statement.empty")}
                       </TableCell>
                     </TableRow>
@@ -336,12 +412,20 @@ export function PartyStatement({ kind, id }: { kind: PartyKind; id: string }) {
                 </TableBody>
                 <TableFooter>
                   <TableRow>
-                    <TableCell colSpan={4} className="font-semibold">{t("statement.closing")}</TableCell>
-                    <TableCell className="text-right font-semibold">{formatCurrency(statement.totalDebit)}</TableCell>
-                    <TableCell className="text-right font-semibold">{formatCurrency(statement.totalCredit)}</TableCell>
+                    <TableCell colSpan={4} className="font-semibold">
+                      {t("statement.closing")}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {formatCurrency(statement.totalDebit)}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {formatCurrency(statement.totalCredit)}
+                    </TableCell>
                     <TableCell className="text-right font-semibold">
                       {formatCurrency(Math.abs(statement.closingBalance))}{" "}
-                      <span className="text-xs font-normal text-muted-foreground">{closingLabel}</span>
+                      <span className="text-xs font-normal text-muted-foreground">
+                        {closingLabel}
+                      </span>
                     </TableCell>
                   </TableRow>
                 </TableFooter>
@@ -354,10 +438,25 @@ export function PartyStatement({ kind, id }: { kind: PartyKind; id: string }) {
   );
 }
 
-function SummaryTile({ label, value, emphasize }: { label: string; value: string; emphasize?: boolean }) {
+function SummaryTile({
+  label,
+  value,
+  emphasize,
+}: {
+  label: string;
+  value: string;
+  emphasize?: boolean;
+}) {
   return (
-    <div className={cn("rounded-lg border bg-muted/30 p-3", emphasize && "border-primary/30 bg-primary/5")}>
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+    <div
+      className={cn(
+        "rounded-lg border bg-muted/30 p-3",
+        emphasize && "border-primary/30 bg-primary/5",
+      )}
+    >
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
       <p className="mt-1 font-display text-lg font-semibold">{value}</p>
     </div>
   );
@@ -385,8 +484,12 @@ function OpeningStrip({
         {formatCurrency(Math.abs(line.balance))}
         <span className="ml-1 text-[10px] font-normal text-muted-foreground">
           {kind === "customer"
-            ? (line.balance >= 0 ? t("statement.dr") : t("statement.cr"))
-            : (line.balance >= 0 ? t("statement.cr") : t("statement.dr"))}
+            ? line.balance >= 0
+              ? t("statement.dr")
+              : t("statement.cr")
+            : line.balance >= 0
+              ? t("statement.cr")
+              : t("statement.dr")}
         </span>
       </p>
     </div>
@@ -450,15 +553,21 @@ function StatementLineRow({
       <TableCell className="text-right tabular-nums">
         {line.credit ? formatCurrency(line.credit) : "—"}
       </TableCell>
-      <TableCell className={cn(
-        "text-right tabular-nums font-medium",
-        line.balance < 0 && "text-emerald-700 dark:text-emerald-400",
-      )}>
+      <TableCell
+        className={cn(
+          "text-right tabular-nums font-medium",
+          line.balance < 0 && "text-emerald-700 dark:text-emerald-400",
+        )}
+      >
         {formatCurrency(Math.abs(line.balance))}
         <span className="ml-1 text-[10px] font-normal text-muted-foreground">
           {kind === "customer"
-            ? (line.balance >= 0 ? t("statement.dr") : t("statement.cr"))
-            : (line.balance >= 0 ? t("statement.cr") : t("statement.dr"))}
+            ? line.balance >= 0
+              ? t("statement.dr")
+              : t("statement.cr")
+            : line.balance >= 0
+              ? t("statement.cr")
+              : t("statement.dr")}
         </span>
       </TableCell>
     </TableRow>

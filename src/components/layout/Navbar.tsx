@@ -31,7 +31,9 @@ export function Navbar() {
       <div className="ml-1 flex min-w-0 items-center gap-2">
         <BrandLogo size="sm" className="hidden sm:block" />
         <div className="flex min-w-0 flex-col leading-tight">
-          <span className="font-display truncate text-sm font-semibold tracking-tight">{t("brand.name")}</span>
+          <span className="font-display truncate text-sm font-semibold tracking-tight">
+            {t("brand.name")}
+          </span>
           <span className="hidden text-[11px] font-medium tracking-[0.08em] text-muted-foreground sm:block">
             {t("brand.tagline")}
           </span>
@@ -52,9 +54,17 @@ export function Navbar() {
         <div className="hidden items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground sm:flex">
           <User className="h-3.5 w-3.5" />
           <span className="font-medium text-foreground">{user?.displayName ?? "Operator"}</span>
-          {user?.role && <span className="rounded bg-muted px-1.5 py-0.5 text-[10px]">{user.role}</span>}
+          {user?.role && (
+            <span className="rounded bg-muted px-1.5 py-0.5 text-[10px]">{user.role}</span>
+          )}
         </div>
-        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={onLogout} title={t("common.signOut")}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9"
+          onClick={onLogout}
+          title={t("common.signOut")}
+        >
           <LogOut className="h-4 w-4" />
         </Button>
       </div>

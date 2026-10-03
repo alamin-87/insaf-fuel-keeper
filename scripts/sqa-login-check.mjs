@@ -4,7 +4,9 @@ const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage();
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
-page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+page.on("console", (m) => {
+  if (m.type() === "error") errors.push(m.text());
+});
 await page.goto(`${BASE}/login`, { waitUntil: "domcontentloaded", timeout: 60000 });
 console.log("url", page.url());
 console.log("title", await page.title());

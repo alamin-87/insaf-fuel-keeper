@@ -16,7 +16,11 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { formatCurrency, formatDate } from "@/utils/formatters";
 import { useT } from "@/i18n";
@@ -43,12 +47,21 @@ function EmployeeDetailBody() {
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [status, setStatus] = useState<"active" | "inactive">("active");
-  const { data: e, isLoading, isFetched } = useQuery({
+  const {
+    data: e,
+    isLoading,
+    isFetched,
+  } = useQuery({
     queryKey: ["employees", id],
     queryFn: () => hrService.getEmployee(id),
   });
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<EmpForm>({
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<EmpForm>({
     resolver: zodResolver(employeeSchema),
   });
 
@@ -91,8 +104,10 @@ function EmployeeDetailBody() {
     onError: (err: Error) => toast.error(err.message),
   });
 
-  if (isLoading) return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
-  if (isFetched && !e) return <div className="p-6 text-sm text-destructive">{t("hr.notFound")}</div>;
+  if (isLoading)
+    return <div className="p-6 text-sm text-muted-foreground">{t("common.loading")}</div>;
+  if (isFetched && !e)
+    return <div className="p-6 text-sm text-destructive">{t("hr.notFound")}</div>;
   if (!e) return null;
 
   return (
@@ -104,10 +119,7 @@ function EmployeeDetailBody() {
         backLabel={t("hr.title")}
         actions={
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setEditing((v) => !v)}
-            >
+            <Button variant="outline" onClick={() => setEditing((v) => !v)}>
               <Pencil className="mr-1 h-4 w-4" /> {editing ? t("common.close") : t("common.edit")}
             </Button>
             <Button asChild>
@@ -132,7 +144,10 @@ function EmployeeDetailBody() {
         <Card className="mb-4">
           <CardContent className="pt-6">
             <h3 className="mb-4 text-sm font-semibold">{t("hr.editEmployee")}</h3>
-            <form onSubmit={handleSubmit((v) => save.mutate(v))} className="grid gap-4 md:grid-cols-2">
+            <form
+              onSubmit={handleSubmit((v) => save.mutate(v))}
+              className="grid gap-4 md:grid-cols-2"
+            >
               <div className="space-y-1.5">
                 <Label>{t("common.name")}</Label>
                 <Input {...register("name")} />
@@ -143,14 +158,28 @@ function EmployeeDetailBody() {
                 <Input {...register("phone")} />
                 {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
               </div>
-              <div className="space-y-1.5"><Label>{t("hr.designation")}</Label><Input {...register("designation")} /></div>
-              <div className="space-y-1.5"><Label>{t("hr.department")}</Label><Input {...register("department")} /></div>
-              <div className="space-y-1.5"><Label>{t("hr.joiningDate")}</Label><Input type="date" {...register("joiningDate")} /></div>
-              <div className="space-y-1.5"><Label>{t("hr.basicSalary")}</Label><Input type="number" {...register("salary")} /></div>
+              <div className="space-y-1.5">
+                <Label>{t("hr.designation")}</Label>
+                <Input {...register("designation")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t("hr.department")}</Label>
+                <Input {...register("department")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t("hr.joiningDate")}</Label>
+                <Input type="date" {...register("joiningDate")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t("hr.basicSalary")}</Label>
+                <Input type="number" {...register("salary")} />
+              </div>
               <div className="space-y-1.5">
                 <Label>{t("common.status")}</Label>
                 <Select value={status} onValueChange={(v) => setStatus(v as "active" | "inactive")}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="active">{t("common.active")}</SelectItem>
                     <SelectItem value="inactive">{t("common.inactive")}</SelectItem>
@@ -158,8 +187,12 @@ function EmployeeDetailBody() {
                 </Select>
               </div>
               <div className="md:col-span-2 flex justify-end gap-2">
-                <Button type="button" variant="ghost" onClick={() => setEditing(false)}>{t("common.cancel")}</Button>
-                <Button type="submit" disabled={isSubmitting || save.isPending}>{t("common.save")}</Button>
+                <Button type="button" variant="ghost" onClick={() => setEditing(false)}>
+                  {t("common.cancel")}
+                </Button>
+                <Button type="submit" disabled={isSubmitting || save.isPending}>
+                  {t("common.save")}
+                </Button>
               </div>
             </form>
           </CardContent>

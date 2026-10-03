@@ -1,22 +1,22 @@
-import type { Customer, Employee, PayrollRun, PurchaseOrder, SalesOrder, Supplier, Voucher } from "@/types";
+import type {
+  Customer,
+  Employee,
+  PayrollRun,
+  PurchaseOrder,
+  SalesOrder,
+  Supplier,
+  Voucher,
+} from "@/types";
 import { parseRecordTime, type DateRange } from "@/lib/date-range";
 import { customerOpeningSigned } from "@/lib/customer-balance";
 
 export type PartyKind = "customer" | "supplier" | "employee";
 
 export type StatementLineType =
-  | "opening"
-  | "invoice"
-  | "purchase"
-  | "payment"
-  | "receipt"
-  | "salary"
-  | "adjustment"
-  | "return";
+  "opening" | "invoice" | "purchase" | "payment" | "receipt" | "salary" | "adjustment" | "return";
 
 export type StatementLineHref =
-  | { to: "/sales/$id"; params: { id: string } }
-  | { to: "/purchases/$id"; params: { id: string } };
+  { to: "/sales/$id"; params: { id: string } } | { to: "/purchases/$id"; params: { id: string } };
 
 export type StatementLine = {
   id: string;
@@ -188,7 +188,11 @@ function buildCustomerRaws(sales: SalesOrder[], vouchers: Voucher[], partyId: st
   return lines;
 }
 
-function buildSupplierRaws(purchases: PurchaseOrder[], vouchers: Voucher[], partyId: string): RawLine[] {
+function buildSupplierRaws(
+  purchases: PurchaseOrder[],
+  vouchers: Voucher[],
+  partyId: string,
+): RawLine[] {
   const lines: RawLine[] = [];
   for (const po of purchases) {
     if (po.supplierId !== partyId) continue;
@@ -351,9 +355,12 @@ export function buildPartyStatement(opts: {
   const fromTs = range.preset !== "all" && range.from ? parseRecordTime(range.from) : null;
   const toTs = range.preset !== "all" && range.to ? parseRecordTime(`${range.to}T23:59:59`) : null;
 
-  const openingSeed = kind === "customer" && "openingBalance" in party
-    ? customerOpeningSigned(party as Customer)
-    : ("openingBalance" in party ? (party.openingBalance || 0) : 0);
+  const openingSeed =
+    kind === "customer" && "openingBalance" in party
+      ? customerOpeningSigned(party as Customer)
+      : "openingBalance" in party
+        ? party.openingBalance || 0
+        : 0;
   let opening = openingSeed;
   const period: RawLine[] = [];
   for (const line of raws) {
@@ -368,12 +375,10 @@ export function buildPartyStatement(opts: {
 
   const openingDate = range.from || party.createdAt;
   let running = opening;
-  const openingDebit = kind === "customer"
-    ? (opening >= 0 ? opening : 0)
-    : (opening < 0 ? -opening : 0);
-  const openingCredit = kind === "customer"
-    ? (opening < 0 ? -opening : 0)
-    : (opening >= 0 ? opening : 0);
+  const openingDebit =
+    kind === "customer" ? (opening >= 0 ? opening : 0) : opening < 0 ? -opening : 0;
+  const openingCredit =
+    kind === "customer" ? (opening < 0 ? -opening : 0) : opening >= 0 ? opening : 0;
   const lines: StatementLine[] = [
     {
       id: "opening",
@@ -402,7 +407,10 @@ export function buildPartyStatement(opts: {
     partyName: party.name,
     partyKind: kind,
     phone: party.phone,
-    address: "address" in party ? party.address : `${(party as Employee).designation} · ${(party as Employee).department}`,
+    address:
+      "address" in party
+        ? party.address
+        : `${(party as Employee).designation} · ${(party as Employee).department}`,
     gstin: "gstin" in party ? party.gstin : undefined,
     openingBalance: opening,
     lines,
@@ -412,8 +420,10 @@ export function buildPartyStatement(opts: {
     periodSales: periodSum(activity, "invoice", "debit"),
     periodPurchases: periodSum(activity, "purchase", "credit"),
     periodCollections: periodSum(activity, "receipt", "credit"),
-    periodPayments: periodSum(activity, "payment", "debit") + periodSum(activity, "payment", "credit"),
+    periodPayments:
+      periodSum(activity, "payment", "debit") + periodSum(activity, "payment", "credit"),
     periodReturns: periodSum(activity, "return", "debit") + periodSum(activity, "return", "credit"),
-    periodAdjustments: periodSum(activity, "adjustment", "debit") + periodSum(activity, "adjustment", "credit"),
+    periodAdjustments:
+      periodSum(activity, "adjustment", "debit") + periodSum(activity, "adjustment", "credit"),
   };
 }

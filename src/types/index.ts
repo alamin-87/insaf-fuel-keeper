@@ -82,7 +82,16 @@ export interface LayerConsumption {
   unitCost: number;
 }
 
-export type CylinderStatus = "in_stock" | "at_customer" | "in_transit" | "refilling" | "damaged" | "lost" | "scrapped" | "written_off" | "stock_out";
+export type CylinderStatus =
+  | "in_stock"
+  | "at_customer"
+  | "in_transit"
+  | "refilling"
+  | "damaged"
+  | "lost"
+  | "scrapped"
+  | "written_off"
+  | "stock_out";
 export type CylinderFillLevel = "full" | "empty";
 
 export interface Cylinder {
@@ -211,7 +220,8 @@ export interface Delivery {
   emptyReturned?: number;
 }
 
-export type PurchaseStatus = "draft" | "ordered" | "partial" | "received" | "billed" | "paid" | "cancelled";
+export type PurchaseStatus =
+  "draft" | "ordered" | "partial" | "received" | "billed" | "paid" | "cancelled";
 
 export type PurchaseGrn = {
   id: string;
@@ -237,7 +247,7 @@ export interface PurchaseOrder {
   notes?: string;
   /** Completed GRN events. Inventory posts against each grnNo, not the PO ordered qty. */
   grns?: PurchaseGrn[];
-};
+}
 
 export type StockMovementType = "in" | "out" | "adjust" | "return";
 

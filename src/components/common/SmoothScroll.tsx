@@ -71,27 +71,30 @@ export function SmoothScrollProvider({ children }: { children: ReactNode }) {
     };
   }, [isLogin]);
 
-  const scrollTo = useCallback((
-    target: number | string | HTMLElement = 0,
-    opts?: { immediate?: boolean; offset?: number },
-  ) => {
-    const lenis = lenisRef.current;
-    if (lenis) {
-      lenis.scrollTo(target, {
-        immediate: opts?.immediate ?? false,
-        offset: opts?.offset ?? 0,
-        force: true,
-      });
-      return;
-    }
-    if (typeof window === "undefined") return;
-    if (typeof target === "number") {
-      window.scrollTo({
-        top: target,
-        behavior: opts?.immediate || prefersReducedMotion() ? "auto" : "smooth",
-      });
-    }
-  }, []);
+  const scrollTo = useCallback(
+    (
+      target: number | string | HTMLElement = 0,
+      opts?: { immediate?: boolean; offset?: number },
+    ) => {
+      const lenis = lenisRef.current;
+      if (lenis) {
+        lenis.scrollTo(target, {
+          immediate: opts?.immediate ?? false,
+          offset: opts?.offset ?? 0,
+          force: true,
+        });
+        return;
+      }
+      if (typeof window === "undefined") return;
+      if (typeof target === "number") {
+        window.scrollTo({
+          top: target,
+          behavior: opts?.immediate || prefersReducedMotion() ? "auto" : "smooth",
+        });
+      }
+    },
+    [],
+  );
 
   const stop = useCallback(() => lenisRef.current?.stop(), []);
   const start = useCallback(() => lenisRef.current?.start(), []);
@@ -103,14 +106,7 @@ export function SmoothScrollProvider({ children }: { children: ReactNode }) {
     requestAnimationFrame(() => ScrollTrigger.refresh());
   }, [pathname, scrollTo, isLogin]);
 
-  const api = useMemo(
-    () => ({ scrollTo, stop, start }),
-    [scrollTo, stop, start],
-  );
+  const api = useMemo(() => ({ scrollTo, stop, start }), [scrollTo, stop, start]);
 
-  return (
-    <SmoothScrollContext.Provider value={api}>
-      {children}
-    </SmoothScrollContext.Provider>
-  );
+  return <SmoothScrollContext.Provider value={api}>{children}</SmoothScrollContext.Provider>;
 }
