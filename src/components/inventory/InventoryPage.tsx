@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/select";
 import { formatCurrency, formatDateTime } from "@/utils/formatters";
 import { buildProductInventory, sumInventory } from "@/lib/cylinder-inventory";
-import { buildStockReport, isMovementIn } from "@/lib/stock-report";
+import { buildStockReport, isMovementIn, isMovementOut } from "@/lib/stock-report";
 import { EMPTY_DATE_RANGE } from "@/lib/date-range";
 import { partyCylinderBalance } from "@/lib/customer-cylinders";
 import type { StockMovement, UnitOfMeasure } from "@/types";
@@ -145,13 +145,23 @@ export function InventoryPage() {
         if (m.type === "received") received += 1;
       }
     }
+    const cylinderRows = rows.filter((r) => {
+      const p = products.find((x) => x.id === r.productId);
+      return p?.productType === "cylinder" || (p?.uom === "cyl" && p?.productType !== "gas");
+    });
+    const cylinderOnHand = cylinderRows.reduce((sum, r) => sum + r.full, 0);
+    const cylinderAvailable = cylinderRows.reduce((sum, r) => sum + r.available, 0);
+    const cylinderReserved = cylinderRows.reduce((sum, r) => sum + r.reserved, 0);
+
     return {
       received,
       delivery,
-      cylinder: totals.full,
+      cylinder: cylinderOnHand,
       returned,
+      reserved: cylinderReserved,
+      available: cylinderAvailable,
     };
-  }, [customers, cylinders, cylMoves, movements, totals.full]);
+  }, [customers, cylinders, cylMoves, movements, products, rows]);
   const activity = useMemo(
     () =>
       movements
@@ -215,20 +225,23 @@ export function InventoryPage() {
     () =>
       filteredRows.map((row) => {
         const p = products.find((x) => x.id === row.productId);
+        const pMoves = movements.filter((m) => m.productId === row.productId);
+        const stockIn = pMoves.filter(isMovementIn).reduce((sum, m) => sum + (m.quantity || 0), 0);
+        const stockOut = pMoves.filter(isMovementOut).reduce((sum, m) => sum + (m.quantity || 0), 0);
+        const onHand = stockIn - stockOut;
         const sr = stockByProduct.get(row.productId);
-        const onHand = row.full;
         const unitCost = sr?.unitCost ?? p?.cost ?? 0;
         return {
           ...row,
-          stockIn: sr?.qtyIn ?? 0,
-          stockOut: sr?.qtyOut ?? 0,
+          stockIn,
+          stockOut,
           onHand,
           unit: inventoryUnitLabel(p?.uom, t),
           unitCost,
           totalValue: onHand * unitCost,
         };
       }),
-    [filteredRows, products, stockByProduct, t],
+    [filteredRows, products, movements, stockByProduct, t],
   );
 
   const invalidate = () => {

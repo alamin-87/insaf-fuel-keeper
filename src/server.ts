@@ -47,6 +47,65 @@ function isH3SwallowedErrorBody(body: string): boolean {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const url = new URL(request.url);
+      const pathname = url.pathname;
+
+      // Handle separated inventory REST API endpoints
+      if (pathname === "/api/inventory/gas" && request.method === "GET") {
+        const { getDb } = await import("./lib/mongo.server");
+        const { reconcileDatabaseInventory } = await import("./lib/inventory.server");
+        const db = await getDb();
+        const summary = await reconcileDatabaseInventory(db);
+        return new Response(JSON.stringify(summary.gas), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=utf-8" },
+        });
+      }
+
+      if (pathname === "/api/inventory/cylinders" && request.method === "GET") {
+        const { getDb } = await import("./lib/mongo.server");
+        const { reconcileDatabaseInventory } = await import("./lib/inventory.server");
+        const db = await getDb();
+        const summary = await reconcileDatabaseInventory(db);
+        return new Response(JSON.stringify(summary.cylinders), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=utf-8" },
+        });
+      }
+
+      if (pathname === "/api/inventory/products" && request.method === "GET") {
+        const { getDb } = await import("./lib/mongo.server");
+        const { reconcileDatabaseInventory } = await import("./lib/inventory.server");
+        const db = await getDb();
+        const summary = await reconcileDatabaseInventory(db);
+        return new Response(JSON.stringify(summary.products), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=utf-8" },
+        });
+      }
+
+      if (pathname === "/api/inventory/summary" && request.method === "GET") {
+        const { getDb } = await import("./lib/mongo.server");
+        const { reconcileDatabaseInventory } = await import("./lib/inventory.server");
+        const db = await getDb();
+        const summary = await reconcileDatabaseInventory(db);
+        return new Response(JSON.stringify(summary), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=utf-8" },
+        });
+      }
+
+      if (pathname === "/api/inventory/reconcile" && request.method === "POST") {
+        const { getDb } = await import("./lib/mongo.server");
+        const { reconcileDatabaseInventory } = await import("./lib/inventory.server");
+        const db = await getDb();
+        const summary = await reconcileDatabaseInventory(db);
+        return new Response(JSON.stringify({ ok: true, summary }), {
+          status: 200,
+          headers: { "content-type": "application/json; charset=utf-8" },
+        });
+      }
+
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);

@@ -40,8 +40,75 @@ export interface ProductCategoryRecord {
   updatedAt?: string;
 }
 export type UnitOfMeasure = "kg" | "cyl" | "ltr" | "pcs";
+export type ProductType = "gas" | "cylinder" | "product";
 export type CostingMethod = "fifo" | "lifo" | "average";
-export type ProductType = "gas" | "cylinder";
+
+export interface GasInventory {
+  id: ID;
+  productId: ID;
+  productName: string;
+  productType: "gas";
+  uom: UnitOfMeasure;
+  openingStock: number;
+  stockIn: number;
+  stockOut: number;
+  onHand: number;
+  unitPrice: number;
+  costPrice: number;
+  totalValue: number;
+  createdAt?: string;
+  updatedAt: string;
+}
+
+export interface CylinderInventory {
+  id: ID;
+  productId: ID;
+  productName: string;
+  productType: "cylinder";
+  uom: UnitOfMeasure;
+  openingStock: number;
+  stockIn: number;
+  stockOut: number;
+  reserved: number;
+  available: number;
+  onHand: number;
+  unitPrice: number;
+  costPrice: number;
+  totalValue: number;
+  createdAt?: string;
+  updatedAt: string;
+}
+
+export interface ProductInventory {
+  id: ID;
+  productId: ID;
+  productName: string;
+  productType: "product";
+  uom: UnitOfMeasure;
+  openingStock: number;
+  stockIn: number;
+  stockOut: number;
+  onHand: number;
+  unitPrice: number;
+  costPrice: number;
+  totalValue: number;
+  createdAt?: string;
+  updatedAt: string;
+}
+
+export interface InventorySummary {
+  gas: GasInventory[];
+  cylinders: CylinderInventory[];
+  products: ProductInventory[];
+  totals: {
+    gasOnHand: number;
+    cylinderOnHand: number;
+    cylinderReserved: number;
+    cylinderAvailable: number;
+    productOnHand: number;
+    totalValue: number;
+  };
+}
 
 export interface Product {
   id: ID;
@@ -255,8 +322,12 @@ export type StockMovementType = "in" | "out" | "adjust" | "return";
 
 export type MovementTypeKind =
   | "RECEIPT"
+  | "PURCHASE_RECEIVED"
   | "SALE_ISSUE"
+  | "SALE_COMPLETED"
   | "RETURN"
+  | "SALES_RETURN"
+  | "PURCHASE_RETURN"
   | "ADJUSTMENT_IN"
   | "ADJUSTMENT_OUT"
   | "DAMAGE"
@@ -266,14 +337,18 @@ export type MovementTypeKind =
 
 export interface StockMovement {
   id: ID;
+  movementId?: string;
   date: string;
   productId: ID;
   productName: string;
+  productType?: ProductType;
   type: StockMovementType;
   movementType?: MovementTypeKind;
   direction?: "in" | "out";
   quantity: number;
+  previousBalance?: number;
   balanceAfter: number;
+  newBalance?: number;
   unitCost?: number;
   totalCost?: number;
   cogsAmount?: number;
@@ -281,6 +356,9 @@ export interface StockMovement {
   consumptions?: LayerConsumption[];
   refType?: "sales" | "purchase" | "delivery" | "adjustment" | "refill";
   refId?: string;
+  sourceType?: string;
+  sourceId?: string;
+  sourceLineId?: string;
   notes?: string;
   by: string;
 }

@@ -31,11 +31,23 @@ import type {
   LayerConsumption,
   JournalLine,
   ProductCategory,
+  ProductType,
+  GasInventory,
+  CylinderInventory,
+  ProductInventory,
+  InventorySummary,
 } from "@/types";
 import { crudFn, dashboardFn, notificationsFn } from "@/lib/data.functions";
 import { updateProductFn } from "@/lib/products.functions";
 import { getCylinderTrackingFn } from "@/lib/settings.functions";
 import { receivePurchaseFn } from "@/lib/purchase.functions";
+import {
+  getGasInventoryFn,
+  getCylinderInventoryFn,
+  getProductInventoryFn,
+  getInventorySummaryFn,
+  reconcileInventoryDbFn,
+} from "@/lib/inventory.functions";
 import { genOrderNo } from "@/utils/helpers";
 import {
   cylinderIsEmpty,
@@ -223,28 +235,40 @@ async function receiveStock(productId: string, qty: number, unitCost: number, me
     const leftover = await remainingValue(product.id);
     nextCost = leftover.avg || cost;
   }
+  const pType: ProductType =
+    product.productType === "cylinder" || product.productType === "gas" || product.productType === "product"
+      ? product.productType
+      : product.uom === "cyl"
+        ? "cylinder"
+        : "gas";
+
   await call("update", "products", product.id, { stock: nextStock, cost: nextCost });
   await postStockMovement({
     date: meta?.date || new Date().toISOString(),
     productId: product.id,
     productName: product.name,
+    productType: pType,
     type: "in",
     movementType:
       meta?.movementType ||
       (meta?.refType === "purchase"
-        ? "RECEIPT"
+        ? "PURCHASE_RECEIVED"
         : meta?.refType === "adjustment"
           ? "ADJUSTMENT_IN"
           : "RECEIPT"),
     direction: "in",
     quantity: qty,
+    previousBalance: oldStock,
     balanceAfter: nextStock,
+    newBalance: nextStock,
     unitCost: cost,
     totalCost: qty * cost,
     cogsAmount: qty * cost,
     costingMethod: method,
     refType: meta?.refType,
     refId: meta?.refId,
+    sourceType: meta?.refType,
+    sourceId: meta?.refId,
     notes: meta?.notes,
     by: meta?.by ?? "System",
   });
@@ -280,6 +304,13 @@ async function issueStock(productId: string, qty: number, meta?: StockMeta) {
   }
   const nextStock = available - take;
   const leftover = await remainingValue(product.id);
+  const pType: ProductType =
+    product.productType === "cylinder" || product.productType === "gas" || product.productType === "product"
+      ? product.productType
+      : product.uom === "cyl"
+        ? "cylinder"
+        : "gas";
+
   await call("update", "products", product.id, {
     stock: nextStock,
     cost: method === "average" ? (nextStock > 0 ? (product.cost ?? 0) : 0) : leftover.avg,
@@ -288,6 +319,7 @@ async function issueStock(productId: string, qty: number, meta?: StockMeta) {
     date: meta?.date || new Date().toISOString(),
     productId: product.id,
     productName: product.name,
+    productType: pType,
     type: "out",
     movementType:
       meta?.movementType ||
@@ -298,7 +330,9 @@ async function issueStock(productId: string, qty: number, meta?: StockMeta) {
           : "SALE_ISSUE"),
     direction: "out",
     quantity: take,
+    previousBalance: available,
     balanceAfter: nextStock,
+    newBalance: nextStock,
     unitCost,
     totalCost: cogsAmount,
     cogsAmount,
@@ -306,6 +340,8 @@ async function issueStock(productId: string, qty: number, meta?: StockMeta) {
     consumptions,
     refType: meta?.refType,
     refId: meta?.refId,
+    sourceType: meta?.refType,
+    sourceId: meta?.refId,
     notes: meta?.notes,
     by: meta?.by ?? "System",
   });
@@ -2217,6 +2253,11 @@ export const inventoryService = {
   },
   listStockMovements: () => call<StockMovement[]>("list", "stockMovements"),
   listCostLayers: () => call<CostLayer[]>("list", "costLayers"),
+  getGasInventory: () => getGasInventoryFn(),
+  getCylinderInventory: () => getCylinderInventoryFn(),
+  getProductInventory: () => getProductInventoryFn(),
+  getSummary: () => getInventorySummaryFn(),
+  reconcile: () => reconcileInventoryDbFn(),
 };
 
 export const accountingService = {

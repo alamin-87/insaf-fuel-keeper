@@ -48,7 +48,10 @@ type CollName =
   | "accounts"
   | "chartOfAccounts"
   | "assets"
-  | "costLayers";
+  | "costLayers"
+  | "gasInventory"
+  | "cylinderInventory"
+  | "productInventory";
 
 // Strip Mongo's _id so returned docs are plain and serializable.
 const clean = <T>(doc: any): T => {
@@ -110,70 +113,10 @@ async function ensureSeeded() {
       }
     }
 
-    // Migration / Backfill: Reconcile product stock with authoritative transaction history
+    // Authoritative Database Inventory Reconciliation & Synchronization
     try {
-      const { buildStockReport, getMovementQtyIn, getMovementQtyOut } = await import("./stock-report");
-      const dbProducts = await db.collection("products").find({}).toArray();
-      const dbMovements = await db.collection("stockMovements").find({}).toArray();
-      const prods = dbProducts.map((d: any) => clean<Product>(d));
-      const moves = dbMovements.map((d: any) => clean<StockMovement>(d));
-
-      const openingStockMap: Record<string, number> = {
-        p1: 25,
-        p2: 20,
-        p3: 28,
-        p4: 46,
-        p5: 6,
-        p6: 22,
-        "0n4pn2g1": 20,
-        "9jdnwagj": 78,
-        "59eaw73l": 0,
-        hpgmusaf: 0,
-        azdmoisv: 100,
-      };
-
-      for (const p of prods) {
-        const hasInit = moves.some(
-          (m) => m.productId === p.id && (m.refId?.startsWith("INIT-") || /initial/i.test(m.notes || "")),
-        );
-        if (!hasInit) {
-          const nonInit = moves.filter((m) => m.productId === p.id);
-          const totalIn = nonInit.reduce((sum, m) => sum + getMovementQtyIn(m), 0);
-          const totalOut = nonInit.reduce((sum, m) => sum + getMovementQtyOut(m), 0);
-          const openQty = openingStockMap[p.id] ?? Math.max(0, (p.stock ?? 0) + totalOut - totalIn);
-          if (openQty > 0) {
-            const initMovement: StockMovement = {
-              id: `INIT-${p.id}`,
-              date: p.createdAt || "2026-03-01T00:00:00.000Z",
-              productId: p.id,
-              productName: p.name,
-              type: "in",
-              movementType: "ADJUSTMENT_IN",
-              direction: "in",
-              quantity: openQty,
-              balanceAfter: openQty,
-              unitCost: p.cost || 0,
-              totalCost: openQty * (p.cost || 0),
-              cogsAmount: openQty * (p.cost || 0),
-              costingMethod: "fifo",
-              refType: "adjustment",
-              refId: `INIT-${p.id}`,
-              notes: "Initial opening stock",
-              by: "System",
-            };
-            await db.collection("stockMovements").insertOne(initMovement);
-            moves.push(initMovement);
-          }
-        }
-      }
-
-      const reports = buildStockReport(prods, moves, { preset: "all", from: "", to: "" });
-      for (const r of reports) {
-        const prod = prods.find((p) => p.id === r.id);
-        if (prod && prod.stock !== r.inHand) {
-          await db.collection("products").updateOne({ id: r.id }, { $set: { stock: r.inHand } });
-        }
-      }
+      const { reconcileDatabaseInventory } = await import("./inventory.server");
+      await reconcileDatabaseInventory(db);
     } catch {
       /* ignore migration race */
     }

@@ -68,7 +68,7 @@ export const productSchema = z.object({
   code: z.string().min(1, "Code required"),
   name: z.string().min(2, "Name required"),
   category: z.string().trim().min(1, "Category required"),
-  productType: z.enum(["gas", "cylinder"]),
+  productType: z.enum(["gas", "cylinder", "product"]),
   uom: z.enum(["kg", "cyl", "ltr", "pcs"]),
   price: z.coerce.number().min(0),
   cost: z.coerce.number().min(0).optional(),

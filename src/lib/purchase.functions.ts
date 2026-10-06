@@ -394,6 +394,8 @@ async function receiveStockInDb(
   const productDoc = await db.collection("products").findOne({ id: item.productId }, opt);
   const product = productDoc ? clean<Product>(productDoc) : null;
   if (!product) return;
+  const { resolveProductType } = await import("./inventory.server");
+  const pType = resolveProductType(product);
   const cost = Number.isFinite(item.price) ? item.price : (product.cost ?? 0);
 
   const openLayers = (
@@ -444,11 +446,14 @@ async function receiveStockInDb(
     date: now,
     productId: product.id,
     productName: product.name,
+    productType: pType,
     type: "in",
     movementType: "RECEIPT",
     direction: "in",
     quantity: qty,
+    previousBalance: oldStock,
     balanceAfter: nextStock,
+    newBalance: nextStock,
     unitCost: cost,
     totalCost: qty * cost,
     cogsAmount: qty * cost,
@@ -459,6 +464,36 @@ async function receiveStockInDb(
     by: meta.by,
   };
   await db.collection("stockMovements").insertOne(movement, opt);
+
+  // Update separated inventory collection
+  if (pType === "gas") {
+    await db.collection("gasInventory").updateOne(
+      { productId: product.id },
+      {
+        $inc: { stockIn: qty, onHand: qty },
+        $set: { updatedAt: now },
+      },
+      { upsert: true, ...opt },
+    );
+  } else if (pType === "cylinder") {
+    await db.collection("cylinderInventory").updateOne(
+      { productId: product.id },
+      {
+        $inc: { stockIn: qty, onHand: qty, available: qty },
+        $set: { updatedAt: now },
+      },
+      { upsert: true, ...opt },
+    );
+  } else {
+    await db.collection("productInventory").updateOne(
+      { productId: product.id },
+      {
+        $inc: { stockIn: qty, onHand: qty },
+        $set: { updatedAt: now },
+      },
+      { upsert: true, ...opt },
+    );
+  }
 }
 
 export async function issueStockInDb(
@@ -477,6 +512,8 @@ export async function issueStockInDb(
   const productDoc = await db.collection("products").findOne({ id: productId }, opt);
   const product = productDoc ? clean<Product>(productDoc) : null;
   if (!product) throw new Error("Product not found");
+  const { resolveProductType } = await import("./inventory.server");
+  const pType = resolveProductType(product);
   const available = product.stock ?? 0;
   if (available < qty) {
     throw new Error(`Insufficient stock. Available: ${available}, Requested: ${qty}.`);
@@ -490,11 +527,14 @@ export async function issueStockInDb(
     date: now,
     productId,
     productName: product.name,
+    productType: pType,
     type: "out",
     movementType: meta.refType === "sales" ? "SALE_ISSUE" : "ADJUSTMENT_OUT",
     direction: "out",
     quantity: qty,
+    previousBalance: available,
     balanceAfter: nextStock,
+    newBalance: nextStock,
     unitCost,
     totalCost: qty * unitCost,
     cogsAmount: qty * unitCost,
@@ -505,6 +545,36 @@ export async function issueStockInDb(
     by: meta.by,
   };
   await db.collection("stockMovements").insertOne(movement, opt);
+
+  // Update separated inventory collection
+  if (pType === "gas") {
+    await db.collection("gasInventory").updateOne(
+      { productId: product.id },
+      {
+        $inc: { stockOut: qty, onHand: -qty },
+        $set: { updatedAt: now },
+      },
+      { upsert: true, ...opt },
+    );
+  } else if (pType === "cylinder") {
+    await db.collection("cylinderInventory").updateOne(
+      { productId: product.id },
+      {
+        $inc: { stockOut: qty, onHand: -qty, available: -qty },
+        $set: { updatedAt: now },
+      },
+      { upsert: true, ...opt },
+    );
+  } else {
+    await db.collection("productInventory").updateOne(
+      { productId: product.id },
+      {
+        $inc: { stockOut: qty, onHand: -qty },
+        $set: { updatedAt: now },
+      },
+      { upsert: true, ...opt },
+    );
+  }
 }
 
 export { receivePurchaseInDb as executePurchaseReceive };

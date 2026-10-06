@@ -587,7 +587,7 @@ describe("Inventory, Costing, Stock Movements & Cylinder Tests", () => {
       uom: "cyl",
       price: 1400,
       cost: 1000,
-      stock: 50,
+      stock: 35,
       reorderLevel: 10,
       createdAt: "2026-01-01T00:00:00Z",
     };

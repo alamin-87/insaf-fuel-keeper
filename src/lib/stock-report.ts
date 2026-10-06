@@ -31,13 +31,15 @@ export function isMovementIn(m: StockMovement): boolean {
   if (m.direction === "in") return true;
   if (m.direction === "out") return false;
   // Supplier return means company stock is returned to supplier (outbound from company)
-  if (m.refType === "purchase" && (m.type === "return" || m.movementType === "RETURN")) {
+  if (m.refType === "purchase" && (m.type === "return" || m.movementType === "RETURN" || m.movementType === "PURCHASE_RETURN")) {
     return false;
   }
   if (m.movementType) {
     return (
       m.movementType === "RECEIPT" ||
+      m.movementType === "PURCHASE_RECEIVED" ||
       m.movementType === "RETURN" ||
+      m.movementType === "SALES_RETURN" ||
       m.movementType === "ADJUSTMENT_IN" ||
       m.movementType === "TRANSFER_IN"
     );
@@ -56,12 +58,13 @@ export function isMovementOut(m: StockMovement): boolean {
   if (m.direction === "out") return true;
   if (m.direction === "in") return false;
   // Supplier return means company stock is returned to supplier (outbound from company)
-  if (m.refType === "purchase" && (m.type === "return" || m.movementType === "RETURN")) {
+  if (m.refType === "purchase" && (m.type === "return" || m.movementType === "RETURN" || m.movementType === "PURCHASE_RETURN")) {
     return true;
   }
   if (m.movementType) {
     return (
       m.movementType === "SALE_ISSUE" ||
+      m.movementType === "PURCHASE_RETURN" ||
       m.movementType === "ADJUSTMENT_OUT" ||
       m.movementType === "DAMAGE" ||
       m.movementType === "LOSS" ||
