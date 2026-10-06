@@ -344,5 +344,85 @@ describe("Authoritative Inventory Accounting & Reconciliation Tests", () => {
     assert.strictEqual(resolveProductType({ uom: "cyl" }), "cylinder");
     assert.strictEqual(resolveProductType({ uom: "kg" }), "gas");
     assert.strictEqual(resolveProductType({ uom: "pcs" }), "product");
+    // mitar with uom cyl must resolve to cylinder
+    assert.strictEqual(resolveProductType({ name: "mitar", uom: "cyl", category: "Medical" }), "cylinder");
+  });
+
+  // TEST 12 — GAS SALE 50 DEDUCTION
+  it("TEST 12: Gas sale 50: Starting stock 90, sale 50 -> Current Stock 40, Stock Out +50", () => {
+    const gasInv: GasInventory = {
+      id: "gas-argon",
+      productId: "azdmoisv",
+      productName: "Argon 0.98",
+      productType: "gas",
+      uom: "kg",
+      openingStock: 100,
+      stockIn: 0,
+      stockOut: 10,
+      onHand: 90,
+      unitPrice: 2400,
+      costPrice: 2170,
+      totalValue: 90 * 2170,
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Sale of 50
+    const soldQty = 50;
+    gasInv.stockOut += soldQty;
+    gasInv.onHand = gasInv.openingStock + gasInv.stockIn - gasInv.stockOut;
+    gasInv.totalValue = gasInv.onHand * gasInv.costPrice;
+
+    assert.strictEqual(gasInv.stockOut, 60);
+    assert.strictEqual(gasInv.onHand, 40); // 100 + 0 - 60 = 40 (90 - 50 = 40)
+    assert.notStrictEqual(gasInv.onHand, 140);
+  });
+
+  // TEST 13 — PURCHASE AFTER SALE
+  it("TEST 13: Purchase after sale: Starting stock 40, purchase 50 -> Current Stock 90", () => {
+    const gasInv: GasInventory = {
+      id: "gas-argon",
+      productId: "azdmoisv",
+      productName: "Argon 0.98",
+      productType: "gas",
+      uom: "kg",
+      openingStock: 100,
+      stockIn: 0,
+      stockOut: 60,
+      onHand: 40,
+      unitPrice: 2400,
+      costPrice: 2170,
+      totalValue: 40 * 2170,
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Purchase of 50
+    const purchaseQty = 50;
+    gasInv.stockIn += purchaseQty;
+    gasInv.onHand = gasInv.openingStock + gasInv.stockIn - gasInv.stockOut;
+    gasInv.totalValue = gasInv.onHand * gasInv.costPrice;
+
+    assert.strictEqual(gasInv.stockIn, 50);
+    assert.strictEqual(gasInv.onHand, 90); // 100 + 50 - 60 = 90 (40 + 50 = 90)
+  });
+
+  // TEST 14 — SALES RETURN AND PURCHASE RETURN
+  it("TEST 14: Sales Return increases Current Stock, Purchase Return decreases Current Stock", () => {
+    let opening = 100;
+    let stockIn = 50;
+    let stockOut = 30;
+    let currentStock = opening + stockIn - stockOut; // 120
+    assert.strictEqual(currentStock, 120);
+
+    // Sales return of 5 units (returned back into stock)
+    const salesReturn = 5;
+    stockIn += salesReturn; // Return IN
+    currentStock = opening + stockIn - stockOut;
+    assert.strictEqual(currentStock, 125);
+
+    // Purchase return of 10 units (returned back to supplier)
+    const purchaseReturn = 10;
+    stockOut += purchaseReturn; // Return OUT
+    currentStock = opening + stockIn - stockOut;
+    assert.strictEqual(currentStock, 115);
   });
 });

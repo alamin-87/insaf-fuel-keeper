@@ -23,15 +23,15 @@ export function resolveProductType(
   p: Pick<Product, "productType" | "uom" | "category" | "name"> | null | undefined,
 ): ProductType {
   if (!p) return "gas";
+  const uom = String(p.uom || "").toLowerCase();
+  if (uom === "cyl") return "cylinder";
+  if (uom === "pcs") return "product";
   if (p.productType === "cylinder" || p.productType === "gas" || p.productType === "product") {
     return p.productType;
   }
-  const uom = String(p.uom || "").toLowerCase();
-  if (uom === "pcs") return "product";
-  if (uom === "cyl") return "cylinder";
   if (uom === "kg" || uom === "ltr") return "gas";
   const cat = String(p.category || "").toLowerCase();
-  if (cat.includes("cylinder")) return "cylinder";
+  if (cat.includes("cylinder") || cat === "cylinder") return "cylinder";
   return "gas";
 }
 
@@ -259,6 +259,16 @@ export async function reconcileDatabaseInventory(db: any, session?: any): Promis
       );
     }
   }
+
+  const gasProductIds = gasList.map((g) => g.productId);
+  const cylProductIds = cylinderList.map((c) => c.productId);
+  const prodProductIds = productList.map((p) => p.productId);
+
+  await Promise.all([
+    db.collection("gasInventory").deleteMany({ productId: { $nin: gasProductIds } }, opt),
+    db.collection("cylinderInventory").deleteMany({ productId: { $nin: cylProductIds } }, opt),
+    db.collection("productInventory").deleteMany({ productId: { $nin: prodProductIds } }, opt),
+  ]);
 
   const totals = {
     gasOnHand: gasList.reduce((sum, g) => sum + g.onHand, 0),

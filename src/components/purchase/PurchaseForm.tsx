@@ -33,13 +33,17 @@ import {
 import { useT } from "@/i18n";
 
 function getProductType(p: { productType?: string; category?: string; uom?: string }): "gas" | "cylinder" | "product" {
+  const uom = String(p.uom || "").toLowerCase();
+  if (uom === "cyl") return "cylinder";
+  if (uom === "pcs") return "product";
   if (p.productType === "gas" || p.productType === "cylinder" || p.productType === "product") {
     return p.productType;
   }
+  if (uom === "kg" || uom === "ltr") return "gas";
   if (p.category === "LPG" || p.category === "Industrial" || p.category === "Medical") {
     return "cylinder";
   }
-  return "product";
+  return "gas";
 }
 
 export function PurchaseForm({ id }: { id?: string }) {
