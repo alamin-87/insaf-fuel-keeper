@@ -57,18 +57,32 @@ export function PurchaseForm({ id }: { id?: string }) {
   const [hydrated, setHydrated] = useState(!editing);
 
   useEffect(() => {
-    if (!existing) return;
+    if (!existing) {
+      if (products.length > 0 && items.length === 0) {
+        const p = products[0];
+        setItems([
+          {
+            productId: p.id,
+            productName: p.name,
+            quantity: 1,
+            price: p.cost ?? p.price,
+            taxRate: 0,
+          },
+        ]);
+      }
+      return;
+    }
     setSupplierId(existing.supplierId);
     setNotes(existing.notes ?? "");
     setItems(existing.items.map((it) => ({ ...it })));
     setHydrated(true);
-  }, [existing]);
+  }, [existing, products]);
 
   const addItem = () => {
     const p = products[0];
     if (!p) return;
-    setItems([
-      ...items,
+    setItems((prev) => [
+      ...prev,
       {
         productId: p.id,
         productName: p.name,
@@ -179,7 +193,7 @@ export function PurchaseForm({ id }: { id?: string }) {
           <div>
             <div className="mb-2 flex items-center justify-between">
               <h3 className="text-sm font-semibold">{t("sales.item")}</h3>
-              <Button size="sm" variant="outline" onClick={addItem}>
+              <Button type="button" size="sm" variant="outline" onClick={addItem}>
                 <Plus className="mr-1 h-3 w-3" /> {t("common.addItem")}
               </Button>
             </div>

@@ -35,7 +35,13 @@ import { useT, type MessageKey } from "@/i18n";
 
 export function AppSidebar() {
   const t = useT();
-  const pathname = useRouterState({ select: (r) => r.location.pathname });
+  const { pathname, search } = useRouterState({
+    select: (r) => ({
+      pathname: r.location.pathname,
+      search: (r.location.search as Record<string, string>) || {},
+    }),
+  });
+  const searchTab = search.tab;
   const { canAccessUrl } = useModuleAccess();
   const isActive = (url: string) => {
     if (url === "/") return pathname === "/";
@@ -50,6 +56,7 @@ export function AppSidebar() {
       );
     }
     if (url === "/products/categories") return pathname.startsWith("/products/categories");
+    if (url === "/inventory") return pathname.startsWith("/inventory");
     return pathname.startsWith(url);
   };
 
@@ -143,6 +150,54 @@ export function AppSidebar() {
                           >
                             <Link to="/products/categories">
                               <span>{t("nav.categories")}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      </SidebarMenuSub>
+                    )}
+                    {item.url === "/inventory" && (
+                      <SidebarMenuSub>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={pathname === "/inventory" && (searchTab === "gas" || !searchTab)}
+                            size="sm"
+                          >
+                            <Link to="/inventory" search={{ tab: "gas" }}>
+                              <span>{t("nav.gasInventory")}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={pathname === "/inventory" && searchTab === "cylinder"}
+                            size="sm"
+                          >
+                            <Link to="/inventory" search={{ tab: "cylinder" }}>
+                              <span>{t("nav.cylinderInventory")}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={pathname === "/inventory" && searchTab === "product"}
+                            size="sm"
+                          >
+                            <Link to="/inventory" search={{ tab: "product" }}>
+                              <span>{t("nav.productInventory")}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={pathname === "/inventory" && searchTab === "summary"}
+                            size="sm"
+                          >
+                            <Link to="/inventory" search={{ tab: "summary" }}>
+                              <span>{t("nav.inventorySummary")}</span>
                             </Link>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>

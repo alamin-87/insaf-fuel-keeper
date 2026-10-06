@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Cylinder, Package, RefreshCw, ShoppingCart, Truck, Warehouse } from "lucide-react";
+import { Cylinder, Package, RefreshCw, ShoppingCart, Truck, Warehouse, Flame } from "lucide-react";
 import { productService } from "@/services/product.service";
 import { inventoryService } from "@/services/inventory.service";
 import { cylinderService } from "@/services/cylinder.service";
@@ -30,7 +30,7 @@ import { buildProductInventory, sumInventory } from "@/lib/cylinder-inventory";
 import { buildStockReport, isMovementIn, isMovementOut } from "@/lib/stock-report";
 import { EMPTY_DATE_RANGE } from "@/lib/date-range";
 import { partyCylinderBalance } from "@/lib/customer-cylinders";
-import type { StockMovement, UnitOfMeasure } from "@/types";
+import type { CylinderInventory, GasInventory, ProductInventory, StockMovement, UnitOfMeasure } from "@/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -88,6 +88,37 @@ export function InventoryPage() {
   const t = useT();
   const qc = useQueryClient();
   const navigate = useNavigate();
+
+  const { tab: currentSearchTab = "gas" } = useRouterState({
+    select: (r) => (r.location.search as { tab?: string }) || {},
+  });
+  const activeTab = currentSearchTab || "gas";
+
+  const { data: gasInventory = [] } = useQuery({
+    queryKey: ["gasInventory"],
+    queryFn: inventoryService.getGasInventory,
+  });
+  const { data: cylinderInventory = [] } = useQuery({
+    queryKey: ["cylinderInventory"],
+    queryFn: inventoryService.getCylinderInventory,
+  });
+  const { data: productInventory = [] } = useQuery({
+    queryKey: ["productInventory"],
+    queryFn: inventoryService.getProductInventory,
+  });
+
+  const gasRows = useMemo(
+    () => gasInventory.map((r, i) => ({ ...r, sl: i + 1 })),
+    [gasInventory],
+  );
+  const cylinderRows = useMemo(
+    () => cylinderInventory.map((r, i) => ({ ...r, sl: i + 1 })),
+    [cylinderInventory],
+  );
+  const productRows = useMemo(
+    () => productInventory.map((r, i) => ({ ...r, sl: i + 1 })),
+    [productInventory],
+  );
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
     queryFn: productService.list,
@@ -128,6 +159,7 @@ export function InventoryPage() {
   );
 
   const totals = useMemo(() => sumInventory(rows), [rows]);
+
   const summaryCards = useMemo(() => {
     let delivery = 0;
     let returned = 0;
@@ -162,6 +194,7 @@ export function InventoryPage() {
       available: cylinderAvailable,
     };
   }, [customers, cylinders, cylMoves, movements, products, rows]);
+
   const activity = useMemo(
     () =>
       movements
@@ -202,49 +235,13 @@ export function InventoryPage() {
   const [penalty, setPenalty] = useState("0");
   const [treatment, setTreatment] = useState<"charge" | "writeoff" | "none">("none");
   const [lotNumber, setLotNumber] = useState("");
-  const [focus, setFocus] = useState<
-    "all" | "full" | "empty" | "refill" | "reserved" | "available"
-  >("all");
   const [adjustOpen, setAdjustOpen] = useState(false);
 
-  const filteredRows = useMemo(() => {
-    if (focus === "empty") return rows.filter((r) => r.empty > 0);
-    if (focus === "refill") return rows.filter((r) => r.refillPending > 0);
-    if (focus === "reserved") return rows.filter((r) => r.reserved > 0);
-    if (focus === "available") return rows.filter((r) => r.available > 0);
-    if (focus === "full") return rows.filter((r) => r.full > 0);
-    return rows;
-  }, [rows, focus]);
-
-  const stockByProduct = useMemo(() => {
-    const report = buildStockReport(products, movements, EMPTY_DATE_RANGE);
-    return new Map(report.map((r) => [r.id, r]));
-  }, [products, movements]);
-
-  const tableRows = useMemo(
-    () =>
-      filteredRows.map((row) => {
-        const p = products.find((x) => x.id === row.productId);
-        const pMoves = movements.filter((m) => m.productId === row.productId);
-        const stockIn = pMoves.filter(isMovementIn).reduce((sum, m) => sum + (m.quantity || 0), 0);
-        const stockOut = pMoves.filter(isMovementOut).reduce((sum, m) => sum + (m.quantity || 0), 0);
-        const onHand = stockIn - stockOut;
-        const sr = stockByProduct.get(row.productId);
-        const unitCost = sr?.unitCost ?? p?.cost ?? 0;
-        return {
-          ...row,
-          stockIn,
-          stockOut,
-          onHand,
-          unit: inventoryUnitLabel(p?.uom, t),
-          unitCost,
-          totalValue: onHand * unitCost,
-        };
-      }),
-    [filteredRows, products, movements, stockByProduct, t],
-  );
-
   const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["gasInventory"] });
+    qc.invalidateQueries({ queryKey: ["cylinderInventory"] });
+    qc.invalidateQueries({ queryKey: ["productInventory"] });
+    qc.invalidateQueries({ queryKey: ["inventorySummary"] });
     qc.invalidateQueries({ queryKey: ["products"] });
     qc.invalidateQueries({ queryKey: ["stockMovements"] });
     qc.invalidateQueries({ queryKey: ["dashboard"] });
@@ -375,14 +372,27 @@ export function InventoryPage() {
       navigate({ to: "/deliveries/$id", params: { id: row.refId } });
     else if (row.refType === "purchase" && row.refId)
       navigate({ to: "/purchases/$id", params: { id: row.refId } });
-    else setFocus("all");
+  };
+
+  const getPageTitle = () => {
+    if (activeTab === "gas") return t("inventory.gasTitle");
+    if (activeTab === "cylinder") return t("inventory.cylTitle");
+    if (activeTab === "product") return t("inventory.prodTitle");
+    return t("inventory.summaryTitle");
+  };
+
+  const getPageDesc = () => {
+    if (activeTab === "gas") return t("inventory.gasDesc");
+    if (activeTab === "cylinder") return t("inventory.cylDesc");
+    if (activeTab === "product") return t("inventory.prodDesc");
+    return t("inventory.summaryDesc");
   };
 
   return (
     <div className="space-y-4">
       <PageHeader
-        title={t("inventory.title")}
-        description={t("inventory.desc")}
+        title={getPageTitle()}
+        description={getPageDesc()}
         actions={
           <Button type="button" onClick={() => setAdjustOpen(true)}>
             {t("inventory.adjust")}
@@ -390,87 +400,151 @@ export function InventoryPage() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-6">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button type="button" className="text-left">
-              <StatCard
-                title={t("inventory.cardReceivedCyl")}
-                value={String(summaryCards.received)}
-                icon={Warehouse}
-              />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuItem onSelect={() => navigate({ to: "/purchases/new" })}>
-              {t("inventory.purchaseBillCreate")}
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => navigate({ to: "/purchases" })}>
-              {t("inventory.receiveNoteCreate")}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button type="button" className="text-left">
-              <StatCard
-                title={t("inventory.cardDelivery")}
-                value={String(summaryCards.delivery)}
-                icon={Cylinder}
-                tone="positive"
-              />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuItem onSelect={() => navigate({ to: "/purchases/new" })}>
-              {t("inventory.purchaseBillCreate")}
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => navigate({ to: "/purchases" })}>
-              {t("inventory.receiveNoteCreate")}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button type="button" className="text-left">
-              <StatCard
-                title={t("inventory.cardReturn")}
-                value={String(summaryCards.returned)}
-                icon={RefreshCw}
-                tone="warning"
-              />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuItem onSelect={() => navigate({ to: "/purchases/new" })}>
-              {t("inventory.purchaseBillCreate")}
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => navigate({ to: "/purchases" })}>
-              {t("inventory.receiveNoteCreate")}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <button type="button" className="text-left" onClick={() => navigate({ to: "/sales" })}>
-          <StatCard title={t("inventory.reserved")} value={String(totals.reserved)} icon={Truck} />
-        </button>
-        <button type="button" className="text-left" onClick={() => navigate({ to: "/cylinders" })}>
-          <StatCard
-            title={t("inventory.cardCylinder")}
-            value={String(summaryCards.cylinder)}
-            icon={Package}
-            tone="info"
-          />
-        </button>
-        <button type="button" className="text-left" onClick={() => navigate({ to: "/products" })}>
-          <StatCard
-            title={t("inventory.available")}
-            value={String(totals.available)}
-            icon={ShoppingCart}
-            tone="positive"
-          />
-        </button>
+      {/* Navigation Sub-Tabs */}
+      <div className="flex flex-wrap gap-2 border-b border-border pb-3">
+        <Button
+          type="button"
+          variant={activeTab === "gas" ? "default" : "outline"}
+          size="sm"
+          onClick={() => navigate({ to: "/inventory", search: { tab: "gas" } })}
+        >
+          <Flame className="mr-1.5 h-3.5 w-3.5" />
+          {t("nav.gasInventory")}
+        </Button>
+        <Button
+          type="button"
+          variant={activeTab === "cylinder" ? "default" : "outline"}
+          size="sm"
+          onClick={() => navigate({ to: "/inventory", search: { tab: "cylinder" } })}
+        >
+          <Cylinder className="mr-1.5 h-3.5 w-3.5" />
+          {t("nav.cylinderInventory")}
+        </Button>
+        <Button
+          type="button"
+          variant={activeTab === "product" ? "default" : "outline"}
+          size="sm"
+          onClick={() => navigate({ to: "/inventory", search: { tab: "product" } })}
+        >
+          <Package className="mr-1.5 h-3.5 w-3.5" />
+          {t("nav.productInventory")}
+        </Button>
+        <Button
+          type="button"
+          variant={activeTab === "summary" ? "default" : "outline"}
+          size="sm"
+          onClick={() => navigate({ to: "/inventory", search: { tab: "summary" } })}
+        >
+          <Warehouse className="mr-1.5 h-3.5 w-3.5" />
+          {t("nav.inventorySummary")}
+        </Button>
       </div>
 
+      {/* Note Banner */}
+      {activeTab === "gas" && (
+        <div className="rounded-md bg-muted/50 border px-3.5 py-2 text-xs text-muted-foreground flex items-center gap-1.5">
+          <span className="font-semibold text-foreground">💡 Note:</span>
+          <span>{t("inventory.gasNote")}</span>
+        </div>
+      )}
+      {activeTab === "cylinder" && (
+        <div className="rounded-md bg-muted/50 border px-3.5 py-2 text-xs text-muted-foreground flex items-center gap-1.5">
+          <span className="font-semibold text-foreground">💡 Note:</span>
+          <span>{t("inventory.cylNote")}</span>
+        </div>
+      )}
+      {activeTab === "product" && (
+        <div className="rounded-md bg-muted/50 border px-3.5 py-2 text-xs text-muted-foreground flex items-center gap-1.5">
+          <span className="font-semibold text-foreground">💡 Note:</span>
+          <span>{t("inventory.prodNote")}</span>
+        </div>
+      )}
+
+      {/* Summary Cards View */}
+      {activeTab === "summary" && (
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-6">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className="text-left">
+                <StatCard
+                  title={t("inventory.cardReceivedCyl")}
+                  value={String(summaryCards.received)}
+                  icon={Warehouse}
+                />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onSelect={() => navigate({ to: "/purchases/new" })}>
+                {t("inventory.purchaseBillCreate")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => navigate({ to: "/purchases" })}>
+                {t("inventory.receiveNoteCreate")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className="text-left">
+                <StatCard
+                  title={t("inventory.cardDelivery")}
+                  value={String(summaryCards.delivery)}
+                  icon={Cylinder}
+                  tone="positive"
+                />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onSelect={() => navigate({ to: "/purchases/new" })}>
+                {t("inventory.purchaseBillCreate")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => navigate({ to: "/purchases" })}>
+                {t("inventory.receiveNoteCreate")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className="text-left">
+                <StatCard
+                  title={t("inventory.cardReturn")}
+                  value={String(summaryCards.returned)}
+                  icon={RefreshCw}
+                  tone="warning"
+                />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onSelect={() => navigate({ to: "/purchases/new" })}>
+                {t("inventory.purchaseBillCreate")}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => navigate({ to: "/purchases" })}>
+                {t("inventory.receiveNoteCreate")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <button type="button" className="text-left" onClick={() => navigate({ to: "/sales" })}>
+            <StatCard title={t("inventory.reserved")} value={String(totals.reserved)} icon={Truck} />
+          </button>
+          <button type="button" className="text-left" onClick={() => navigate({ to: "/cylinders" })}>
+            <StatCard
+              title={t("inventory.cardCylinder")}
+              value={String(summaryCards.cylinder)}
+              icon={Package}
+              tone="info"
+            />
+          </button>
+          <button type="button" className="text-left" onClick={() => navigate({ to: "/products" })}>
+            <StatCard
+              title={t("inventory.available")}
+              value={String(totals.available)}
+              icon={ShoppingCart}
+              tone="positive"
+            />
+          </button>
+        </div>
+      )}
+
+      {/* Adjust Stock Dialog */}
       <Dialog
         open={adjustOpen}
         onOpenChange={(open) => {
@@ -503,19 +577,11 @@ export function InventoryPage() {
                     })}
                 </SelectContent>
               </Select>
-              {productId && (
-                <p className="text-xs text-muted-foreground">
-                  {t("inventory.fullAvail")}:{" "}
-                  {rows.find((r) => r.productId === productId)?.full ??
-                    products.find((p) => p.id === productId)?.stock ??
-                    0}
-                </p>
-              )}
             </div>
             <div className="space-y-1.5">
-              <Label>{t("common.type")}</Label>
+              <Label>{t("inventory.txn")}</Label>
               <Select value={type} onValueChange={(v) => setType(v as typeof type)}>
-                <SelectTrigger data-testid="adjust-type">
+                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -523,73 +589,35 @@ export function InventoryPage() {
                   <SelectItem value="out">{t("inventory.stockOut")}</SelectItem>
                   <SelectItem value="adjust">{t("inventory.setAbsolute")}</SelectItem>
                   <SelectItem value="refill">{t("inventory.refillComplete")}</SelectItem>
-                  <SelectItem value="customer_sent">{t("inventory.customerSent")}</SelectItem>
-                  <SelectItem value="exchange">{t("inventory.exchange")}</SelectItem>
-                  <SelectItem value="return_empty">{t("inventory.customerReturned")}</SelectItem>
-                  <SelectItem value="send_supplier">{t("inventory.supplierSent")}</SelectItem>
-                  <SelectItem value="receive_supplier">
-                    {t("inventory.supplierReturned")}
-                  </SelectItem>
-                  <SelectItem value="loan">{t("inventory.loan")}</SelectItem>
+                  <SelectItem value="customer_sent">{t("inventory.sendCustomer")}</SelectItem>
+                  <SelectItem value="exchange">{t("inventory.exchangeCustomer")}</SelectItem>
+                  <SelectItem value="return_empty">{t("inventory.emptyReturn")}</SelectItem>
+                  <SelectItem value="loan">{t("inventory.loanCustomer")}</SelectItem>
                   <SelectItem value="sell_cylinder">{t("inventory.sellCylinder")}</SelectItem>
-                  <SelectItem value="mark_lost">{t("inventory.markLost")}</SelectItem>
-                  <SelectItem value="mark_damaged">{t("inventory.markDamaged")}</SelectItem>
-                  <SelectItem value="repair">{t("inventory.repair")}</SelectItem>
-                  <SelectItem value="scrap">{t("inventory.scrap")}</SelectItem>
-                  <SelectItem value="writeoff">{t("inventory.writeoff")}</SelectItem>
+                  <SelectItem value="send_supplier">{t("inventory.sendSupplier")}</SelectItem>
+                  <SelectItem value="receive_supplier">
+                    {t("inventory.receiveSupplier")}
+                  </SelectItem>
+                  <SelectItem value="mark_lost">{t("status.lost")}</SelectItem>
+                  <SelectItem value="mark_damaged">{t("status.damaged")}</SelectItem>
+                  <SelectItem value="repair">{t("inventory.repairDamage")}</SelectItem>
+                  <SelectItem value="scrap">{t("inventory.scrapDamage")}</SelectItem>
+                  <SelectItem value="writeoff">{t("inventory.writeoffDamage")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            {(type === "send_supplier" ||
-              type === "receive_supplier" ||
-              (type === "mark_lost" && partyKind === "supplier")) && (
-              <div className="space-y-1.5">
-                <Label>{t("common.supplier")}</Label>
-                <Select value={supplierId || undefined} onValueChange={setSupplierId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("common.select")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {suppliers.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            {type === "mark_lost" && (
-              <div className="space-y-1.5">
-                <Label>{t("inventory.partyKind")}</Label>
-                <Select
-                  value={partyKind}
-                  onValueChange={(v) => setPartyKind(v as typeof partyKind)}
-                >
-                  <SelectTrigger data-testid="lost-party-kind">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="customer">{t("common.customer")}</SelectItem>
-                    <SelectItem value="supplier">{t("common.supplier")}</SelectItem>
-                    <SelectItem value="warehouse">{t("dash.cylAtWarehouse")}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            {(type === "return_empty" ||
+            {(type === "customer_sent" ||
+              type === "return_empty" ||
               type === "loan" ||
               type === "sell_cylinder" ||
-              type === "customer_sent" ||
-              type === "exchange" ||
-              (type === "mark_lost" && partyKind === "customer")) && (
+              type === "exchange") && (
               <div className="space-y-1.5">
                 <Label>{t("common.customer")}</Label>
                 <Select value={customerId || undefined} onValueChange={setCustomerId}>
                   <SelectTrigger>
                     <SelectValue placeholder={t("common.select")} />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-60">
                     {customers.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         {c.name}
@@ -599,65 +627,132 @@ export function InventoryPage() {
                 </Select>
               </div>
             )}
-            {(type === "send_supplier" ||
-              type === "loan" ||
-              type === "customer_sent" ||
-              type === "exchange" ||
-              type === "mark_lost") && (
-              <>
+            {(type === "send_supplier" || type === "receive_supplier") && (
+              <div className="space-y-1.5">
+                <Label>{t("common.supplier")}</Label>
+                <Select value={supplierId || undefined} onValueChange={setSupplierId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("common.select")} />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {suppliers.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {(type === "customer_sent" || type === "send_supplier" || type === "loan") && (
+              <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1.5">
-                  <Label>{t("common.date")}</Label>
+                  <Label>{t("inventory.sendDate")}</Label>
                   <Input
                     type="date"
                     value={sendDate}
                     onChange={(e) => setSendDate(e.target.value)}
                   />
                 </div>
-                {(type === "send_supplier" ||
-                  type === "loan" ||
-                  type === "customer_sent" ||
-                  type === "exchange") && (
-                  <div className="space-y-1.5">
-                    <Label>{t("inventory.expectedReturn")}</Label>
-                    <Input
-                      type="date"
-                      value={expectedReturn}
-                      onChange={(e) => setExpectedReturn(e.target.value)}
-                    />
-                  </div>
-                )}
-              </>
+                <div className="space-y-1.5">
+                  <Label>{t("inventory.expectedReturn")}</Label>
+                  <Input
+                    type="date"
+                    value={expectedReturn}
+                    onChange={(e) => setExpectedReturn(e.target.value)}
+                  />
+                </div>
+              </div>
             )}
             {type === "mark_lost" && (
               <>
                 <div className="space-y-1.5">
-                  <Label>{t("inventory.reason")}</Label>
-                  <Input value={reason} onChange={(e) => setReason(e.target.value)} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>{t("inventory.penalty")}</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={penalty}
-                    onChange={(e) => setPenalty(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>{t("inventory.accounting")}</Label>
+                  <Label>{t("inventory.lostPartyType")}</Label>
                   <Select
-                    value={treatment}
-                    onValueChange={(v) => setTreatment(v as typeof treatment)}
+                    value={partyKind}
+                    onValueChange={(v) => {
+                      setPartyKind(v as typeof partyKind);
+                      setCustomerId("");
+                      setSupplierId("");
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">{t("inventory.acct.none")}</SelectItem>
-                      <SelectItem value="charge">{t("inventory.acct.charge")}</SelectItem>
-                      <SelectItem value="writeoff">{t("inventory.acct.writeoff")}</SelectItem>
+                      <SelectItem value="customer">{t("common.customer")}</SelectItem>
+                      <SelectItem value="supplier">{t("common.supplier")}</SelectItem>
+                      <SelectItem value="warehouse">{t("inventory.partyWarehouse")}</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+                {partyKind === "customer" && (
+                  <div className="space-y-1.5">
+                    <Label>{t("common.customer")}</Label>
+                    <Select value={customerId || undefined} onValueChange={setCustomerId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={t("common.select")} />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60">
+                        {customers.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {partyKind === "supplier" && (
+                  <div className="space-y-1.5">
+                    <Label>{t("common.supplier")}</Label>
+                    <Select value={supplierId || undefined} onValueChange={setSupplierId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={t("common.select")} />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60">
+                        {suppliers.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <div className="space-y-1.5">
+                  <Label>{t("inventory.lostReason")}</Label>
+                  <Input
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="E.g. Not returned / cylinder missing"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5">
+                    <Label>{t("inventory.penaltyAmount")}</Label>
+                    <Input
+                      type="number"
+                      value={penalty}
+                      onChange={(e) => setPenalty(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>{t("inventory.accountingTreatment")}</Label>
+                    <Select
+                      value={treatment}
+                      onValueChange={(v) => setTreatment(v as typeof treatment)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="charge">{t("inventory.treatmentCharge")}</SelectItem>
+                        <SelectItem value="writeoff">{t("inventory.treatmentWriteoff")}</SelectItem>
+                        <SelectItem value="none">{t("inventory.treatmentNone")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </>
             )}
@@ -734,146 +829,315 @@ export function InventoryPage() {
         </DialogContent>
       </Dialog>
 
-      <DataTable
-        rows={tableRows}
-        searchKeys={["name", "category"]}
-        columns={[
-          {
-            key: "sl",
-            header: t("inventory.sl"),
-            render: (r) => String(r.sl).padStart(2, "0"),
-            className: "w-12 whitespace-nowrap",
-          },
-          {
-            key: "name",
-            header: t("inventory.productName"),
-            sortable: true,
-            sortValue: (r) => r.name,
-            render: (r) => (
-              <span className="whitespace-normal break-words font-medium">{r.name}</span>
-            ),
-            className: "min-w-[10rem] max-w-[18rem]",
-          },
-          {
-            key: "stockIn",
-            header: t("inventory.stockIn"),
-            sortable: true,
-            sortValue: (r) => r.stockIn,
-            render: (r) => r.stockIn,
-            className: "min-w-[6rem] whitespace-nowrap text-right tabular-nums",
-          },
-          {
-            key: "stockOut",
-            header: t("inventory.stockOut"),
-            sortable: true,
-            sortValue: (r) => r.stockOut,
-            render: (r) => r.stockOut,
-            className: "min-w-[6.5rem] whitespace-nowrap text-right tabular-nums",
-          },
-          {
-            key: "onHand",
-            header: t("inventory.onHand"),
-            sortable: true,
-            sortValue: (r) => r.onHand,
-            render: (r) => <span className="font-semibold">{r.onHand}</span>,
-            className: "min-w-[6rem] whitespace-nowrap text-right tabular-nums",
-          },
-          {
-            key: "unit",
-            header: t("products.uom"),
-            sortable: true,
-            sortValue: (r) => r.unit,
-            render: (r) => r.unit,
-            className: "min-w-[6rem] whitespace-nowrap",
-          },
-          {
-            key: "unitCost",
-            header: t("inventory.unitPriceCost"),
-            sortable: true,
-            sortValue: (r) => r.unitCost,
-            render: (r) => formatCurrency(r.unitCost),
-            className: "min-w-[10rem] whitespace-nowrap text-right tabular-nums",
-          },
-          {
-            key: "totalValue",
-            header: t("inventory.totalValue"),
-            sortable: true,
-            sortValue: (r) => r.totalValue,
-            render: (r) => formatCurrency(r.totalValue),
-            className: "min-w-[8rem] whitespace-nowrap text-right tabular-nums",
-          },
-        ]}
-      />
-
-      <div>
-        <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          {t("inventory.recent")}
-        </h3>
-        <DataTable<ActivityRow>
-          rows={activity}
-          searchKeys={["productName", "notes", "by"]}
-          dateKey="date"
-          onRowClick={openActivity}
+      {/* GAS INVENTORY TABLE */}
+      {activeTab === "gas" && (
+        <DataTable<GasInventory & { sl: number }>
+          rows={gasRows}
+          searchKeys={["productName"]}
           columns={[
             {
-              key: "date",
-              header: t("inventory.when"),
-              sortable: true,
-              sortValue: (r) => r.date,
-              render: (r) => formatDateTime(r.date),
+              key: "sl",
+              header: t("inventory.sl"),
+              render: (r) => String(r.sl).padStart(2, "0"),
+              className: "w-12 whitespace-nowrap",
             },
             {
-              key: "ref",
-              header: t("inventory.ref"),
-              render: (r) => <span className="font-mono text-xs">{r.refId || r.id}</span>,
-            },
-            {
-              key: "txn",
-              header: t("inventory.txn"),
-              render: (r) => (
-                <Badge variant="outline">{t(`inventory.txn.${r.txn}` as MessageKey)}</Badge>
-              ),
-            },
-            {
-              key: "product",
-              header: t("common.product"),
+              key: "productName",
+              header: t("inventory.gasName"),
               sortable: true,
               sortValue: (r) => r.productName,
-              render: (r) => r.productName,
+              render: (r) => (
+                <span className="whitespace-normal break-words font-medium">{r.productName}</span>
+              ),
+              className: "min-w-[12rem] max-w-[20rem]",
             },
             {
-              key: "fin",
-              header: t("inventory.fullIn"),
-              render: (r) => r.fullIn || "—",
-              className: "text-right tabular-nums",
+              key: "uom",
+              header: t("inventory.unit"),
+              render: (r) => inventoryUnitLabel(r.uom, t),
+              className: "w-20 whitespace-nowrap",
             },
             {
-              key: "fout",
-              header: t("inventory.fullOut"),
-              render: (r) => r.fullOut || "—",
-              className: "text-right tabular-nums",
+              key: "stockIn",
+              header: t("inventory.stockIn"),
+              sortable: true,
+              sortValue: (r) => r.stockIn,
+              render: (r) => r.stockIn,
+              className: "min-w-[6rem] whitespace-nowrap text-right tabular-nums",
             },
             {
-              key: "ein",
-              header: t("inventory.emptyIn"),
-              render: (r) => r.emptyIn || "—",
-              className: "text-right tabular-nums",
+              key: "stockOut",
+              header: t("inventory.stockOut"),
+              sortable: true,
+              sortValue: (r) => r.stockOut,
+              render: (r) => r.stockOut,
+              className: "min-w-[6.5rem] whitespace-nowrap text-right tabular-nums",
             },
             {
-              key: "refill",
-              header: t("inventory.refill"),
-              render: (r) => r.refill || "—",
-              className: "text-right tabular-nums",
+              key: "onHand",
+              header: t("inventory.onHand"),
+              sortable: true,
+              sortValue: (r) => r.onHand,
+              render: (r) => <span className="font-semibold">{r.onHand}</span>,
+              className: "min-w-[6.5rem] whitespace-nowrap text-right tabular-nums",
             },
-            { key: "by", header: t("inventory.receivedBy"), render: (r) => r.by || "—" },
             {
-              key: "st",
-              header: t("common.status"),
-              render: (r) => <Badge variant="secondary">{r.type}</Badge>,
+              key: "costPrice",
+              header: t("inventory.unitPriceCost"),
+              sortable: true,
+              sortValue: (r) => r.costPrice,
+              render: (r) => formatCurrency(r.costPrice),
+              className: "min-w-[9rem] whitespace-nowrap text-right tabular-nums",
+            },
+            {
+              key: "totalValue",
+              header: t("inventory.totalValue"),
+              sortable: true,
+              sortValue: (r) => r.totalValue,
+              render: (r) => formatCurrency(r.totalValue),
+              className: "min-w-[9rem] whitespace-nowrap text-right tabular-nums font-medium",
             },
           ]}
         />
-      </div>
+      )}
+
+      {/* CYLINDER INVENTORY TABLE */}
+      {activeTab === "cylinder" && (
+        <DataTable<CylinderInventory & { sl: number }>
+          rows={cylinderRows}
+          searchKeys={["productName"]}
+          columns={[
+            {
+              key: "sl",
+              header: t("inventory.sl"),
+              render: (r) => String(r.sl).padStart(2, "0"),
+              className: "w-12 whitespace-nowrap",
+            },
+            {
+              key: "productName",
+              header: t("inventory.cylName"),
+              sortable: true,
+              sortValue: (r) => r.productName,
+              render: (r) => (
+                <span className="whitespace-normal break-words font-medium">{r.productName}</span>
+              ),
+              className: "min-w-[12rem] max-w-[20rem]",
+            },
+            {
+              key: "uom",
+              header: t("inventory.unit"),
+              render: (r) => inventoryUnitLabel(r.uom, t),
+              className: "w-20 whitespace-nowrap",
+            },
+            {
+              key: "stockIn",
+              header: t("inventory.stockIn"),
+              sortable: true,
+              sortValue: (r) => r.stockIn,
+              render: (r) => r.stockIn,
+              className: "min-w-[6rem] whitespace-nowrap text-right tabular-nums",
+            },
+            {
+              key: "stockOut",
+              header: t("inventory.stockOut"),
+              sortable: true,
+              sortValue: (r) => r.stockOut,
+              render: (r) => r.stockOut,
+              className: "min-w-[6.5rem] whitespace-nowrap text-right tabular-nums",
+            },
+            {
+              key: "onHand",
+              header: t("inventory.onHand"),
+              sortable: true,
+              sortValue: (r) => r.onHand,
+              render: (r) => <span className="font-semibold">{r.onHand}</span>,
+              className: "min-w-[6.5rem] whitespace-nowrap text-right tabular-nums",
+            },
+            {
+              key: "reserved",
+              header: t("inventory.reserved"),
+              sortable: true,
+              sortValue: (r) => r.reserved,
+              render: (r) => (r.reserved > 0 ? <Badge variant="secondary">{r.reserved}</Badge> : 0),
+              className: "min-w-[6rem] whitespace-nowrap text-right tabular-nums",
+            },
+            {
+              key: "available",
+              header: t("inventory.available"),
+              sortable: true,
+              sortValue: (r) => r.available,
+              render: (r) => (
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                  {r.available}
+                </span>
+              ),
+              className: "min-w-[6.5rem] whitespace-nowrap text-right tabular-nums font-medium",
+            },
+            {
+              key: "costPrice",
+              header: t("inventory.unitPriceCost"),
+              sortable: true,
+              sortValue: (r) => r.costPrice,
+              render: (r) => formatCurrency(r.costPrice),
+              className: "min-w-[9rem] whitespace-nowrap text-right tabular-nums",
+            },
+            {
+              key: "totalValue",
+              header: t("inventory.totalValue"),
+              sortable: true,
+              sortValue: (r) => r.totalValue,
+              render: (r) => formatCurrency(r.totalValue),
+              className: "min-w-[9rem] whitespace-nowrap text-right tabular-nums font-medium",
+            },
+          ]}
+        />
+      )}
+
+      {/* GENERAL PRODUCT INVENTORY TABLE */}
+      {activeTab === "product" && (
+        <DataTable<ProductInventory & { sl: number }>
+          rows={productRows}
+          searchKeys={["productName"]}
+          columns={[
+            {
+              key: "sl",
+              header: t("inventory.sl"),
+              render: (r) => String(r.sl).padStart(2, "0"),
+              className: "w-12 whitespace-nowrap",
+            },
+            {
+              key: "productName",
+              header: t("inventory.productName"),
+              sortable: true,
+              sortValue: (r) => r.productName,
+              render: (r) => (
+                <span className="whitespace-normal break-words font-medium">{r.productName}</span>
+              ),
+              className: "min-w-[12rem] max-w-[20rem]",
+            },
+            {
+              key: "uom",
+              header: t("inventory.unit"),
+              render: (r) => inventoryUnitLabel(r.uom, t),
+              className: "w-20 whitespace-nowrap",
+            },
+            {
+              key: "stockIn",
+              header: t("inventory.stockIn"),
+              sortable: true,
+              sortValue: (r) => r.stockIn,
+              render: (r) => r.stockIn,
+              className: "min-w-[6rem] whitespace-nowrap text-right tabular-nums",
+            },
+            {
+              key: "stockOut",
+              header: t("inventory.stockOut"),
+              sortable: true,
+              sortValue: (r) => r.stockOut,
+              render: (r) => r.stockOut,
+              className: "min-w-[6.5rem] whitespace-nowrap text-right tabular-nums",
+            },
+            {
+              key: "onHand",
+              header: t("inventory.onHand"),
+              sortable: true,
+              sortValue: (r) => r.onHand,
+              render: (r) => <span className="font-semibold">{r.onHand}</span>,
+              className: "min-w-[6.5rem] whitespace-nowrap text-right tabular-nums",
+            },
+            {
+              key: "costPrice",
+              header: t("inventory.unitPriceCost"),
+              sortable: true,
+              sortValue: (r) => r.costPrice,
+              render: (r) => formatCurrency(r.costPrice),
+              className: "min-w-[9rem] whitespace-nowrap text-right tabular-nums",
+            },
+            {
+              key: "totalValue",
+              header: t("inventory.totalValue"),
+              sortable: true,
+              sortValue: (r) => r.totalValue,
+              render: (r) => formatCurrency(r.totalValue),
+              className: "min-w-[9rem] whitespace-nowrap text-right tabular-nums font-medium",
+            },
+          ]}
+        />
+      )}
+
+
+      {/* SUMMARY MOVEMENT ACTIVITY */}
+      {activeTab === "summary" && (
+        <div>
+          <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            {t("inventory.recent")}
+          </h3>
+          <DataTable<ActivityRow>
+            rows={activity}
+            searchKeys={["productName", "notes", "by"]}
+            dateKey="date"
+            onRowClick={openActivity}
+            columns={[
+              {
+                key: "date",
+                header: t("inventory.when"),
+                sortable: true,
+                sortValue: (r) => r.date,
+                render: (r) => formatDateTime(r.date),
+              },
+              {
+                key: "ref",
+                header: t("inventory.ref"),
+                render: (r) => <span className="font-mono text-xs">{r.refId || r.id}</span>,
+              },
+              {
+                key: "txn",
+                header: t("inventory.txn"),
+                render: (r) => (
+                  <Badge variant="outline">{t(`inventory.txn.${r.txn}` as MessageKey)}</Badge>
+                ),
+              },
+              {
+                key: "product",
+                header: t("common.product"),
+                sortable: true,
+                sortValue: (r) => r.productName,
+                render: (r) => r.productName,
+              },
+              {
+                key: "fin",
+                header: t("inventory.fullIn"),
+                render: (r) => r.fullIn || "—",
+                className: "text-right tabular-nums",
+              },
+              {
+                key: "fout",
+                header: t("inventory.fullOut"),
+                render: (r) => r.fullOut || "—",
+                className: "text-right tabular-nums",
+              },
+              {
+                key: "ein",
+                header: t("inventory.emptyIn"),
+                render: (r) => r.emptyIn || "—",
+                className: "text-right tabular-nums",
+              },
+              {
+                key: "refill",
+                header: t("inventory.refill"),
+                render: (r) => r.refill || "—",
+                className: "text-right tabular-nums",
+              },
+              { key: "by", header: t("inventory.receivedBy"), render: (r) => r.by || "—" },
+              {
+                key: "st",
+                header: t("common.status"),
+                render: (r) => <Badge variant="secondary">{r.type}</Badge>,
+              },
+            ]}
+          />
+        </div>
+      )}
     </div>
   );
 }
