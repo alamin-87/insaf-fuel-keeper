@@ -395,7 +395,7 @@ async function receiveStockInDb(
   const product = productDoc ? clean<Product>(productDoc) : null;
   if (!product) return;
   const { resolveProductType } = await import("./inventory.server");
-  const pType = resolveProductType(product);
+  const pType = (item.itemType as "gas" | "cylinder" | "product") || resolveProductType(product);
   const cost = Number.isFinite(item.price) ? item.price : (product.cost ?? 0);
 
   const openLayers = (
