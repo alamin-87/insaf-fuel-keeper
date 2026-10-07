@@ -26,10 +26,11 @@ import { formatCurrency, formatDate } from "@/utils/formatters";
 import type { Employee, PayrollRun } from "@/types";
 import { z } from "zod";
 import { useT } from "@/i18n";
-import { Printer } from "lucide-react";
+import { Printer, Trash2, Upload, User } from "lucide-react";
 import { PayslipPrint } from "./PayslipPrint";
 import { EmployeeRoster } from "@/components/hr/EmployeeRoster";
 import { DELIVERY_MAN, DESIGNATION_PRESETS } from "@/lib/hr-staff";
+import { fileToProfileImage } from "@/lib/image-upload";
 
 type EmpForm = z.infer<typeof employeeSchema>;
 
@@ -87,8 +88,11 @@ export function HrPage() {
       joiningDate: new Date().toISOString().slice(0, 10),
       salary: 20000,
       perDeliveryCommission: 0,
+      image: "",
     },
   });
+
+  const photo = watch("image");
 
   const closeForm = () => {
     setOpen(false);
@@ -102,6 +106,7 @@ export function HrPage() {
       joiningDate: new Date().toISOString().slice(0, 10),
       salary: 20000,
       perDeliveryCommission: 0,
+      image: "",
     });
   };
 
@@ -117,6 +122,7 @@ export function HrPage() {
       joiningDate: emp.joiningDate.slice(0, 10),
       salary: emp.salary,
       perDeliveryCommission: emp.perDeliveryCommission || 0,
+      image: emp.image || "",
     });
   };
 
@@ -124,6 +130,7 @@ export function HrPage() {
     mutationFn: (values: EmpForm) => {
       const payload = {
         ...values,
+        image: values.image || undefined,
         joiningDate: new Date(values.joiningDate).toISOString(),
         status,
       };
@@ -230,6 +237,55 @@ export function HrPage() {
               onSubmit={handleSubmit((v) => saveEmp.mutate(v))}
               className="grid gap-4 md:grid-cols-2"
             >
+              <div className="space-y-1.5 md:col-span-2">
+                <Label>{t("hr.photo")}</Label>
+                <div className="flex items-center gap-3">
+                  {photo ? (
+                    <img
+                      src={photo}
+                      alt="Employee photo"
+                      className="h-12 w-12 rounded-full border border-border object-cover shrink-0"
+                    />
+                  ) : (
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground shrink-0">
+                      <User className="h-6 w-6" />
+                    </div>
+                  )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-sm transition hover:bg-accent hover:text-accent-foreground">
+                      <Upload className="h-3.5 w-3.5" />
+                      <span>{photo ? t("common.edit") : t("hr.uploadPhoto")}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          try {
+                            const dataUrl = await fileToProfileImage(file);
+                            setValue("image", dataUrl, { shouldValidate: true });
+                          } catch (err: any) {
+                            toast.error(err.message || "Failed to process image");
+                          }
+                        }}
+                      />
+                    </label>
+                    {photo && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs text-muted-foreground hover:text-destructive"
+                        onClick={() => setValue("image", "", { shouldValidate: true })}
+                      >
+                        <Trash2 className="mr-1 h-3.5 w-3.5" />
+                        {t("hr.removePhoto")}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
               <div className="space-y-1.5">
                 <Label>{t("common.name")}</Label>
                 <Input {...register("name")} />

@@ -8,7 +8,7 @@ const clean = <T>(doc: any): T => {
 };
 
 const UOMS = new Set<UnitOfMeasure>(["kg", "cyl", "ltr", "pcs"]);
-const TYPES = new Set<ProductType>(["gas", "cylinder"]);
+const TYPES = new Set<ProductType>(["gas", "cylinder", "product"]);
 const COSTING = new Set<CostingMethod>(["fifo", "lifo", "average"]);
 
 async function findProductDoc(id: string) {
@@ -40,7 +40,6 @@ export const updateProductFn = createServerFn({ method: "POST" })
 
     if (src.code != null) {
       const code = String(src.code).trim();
-      if (!code) throw new Error("Code required");
       patch.code = code;
     }
     if (src.name != null) {

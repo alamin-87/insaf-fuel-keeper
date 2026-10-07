@@ -101,3 +101,47 @@ export async function roleCanAccess(
   const matrix = await getPowerMatrix();
   return Boolean(matrix[role as AppRole]?.[moduleId]);
 }
+
+export interface AppBranding {
+  favicon?: string;
+  logo?: string;
+  updatedAt?: string;
+}
+
+const BRANDING_ID = "branding";
+
+export async function getBranding(): Promise<AppBranding> {
+  try {
+    const coll = await ensureSettingsColl();
+    const doc = await coll.findOne({ id: BRANDING_ID });
+    if (doc) {
+      return {
+        favicon: typeof doc.favicon === "string" ? doc.favicon : undefined,
+        logo: typeof doc.logo === "string" ? doc.logo : undefined,
+        updatedAt: doc.updatedAt,
+      };
+    }
+  } catch {}
+  return {};
+}
+
+export async function saveBranding(branding: {
+  favicon?: string;
+  logo?: string;
+}): Promise<AppBranding> {
+  const coll = await ensureSettingsColl();
+  const updateData: Record<string, any> = {
+    id: BRANDING_ID,
+    updatedAt: new Date().toISOString(),
+  };
+  if ("favicon" in branding) updateData.favicon = branding.favicon ?? "";
+  if ("logo" in branding) updateData.logo = branding.logo ?? "";
+
+  await coll.updateOne(
+    { id: BRANDING_ID },
+    { $set: updateData },
+    { upsert: true },
+  );
+  return getBranding();
+}
+

@@ -2,8 +2,9 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { FileText } from "lucide-react";
+import { FileText, Trash2, Upload, User } from "lucide-react";
 import { hrService } from "@/services/hr.service";
+import { fileToProfileImage } from "@/lib/image-upload";
 import { DataTable } from "@/components/common/DataTable";
 import { RowActions, actionsColumnClass } from "@/components/common/RowActions";
 import { PartyNameLink } from "@/components/common/PartyNameLink";
@@ -57,6 +58,7 @@ export function EmployeeRoster() {
   });
   const [open, setOpen] = useState(false);
   const [emp, setEmp] = useState<Employee | null>(null);
+  const [image, setImage] = useState("");
   const [name, setName] = useState("");
   const [role, setRole] = useState("");
   const [salary, setSalary] = useState("0");
@@ -76,6 +78,7 @@ export function EmployeeRoster() {
   const startEdit = (row: Employee) => {
     const snap = paySnapshot(row, payroll);
     setEmp(row);
+    setImage(row.image || "");
     setName(row.name);
     setRole(row.designation);
     setSalary(String(row.salary || 0));
@@ -98,6 +101,7 @@ export function EmployeeRoster() {
         designation: role || emp.designation,
         salary: basic,
         perDeliveryCommission: comm,
+        image: image || undefined,
       });
       const month = currentMonthKey();
       const existing = payroll
@@ -144,6 +148,26 @@ export function EmployeeRoster() {
         dateKey="createdAt"
         onRowClick={(r) => navigate({ to: "/hr/$id", params: { id: r.id } })}
         columns={[
+          {
+            key: "image",
+            header: t("common.image"),
+            className: "w-12 text-center",
+            render: (r) => (
+              <div className="flex items-center justify-center">
+                {r.image ? (
+                  <img
+                    src={r.image}
+                    alt={r.name}
+                    className="h-8 w-8 rounded-full border border-border object-cover shrink-0"
+                  />
+                ) : (
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground shrink-0">
+                    <User className="h-4 w-4" />
+                  </div>
+                )}
+              </div>
+            ),
+          },
           {
             key: "name",
             header: t("common.name"),
@@ -237,6 +261,55 @@ export function EmployeeRoster() {
             <DialogTitle>{t("hr.editEmployee")}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>{t("hr.photo")}</Label>
+              <div className="flex items-center gap-3">
+                {image ? (
+                  <img
+                    src={image}
+                    alt={name || "Employee"}
+                    className="h-12 w-12 rounded-full border border-border object-cover shrink-0"
+                  />
+                ) : (
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground shrink-0">
+                    <User className="h-6 w-6" />
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-sm transition hover:bg-accent hover:text-accent-foreground">
+                    <Upload className="h-3.5 w-3.5" />
+                    <span>{image ? t("common.edit") : t("hr.uploadPhoto")}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        try {
+                          const dataUrl = await fileToProfileImage(file);
+                          setImage(dataUrl);
+                        } catch (err: any) {
+                          toast.error(err.message || "Failed to process image");
+                        }
+                      }}
+                    />
+                  </label>
+                  {image && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2 text-xs text-muted-foreground hover:text-destructive"
+                      onClick={() => setImage("")}
+                    >
+                      <Trash2 className="mr-1 h-3.5 w-3.5" />
+                      {t("hr.removePhoto")}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
             <div className="space-y-1.5 sm:col-span-2">
               <Label>{t("common.name")}</Label>
               <Input value={name} onChange={(e) => setName(e.target.value)} />

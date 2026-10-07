@@ -210,9 +210,6 @@ export function ProductForm({ id }: { id?: string }) {
               </div>
             </div>
 
-            <Row label={t("products.code")} error={errors.code?.message}>
-              <Input {...register("code")} />
-            </Row>
             <Row label={t("common.name")} error={errors.name?.message}>
               <Input {...register("name")} />
             </Row>
@@ -244,6 +241,7 @@ export function ProductForm({ id }: { id?: string }) {
                 <SelectContent>
                   <SelectItem value="gas">{t("products.type.gas")}</SelectItem>
                   <SelectItem value="cylinder">{t("products.type.cylinder")}</SelectItem>
+                  <SelectItem value="product">{t("products.type.product")}</SelectItem>
                 </SelectContent>
               </Select>
             </Row>

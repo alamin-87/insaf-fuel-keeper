@@ -65,7 +65,7 @@ export const supplierSchema = z.object({
 });
 
 export const productSchema = z.object({
-  code: z.string().min(1, "Code required"),
+  code: z.string().optional(),
   name: z.string().min(2, "Name required"),
   category: z.string().trim().min(1, "Category required"),
   productType: z.enum(["gas", "cylinder", "product"]),
@@ -145,6 +145,7 @@ export const employeeSchema = z.object({
   joiningDate: z.string().min(1, "Joining date required"),
   salary: z.coerce.number().min(0),
   perDeliveryCommission: z.coerce.number().min(0).optional(),
+  image: z.string().nullish(),
 });
 
 export const voucherSchema = z.object({

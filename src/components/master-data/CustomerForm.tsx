@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -39,26 +40,15 @@ export function CustomerForm({ id }: { id?: string }) {
     handleSubmit,
     setValue,
     watch,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(customerSchema),
-    values: existing
-      ? {
-          name: existing.name,
-          phone: existing.phone,
-          whatsapp: existing.whatsapp ?? "",
-          address: existing.address,
-          creditLimit: existing.creditLimit ?? 0,
-          openingBalance: Math.abs(existing.openingBalance || 0),
-          openingBalanceType:
-            existing.openingBalanceType ??
-            ((existing.openingBalance || 0) < 0 ? "payable" : "receivable"),
-          creditReminderEnabled: existing.creditReminderEnabled ?? false,
-          creditReminderDays: existing.creditReminderDays ?? 30,
-        }
-      : undefined,
     defaultValues: {
+      name: "",
+      phone: "",
       whatsapp: "",
+      address: "",
       creditLimit: 0,
       openingBalance: 0,
       openingBalanceType: "receivable",
@@ -67,26 +57,40 @@ export function CustomerForm({ id }: { id?: string }) {
     },
   });
 
+  useEffect(() => {
+    if (!existing) return;
+    reset({
+      name: existing.name || "",
+      phone: existing.phone || "",
+      whatsapp: existing.whatsapp ?? "",
+      address: existing.address || "",
+      creditLimit: Number(existing.creditLimit) || 0,
+      openingBalance: Math.abs(Number(existing.openingBalance) || 0),
+      openingBalanceType:
+        existing.openingBalanceType ||
+        (Number(existing.openingBalance || 0) < 0 ? "payable" : "receivable"),
+      creditReminderEnabled: Boolean(existing.creditReminderEnabled),
+      creditReminderDays: Number(existing.creditReminderDays) || 30,
+    });
+  }, [existing, reset]);
+
   const reminderOn = watch("creditReminderEnabled");
   const openingType = watch("openingBalanceType") || "receivable";
 
   const mutation = useMutation({
     mutationFn: (values: FormValues) => {
       const payload = {
-        name: values.name,
-        phone: values.phone,
+        name: values.name.trim(),
+        phone: values.phone.trim(),
         whatsapp: values.whatsapp?.trim() || undefined,
-        address: values.address,
+        address: values.address.trim(),
         creditLimit: Number(values.creditLimit) || 0,
         openingBalance: Number(values.openingBalance) || 0,
-        openingBalanceType:
-          (Number(values.openingBalance) || 0) > 0
-            ? values.openingBalanceType
-            : values.openingBalanceType || "receivable",
-        creditReminderEnabled: values.creditReminderEnabled,
+        openingBalanceType: values.openingBalanceType || "receivable",
+        creditReminderEnabled: Boolean(values.creditReminderEnabled),
         creditReminderDays: values.creditReminderEnabled
-          ? Math.floor(Number(values.creditReminderDays) || 0)
-          : Number(values.creditReminderDays) || 0,
+          ? Math.floor(Number(values.creditReminderDays) || 30)
+          : 30,
       };
       return mode === "edit"
         ? customerService.update(id!, payload)

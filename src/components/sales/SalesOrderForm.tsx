@@ -518,11 +518,11 @@ export function SalesOrderForm({
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-10">{t("inventory.sl")}</TableHead>
-                      <TableHead className="min-w-[14rem]">{t("common.product")}</TableHead>
+                      <TableHead className="min-w-[11rem]">{t("common.product")}</TableHead>
                       <TableHead className="w-28">{t("common.category")}</TableHead>
                       <TableHead className="w-32">{t("sales.gasOrCylinder")}</TableHead>
                       <TableHead className="w-20 text-right">{t("common.quantity")}</TableHead>
-                      <TableHead className="w-28 text-right">{t("common.price")}</TableHead>
+                      <TableHead className="w-36 min-w-[9.5rem] text-right">{t("common.price")}</TableHead>
                       <TableHead className="w-28 text-right">{t("common.subtotal")}</TableHead>
                       <TableHead className="w-10" />
                     </TableRow>
@@ -552,7 +552,7 @@ export function SalesOrderForm({
                           <TableCell className="tabular-nums text-muted-foreground">
                             {idx + 1}
                           </TableCell>
-                          <TableCell className="min-w-[14rem]">
+                          <TableCell className="min-w-[11rem]">
                             <Popover
                               open={productOpenIdx === idx}
                               onOpenChange={(open) => {
@@ -681,13 +681,17 @@ export function SalesOrderForm({
                               return null;
                             })()}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="w-36 min-w-[9.5rem]">
                             <Input
                               type="number"
-                              step="0.01"
-                              value={it.price}
-                              onChange={(e) => update(idx, { price: Number(e.target.value) })}
-                              className="text-right"
+                              step="any"
+                              value={it.price === 0 ? "" : it.price}
+                              onChange={(e) =>
+                                update(idx, {
+                                  price: e.target.value === "" ? 0 : Number(e.target.value),
+                                })
+                              }
+                              className="w-full text-right"
                             />
                           </TableCell>
                           <TableCell className="text-right font-medium tabular-nums">

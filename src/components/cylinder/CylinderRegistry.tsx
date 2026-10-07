@@ -11,6 +11,7 @@ import {
   Warehouse,
 } from "lucide-react";
 import { toast } from "sonner";
+import { inventoryService } from "@/services/inventory.service";
 import { cylinderService } from "@/services/cylinder.service";
 import { productService } from "@/services/product.service";
 import { customerService } from "@/services/customer.service";
@@ -85,6 +86,10 @@ export function CylinderRegistry() {
   const [cardFocus, setCardFocus] = useState<CardFocus | null>(null);
   const [reportView, setReportView] = useState<ReportView>("cylinder");
   const { data = [] } = useQuery({ queryKey: ["cylinders"], queryFn: cylinderService.list });
+  const { data: cylinderInventory = [] } = useQuery({
+    queryKey: ["cylinderInventory"],
+    queryFn: inventoryService.getCylinderInventory,
+  });
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
     queryFn: productService.list,
@@ -113,6 +118,7 @@ export function CylinderRegistry() {
       return true;
     });
   }, [data, sizeFilter, warehouseFilter]);
+
   const counts = cylinderOverviewCounts(filtered);
   const locations = useMemo(() => companyOwnedLocations(filtered), [filtered]);
   const gasCategoryOf = (c: Cylinder) =>
@@ -127,48 +133,103 @@ export function CylinderRegistry() {
   }, [filtered, cardFocus]);
 
   const productRows = useMemo(() => {
-    const byProduct = new Map<string, Cylinder[]>();
+    // Map registered cylinder assets by productId
+    const byProductCylinders = new Map<string, Cylinder[]>();
     for (const c of filtered) {
-      const list = byProduct.get(c.productId) ?? [];
+      if (!c.productId) continue;
+      const list = byProductCylinders.get(c.productId) ?? [];
       list.push(c);
-      byProduct.set(c.productId, list);
+      byProductCylinders.set(c.productId, list);
     }
-    return [...byProduct.entries()]
-      .map(([productId, list], idx) => {
-        const product = products.find((p) => p.id === productId);
-        const name = product?.name || productId;
-        const active = list.filter((c) => !isInactiveCompanyCylinder(c));
-        const full = active.filter((c) => cylinderIsFullStock(c)).length;
-        const empty = active.filter(
-          (c) =>
-            cylinderIsEmpty(c) &&
-            c.status !== "at_customer" &&
-            c.status !== "in_transit" &&
-            !cylinderAtSupplier(c),
-        ).length;
-        const customer = active.filter((c) => cylinderAtCustomer(c)).length;
-        const suppliers = active.filter((c) => cylinderAtSupplier(c)).length;
-        const lossDamage = active.filter(
-          (c) => c.status === "lost" || c.status === "damaged",
-        ).length;
-        const total = active.length;
-        const unitCost = product?.cost ?? 0;
-        return {
-          id: productId,
-          sl: idx + 1,
-          name,
-          full,
-          empty,
-          customer,
-          suppliers,
-          lossDamage,
-          unitCost,
-          total,
-          totalValue: total * unitCost,
-        };
+
+    // Identify all cylinder product IDs from authoritative cylinderInventory and products
+    const cylProductIds = new Set<string>();
+    for (const inv of cylinderInventory) {
+      cylProductIds.add(inv.productId);
+    }
+    for (const p of products) {
+      if (p.productType === "cylinder" || (p.uom === "cyl" && p.productType !== "gas")) {
+        cylProductIds.add(p.id);
+      }
+    }
+    for (const c of filtered) {
+      if (c.productId) cylProductIds.add(c.productId);
+    }
+
+    const rows = Array.from(cylProductIds).map((productId) => {
+      const inv = cylinderInventory.find((i) => i.productId === productId);
+      const product = products.find((p) => p.id === productId);
+      const name = inv?.productName || product?.name || productId;
+      const list = byProductCylinders.get(productId) ?? [];
+      const active = list.filter((c) => !isInactiveCompanyCylinder(c));
+
+      // Full stock from authoritative cylinderInventory onHand (or product stock / active in-stock)
+      const full = inv ? inv.onHand : (product?.stock ?? active.filter((c) => cylinderIsFullStock(c)).length);
+
+      // Empty in warehouse
+      const empty = active.filter(
+        (c) =>
+          cylinderIsEmpty(c) &&
+          c.status !== "at_customer" &&
+          c.status !== "in_transit" &&
+          !cylinderAtSupplier(c),
+      ).length;
+
+      // With customer
+      const customer = active.filter((c) => cylinderAtCustomer(c)).length;
+
+      // With supplier
+      const suppliers = active.filter((c) => cylinderAtSupplier(c)).length;
+
+      // Loss / Damage
+      const lossDamage = active.filter(
+        (c) => c.status === "lost" || c.status === "damaged",
+      ).length;
+
+      // Total cylinders for this product
+      const total = full + empty + customer + suppliers + lossDamage;
+
+      // Authoritative Unit Cost from inventory or product
+      const unitCost = inv
+        ? (inv.costPrice > 0 ? inv.costPrice : inv.unitPrice)
+        : (Number(product?.cost) || Number(product?.price) || 0);
+
+      const totalValue = total * unitCost;
+
+      return {
+        id: productId,
+        sl: 1,
+        name,
+        full,
+        empty,
+        customer,
+        suppliers,
+        lossDamage,
+        unitCost,
+        total,
+        totalValue,
+      };
+    });
+
+    return rows
+      .filter((r) => {
+        if (sizeFilter === "all") return true;
+        const capacity = r.name.match(/(\d+)\s*kg/i)?.[1];
+        if (!capacity) return true;
+        return matchesCylinderSize(Number(capacity), Number(sizeFilter));
       })
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [filtered, products]);
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((r, i) => ({ ...r, sl: i + 1 }));
+  }, [cylinderInventory, products, filtered, sizeFilter]);
+
+  const summaryTotals = useMemo(() => {
+    const warehouse = productRows.reduce((sum, r) => sum + r.full + r.empty, 0);
+    const suppliers = productRows.reduce((sum, r) => sum + r.suppliers, 0);
+    const customers = productRows.reduce((sum, r) => sum + r.customer, 0);
+    const lostDamaged = productRows.reduce((sum, r) => sum + r.lossDamage, 0);
+    const total = warehouse + suppliers + customers + lostDamaged;
+    return { warehouse, suppliers, customers, lostDamaged, total };
+  }, [productRows]);
 
   const customerRows = useMemo(() => {
     const rows = customers
@@ -267,32 +328,32 @@ export function CylinderRegistry() {
     icon: typeof Warehouse;
     tone?: string;
   }[] = [
-    { focus: "all", label: "cylinders.total", value: locations.owned, icon: CylinderIcon },
+    { focus: "all", label: "cylinders.total", value: summaryTotals.total, icon: CylinderIcon },
     {
       focus: "warehouse",
       label: "cylinders.head.warehouse",
-      value: locations.warehouse,
+      value: summaryTotals.warehouse,
       icon: Warehouse,
       tone: "text-primary",
     },
     {
       focus: "suppliers",
       label: "dash.cylSuppliers",
-      value: locations.suppliers,
+      value: summaryTotals.suppliers,
       icon: Truck,
       tone: "text-info",
     },
     {
       focus: "customers",
       label: "dash.cylCustomers",
-      value: locations.customers,
+      value: summaryTotals.customers,
       icon: Users,
       tone: "text-success",
     },
     {
       focus: "lostDamaged",
       label: "cylinders.lossDamage",
-      value: locations.lost + locations.damaged,
+      value: summaryTotals.lostDamaged,
       icon: AlertTriangle,
       tone: "text-destructive",
     },

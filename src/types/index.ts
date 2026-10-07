@@ -469,6 +469,8 @@ export interface Employee {
   salary: number;
   /** Commission earned per delivery, if applicable */
   perDeliveryCommission?: number;
+  /** Profile photo data-URL or remote URL */
+  image?: string;
   status: "active" | "inactive";
   createdAt: string;
 }

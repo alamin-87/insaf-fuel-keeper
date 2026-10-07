@@ -4,10 +4,11 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { FileText, Pencil, Trash2 } from "lucide-react";
+import { FileText, Pencil, Trash2, Upload, User } from "lucide-react";
 import { z } from "zod";
 import { hrService } from "@/services/hr.service";
 import { employeeSchema } from "@/utils/validators";
+import { fileToProfileImage } from "@/lib/image-upload";
 import { PageHeader } from "@/components/common/PageHeader";
 import { DetailOrOutlet } from "@/components/common/DetailOrOutlet";
 import { Card, CardContent } from "@/components/ui/card";
@@ -60,10 +61,17 @@ function EmployeeDetailBody() {
     register,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<EmpForm>({
     resolver: zodResolver(employeeSchema),
+    defaultValues: {
+      image: "",
+    },
   });
+
+  const photo = watch("image");
 
   useEffect(() => {
     if (!e) return;
@@ -75,6 +83,7 @@ function EmployeeDetailBody() {
       department: e.department,
       joiningDate: e.joiningDate.slice(0, 10),
       salary: e.salary,
+      image: e.image || "",
     });
   }, [e, reset]);
 
@@ -82,6 +91,7 @@ function EmployeeDetailBody() {
     mutationFn: (values: EmpForm) =>
       hrService.updateEmployee(id, {
         ...values,
+        image: values.image || undefined,
         joiningDate: new Date(values.joiningDate).toISOString(),
         status,
       }),
@@ -148,6 +158,55 @@ function EmployeeDetailBody() {
               onSubmit={handleSubmit((v) => save.mutate(v))}
               className="grid gap-4 md:grid-cols-2"
             >
+              <div className="space-y-1.5 md:col-span-2">
+                <Label>{t("hr.photo")}</Label>
+                <div className="flex items-center gap-3">
+                  {photo ? (
+                    <img
+                      src={photo}
+                      alt="Employee photo"
+                      className="h-12 w-12 rounded-full border border-border object-cover shrink-0"
+                    />
+                  ) : (
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground shrink-0">
+                      <User className="h-6 w-6" />
+                    </div>
+                  )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-sm transition hover:bg-accent hover:text-accent-foreground">
+                      <Upload className="h-3.5 w-3.5" />
+                      <span>{photo ? t("common.edit") : t("hr.uploadPhoto")}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          try {
+                            const dataUrl = await fileToProfileImage(file);
+                            setValue("image", dataUrl, { shouldValidate: true });
+                          } catch (err: any) {
+                            toast.error(err.message || "Failed to process image");
+                          }
+                        }}
+                      />
+                    </label>
+                    {photo && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs text-muted-foreground hover:text-destructive"
+                        onClick={() => setValue("image", "", { shouldValidate: true })}
+                      >
+                        <Trash2 className="mr-1 h-3.5 w-3.5" />
+                        {t("hr.removePhoto")}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
               <div className="space-y-1.5">
                 <Label>{t("common.name")}</Label>
                 <Input {...register("name")} />
@@ -200,18 +259,37 @@ function EmployeeDetailBody() {
       )}
 
       <Card>
-        <CardContent className="grid gap-4 pt-6 text-sm md:grid-cols-2">
-          <Info label={t("hr.employeeId")} value={e.employeeNo} />
-          <Info label={t("common.phone")} value={e.phone} />
-          <Info label={t("hr.designation")} value={e.designation} />
-          <Info label={t("hr.department")} value={e.department} />
-          <Info label={t("hr.joiningDate")} value={formatDate(e.joiningDate)} />
-          <Info label={t("hr.basicSalary")} value={formatCurrency(e.salary)} />
-          <div>
-            <p className="text-xs uppercase text-muted-foreground">{t("common.status")}</p>
-            <Badge variant={e.status === "active" ? "default" : "secondary"} className="mt-1">
-              {e.status === "active" ? t("common.active") : t("common.inactive")}
-            </Badge>
+        <CardContent className="space-y-4 pt-6 text-sm">
+          <div className="flex items-center gap-4 border-b pb-4">
+            {e.image ? (
+              <img
+                src={e.image}
+                alt={e.name}
+                className="h-16 w-16 rounded-full border border-border object-cover shadow-sm shrink-0"
+              />
+            ) : (
+              <div className="flex h-16 w-16 items-center justify-center rounded-full border border-border bg-muted text-muted-foreground shrink-0">
+                <User className="h-8 w-8" />
+              </div>
+            )}
+            <div>
+              <h3 className="font-display text-lg font-semibold">{e.name}</h3>
+              <p className="text-xs text-muted-foreground">{e.employeeNo} · {e.designation}</p>
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Info label={t("hr.employeeId")} value={e.employeeNo} />
+            <Info label={t("common.phone")} value={e.phone} />
+            <Info label={t("hr.designation")} value={e.designation} />
+            <Info label={t("hr.department")} value={e.department} />
+            <Info label={t("hr.joiningDate")} value={formatDate(e.joiningDate)} />
+            <Info label={t("hr.basicSalary")} value={formatCurrency(e.salary)} />
+            <div>
+              <p className="text-xs uppercase text-muted-foreground">{t("common.status")}</p>
+              <Badge variant={e.status === "active" ? "default" : "secondary"} className="mt-1">
+                {e.status === "active" ? t("common.active") : t("common.inactive")}
+              </Badge>
+            </div>
           </div>
         </CardContent>
       </Card>

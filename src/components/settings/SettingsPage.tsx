@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Pencil, RotateCcw, Save, Trash2, X } from "lucide-react";
+import { Pencil, RotateCcw, Save, Trash2, Upload, X } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,8 @@ import {
 } from "@/components/ui/table";
 import { useT, type MessageKey } from "@/i18n";
 import { BG_THEMES, useThemeSettings } from "@/lib/theme";
+import { useBranding } from "@/lib/branding";
+import { fileToFavicon, fileToCompanyLogo } from "@/lib/image-upload";
 import {
   APP_MODULES,
   APP_ROLES,
@@ -59,7 +61,10 @@ function matricesEqual(a: PowerMatrix, b: PowerMatrix) {
 export function SettingsPage() {
   const t = useT();
   const theme = useThemeSettings();
+  const branding = useBranding();
   const qc = useQueryClient();
+  const [faviconPreview, setFaviconPreview] = useState("");
+  const [logoPreview, setLogoPreview] = useState("");
   const { data: users = [], isLoading: usersLoading } = useQuery({
     queryKey: ["appUsers"],
     queryFn: () => listAppUsersFn(),
@@ -276,28 +281,150 @@ export function SettingsPage() {
           </Card>
 
           <Card>
-            <CardContent className="space-y-3 pt-6">
-              <div>
-                <h3 className="font-display text-base font-semibold">
-                  {t("settings.cylTracking")}
-                </h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {t("settings.cylTrackingHint")}
-                </p>
+            <CardContent className="space-y-4 pt-6">
+              <div className="grid gap-6 md:grid-cols-3">
+                <div className="space-y-2">
+                  <div>
+                    <h3 className="font-display text-base font-semibold">
+                      {t("settings.cylTracking")}
+                    </h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {t("settings.cylTrackingHint")}
+                    </p>
+                  </div>
+                  <Select
+                    value={tracking}
+                    onValueChange={(v) => saveTracking.mutate(v as CylinderTrackingMethod)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="quantity">{t("settings.track.quantity")}</SelectItem>
+                      <SelectItem value="lot">{t("settings.track.lot")}</SelectItem>
+                      <SelectItem value="serial">{t("settings.track.serial")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <div>
+                    <h3 className="font-display text-base font-semibold">
+                      {t("settings.favicon")}
+                    </h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {t("settings.faviconHint")}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-muted/40 p-1.5 shadow-sm">
+                      <img
+                        src={faviconPreview || branding.favicon}
+                        alt="Favicon preview"
+                        className="h-6 w-6 object-contain"
+                      />
+                    </div>
+                    <div className="flex flex-1 flex-wrap items-center gap-2">
+                      <label className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-sm transition hover:bg-accent hover:text-accent-foreground">
+                        <Upload className="h-3.5 w-3.5" />
+                        <span>{t("settings.uploadFavicon")}</span>
+                        <input
+                          type="file"
+                          accept=".ico,.png,.svg,.jpg,.jpeg,.webp,image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            try {
+                              const dataUrl = await fileToFavicon(file);
+                              setFaviconPreview(dataUrl);
+                              await branding.setCustomFavicon(dataUrl);
+                              toast.success(t("settings.faviconSaved"));
+                            } catch (err: any) {
+                              toast.error(err.message || "Failed to process favicon");
+                            }
+                          }}
+                        />
+                      </label>
+                      {branding.customFavicon && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 px-2 text-xs text-muted-foreground hover:text-destructive"
+                          onClick={async () => {
+                            setFaviconPreview("");
+                            await branding.setCustomFavicon("");
+                            toast.success(t("settings.faviconSaved"));
+                          }}
+                        >
+                          <Trash2 className="mr-1 h-3.5 w-3.5" />
+                          {t("settings.removeFavicon")}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div>
+                    <h3 className="font-display text-base font-semibold">
+                      {t("settings.logo")}
+                    </h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {t("settings.logoHint")}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-muted/40 p-1.5 shadow-sm">
+                      <img
+                        src={logoPreview || branding.logo}
+                        alt="Company logo preview"
+                        className="h-6 w-6 object-contain"
+                      />
+                    </div>
+                    <div className="flex flex-1 flex-wrap items-center gap-2">
+                      <label className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-sm transition hover:bg-accent hover:text-accent-foreground">
+                        <Upload className="h-3.5 w-3.5" />
+                        <span>{t("settings.uploadLogo")}</span>
+                        <input
+                          type="file"
+                          accept=".png,.jpg,.jpeg,.svg,.webp,image/*"
+                          className="hidden"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            try {
+                              const dataUrl = await fileToCompanyLogo(file);
+                              setLogoPreview(dataUrl);
+                              await branding.setCustomLogo(dataUrl);
+                              toast.success(t("settings.logoSaved"));
+                            } catch (err: any) {
+                              toast.error(err.message || "Failed to process logo");
+                            }
+                          }}
+                        />
+                      </label>
+                      {branding.customLogo && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 px-2 text-xs text-muted-foreground hover:text-destructive"
+                          onClick={async () => {
+                            setLogoPreview("");
+                            await branding.setCustomLogo("");
+                            toast.success(t("settings.logoSaved"));
+                          }}
+                        >
+                          <Trash2 className="mr-1 h-3.5 w-3.5" />
+                          {t("settings.removeLogo")}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
-              <Select
-                value={tracking}
-                onValueChange={(v) => saveTracking.mutate(v as CylinderTrackingMethod)}
-              >
-                <SelectTrigger className="max-w-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="quantity">{t("settings.track.quantity")}</SelectItem>
-                  <SelectItem value="lot">{t("settings.track.lot")}</SelectItem>
-                  <SelectItem value="serial">{t("settings.track.serial")}</SelectItem>
-                </SelectContent>
-              </Select>
             </CardContent>
           </Card>
         </TabsContent>

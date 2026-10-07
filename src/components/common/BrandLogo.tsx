@@ -1,6 +1,5 @@
 import { cn } from "@/lib/utils";
-
-const LOGO_SRC = "/favicon.png?v=4";
+import { useBranding } from "@/lib/branding";
 
 type BrandLogoProps = {
   className?: string;
@@ -16,12 +15,14 @@ const SIZE_CLASS: Record<NonNullable<BrandLogoProps["size"]>, string> = {
 };
 
 export function BrandLogo({ className, size = "md", alt = "Insaf Gas Corp" }: BrandLogoProps) {
+  const { logo } = useBranding();
   return (
     <img
-      src={LOGO_SRC}
+      src={logo}
       alt={alt}
       draggable={false}
       className={cn("shrink-0 rounded-md object-contain", SIZE_CLASS[size], className)}
     />
   );
 }
+

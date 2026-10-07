@@ -110,12 +110,12 @@ export function CustomerList() {
             sortable: true,
             sortValue: (r) => customerOpeningSigned(r),
             render: (r) => formatCurrency(customerOpeningSigned(r)),
-            className: "min-w-[8.75rem] whitespace-nowrap text-right tabular-nums",
+            className: "min-w-[9.5rem] whitespace-nowrap text-right tabular-nums pr-4",
           },
           {
             key: "actions",
             header: t("common.actions"),
-            className: `${actionsColumnClass} min-w-[12.5rem]`,
+            className: `${actionsColumnClass} min-w-[20rem] w-[20rem] px-3`,
             render: (r) => (
               <RowActions
                 onView={() => navigate({ to: "/customers/$id", params: { id: r.id } })}

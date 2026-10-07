@@ -58,3 +58,27 @@ export const resetPowerMatrixFn = createServerFn({ method: "POST" }).handler(
     return savePowerMatrixDoc(defaultMatrix());
   },
 );
+
+export interface AppBranding {
+  favicon?: string;
+  logo?: string;
+}
+
+export const getBrandingFn = createServerFn({ method: "POST" }).handler(
+  async (): Promise<AppBranding> => {
+    const { getBranding } = await import("./settings.server");
+    return getBranding();
+  },
+);
+
+export const saveBrandingFn = createServerFn({ method: "POST" })
+  .inputValidator((d: { favicon?: string; logo?: string }) => d)
+  .handler(async ({ data }): Promise<AppBranding> => {
+    const { requireUser } = await import("./session.server");
+    const { saveBranding, roleCanAccess } = await import("./settings.server");
+    const user = await requireUser();
+    const allowed = user.role === "Administrator" || (await roleCanAccess(user.role, "settings"));
+    if (!allowed) throw new Error("Not allowed to update settings");
+    return saveBranding(data);
+  });
+

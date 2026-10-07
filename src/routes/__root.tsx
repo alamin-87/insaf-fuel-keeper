@@ -18,6 +18,7 @@ import type { AuthUser } from "@/types";
 import appCss from "../styles.css?url";
 import { I18nProvider, useT } from "@/i18n";
 import { ThemeProvider } from "@/lib/theme";
+import { BrandingProvider } from "@/lib/branding";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { SmoothScrollProvider } from "@/components/common/SmoothScroll";
 
@@ -148,26 +149,30 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Insaf Gas Corp ERP" },
+      { title: "Insaf Gas Corp ERP — Complete Gas & Cylinder Management" },
       {
         name: "description",
         content:
           "Enterprise resource planning for Insaf Gas Corp — sales, cylinders, deliveries and master data.",
       },
-      { property: "og:title", content: "Insaf Gas Corp ERP" },
+      { property: "og:site_name", content: "Insaf Gas Corp ERP" },
+      { property: "og:type", content: "website" },
+      { property: "og:title", content: "Insaf Gas Corp ERP — Complete Gas & Cylinder Management" },
       {
         property: "og:description",
         content:
           "Enterprise resource planning for Insaf Gas Corp — sales, cylinders, deliveries and master data.",
       },
-      { property: "og:type", content: "website" },
+      { property: "og:image", content: "/favicon.png?v=4" },
+      { property: "og:url", content: "https://insafgascorp.com" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "Insaf Gas Corp ERP" },
+      { name: "twitter:title", content: "Insaf Gas Corp ERP — Complete Gas & Cylinder Management" },
       {
         name: "twitter:description",
         content:
           "Enterprise resource planning for Insaf Gas Corp — sales, cylinders, deliveries and master data.",
       },
+      { name: "twitter:image", content: "/favicon.png?v=4" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -197,7 +202,9 @@ function RootShell({ children }: { children: ReactNode }) {
       <body>
         <QueryClientProvider client={fallbackQueryClient}>
           <I18nProvider>
-            <ThemeProvider>{children}</ThemeProvider>
+            <ThemeProvider>
+              <BrandingProvider>{children}</BrandingProvider>
+            </ThemeProvider>
           </I18nProvider>
         </QueryClientProvider>
         <Scripts />
@@ -217,17 +224,20 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
-        <SmoothScrollProvider>
-          {isLogin ? (
-            <Outlet />
-          ) : (
-            <Layout>
+        <BrandingProvider>
+          <SmoothScrollProvider>
+            {isLogin ? (
               <Outlet />
-            </Layout>
-          )}
-          {mounted && <Toaster richColors position={isLogin ? "bottom-center" : "top-right"} />}
-        </SmoothScrollProvider>
+            ) : (
+              <Layout>
+                <Outlet />
+              </Layout>
+            )}
+            {mounted && <Toaster richColors position={isLogin ? "bottom-center" : "top-right"} />}
+          </SmoothScrollProvider>
+        </BrandingProvider>
       </I18nProvider>
     </QueryClientProvider>
   );
 }
+
