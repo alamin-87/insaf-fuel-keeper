@@ -106,6 +106,41 @@ export default {
         });
       }
 
+      // Public branding endpoints for Open Graph and Logo/Favicon requests
+      if (
+        (pathname === "/api/branding/og-image" ||
+          pathname === "/api/branding/logo" ||
+          pathname === "/api/branding/favicon") &&
+        request.method === "GET"
+      ) {
+        try {
+          const { getBranding } = await import("./lib/settings.server");
+          const branding = await getBranding();
+          const target =
+            pathname === "/api/branding/favicon"
+              ? (branding.favicon || branding.logo)
+              : (branding.logo || branding.favicon);
+
+          if (target && target.startsWith("data:")) {
+            const match = target.match(/^data:([^;]+);base64,(.*)$/);
+            if (match) {
+              const mime = match[1];
+              const buffer = Buffer.from(match[2], "base64");
+              return new Response(buffer, {
+                status: 200,
+                headers: {
+                  "content-type": mime,
+                  "cache-control": "public, max-age=60, stale-while-revalidate=86400",
+                },
+              });
+            }
+          } else if (target && (target.startsWith("http://") || target.startsWith("https://"))) {
+            return Response.redirect(target, 302);
+          }
+        } catch {}
+        return Response.redirect(new URL("/favicon.png?v=4", request.url).toString(), 302);
+      }
+
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);

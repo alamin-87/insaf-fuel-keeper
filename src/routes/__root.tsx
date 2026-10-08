@@ -163,7 +163,9 @@ export const Route = createRootRouteWithContext<RouterContext>()({
         content:
           "Enterprise resource planning for Insaf Gas Corp — sales, cylinders, deliveries and master data.",
       },
-      { property: "og:image", content: "/favicon.png?v=4" },
+      { property: "og:image", content: "/api/branding/og-image" },
+      { property: "og:image:secure_url", content: "https://insafgascorp.com/api/branding/og-image" },
+      { property: "og:image:alt", content: "Insaf Gas Corp ERP — Complete Gas & Cylinder Management" },
       { property: "og:url", content: "https://insafgascorp.com" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "Insaf Gas Corp ERP — Complete Gas & Cylinder Management" },
@@ -172,7 +174,8 @@ export const Route = createRootRouteWithContext<RouterContext>()({
         content:
           "Enterprise resource planning for Insaf Gas Corp — sales, cylinders, deliveries and master data.",
       },
-      { name: "twitter:image", content: "/favicon.png?v=4" },
+      { name: "twitter:image", content: "/api/branding/og-image" },
+      { name: "twitter:image:alt", content: "Insaf Gas Corp ERP — Complete Gas & Cylinder Management" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },

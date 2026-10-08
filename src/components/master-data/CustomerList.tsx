@@ -63,7 +63,7 @@ export function CustomerList() {
                 {formatOpenedOn(r.createdAt)}
               </span>
             ),
-            className: "min-w-[9.5rem] whitespace-nowrap",
+            className: "whitespace-nowrap text-xs",
           },
           {
             key: "name",
@@ -75,10 +75,10 @@ export function CustomerList() {
                 kind="customer"
                 id={r.id}
                 name={r.name}
-                className="whitespace-normal break-words"
+                className="whitespace-normal break-words font-medium"
               />
             ),
-            className: "min-w-[8rem] max-w-[14rem] align-top",
+            className: "min-w-[7rem] max-w-[12rem] align-top",
           },
           {
             key: "phone",
@@ -86,23 +86,23 @@ export function CustomerList() {
             sortable: true,
             sortValue: (r) => r.phone,
             render: (r) => r.phone,
-            className: "min-w-[7.5rem] whitespace-nowrap",
+            className: "whitespace-nowrap",
           },
           {
             key: "whatsapp",
             header: t("customers.whatsapp"),
             render: (r) => r.whatsapp || "—",
-            className: "min-w-[7.5rem] whitespace-nowrap",
+            className: "whitespace-nowrap",
           },
           {
             key: "address",
             header: t("common.address"),
             render: (r) => (
-              <span className="whitespace-normal break-words text-muted-foreground">
+              <span className="whitespace-normal break-words text-muted-foreground line-clamp-2">
                 {r.address}
               </span>
             ),
-            className: "min-w-[10rem] max-w-[16rem] align-top",
+            className: "min-w-[8rem] max-w-[14rem] align-top",
           },
           {
             key: "bal",
@@ -110,14 +110,15 @@ export function CustomerList() {
             sortable: true,
             sortValue: (r) => customerOpeningSigned(r),
             render: (r) => formatCurrency(customerOpeningSigned(r)),
-            className: "min-w-[9.5rem] whitespace-nowrap text-right tabular-nums pr-4",
+            className: "whitespace-nowrap text-right tabular-nums pr-3",
           },
           {
             key: "actions",
             header: t("common.actions"),
-            className: `${actionsColumnClass} min-w-[20rem] w-[20rem] px-3`,
+            className: "w-[1%] whitespace-nowrap text-right pr-3 pl-2",
             render: (r) => (
               <RowActions
+                compact
                 onView={() => navigate({ to: "/customers/$id", params: { id: r.id } })}
                 onEdit={() => navigate({ to: "/customers/$id/edit", params: { id: r.id } })}
                 extras={[

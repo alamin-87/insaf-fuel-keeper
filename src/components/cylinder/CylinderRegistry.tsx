@@ -142,59 +142,65 @@ export function CylinderRegistry() {
       byProductCylinders.set(c.productId, list);
     }
 
-    // Identify all cylinder product IDs from authoritative cylinderInventory and products
-    const cylProductIds = new Set<string>();
+    // Source of Truth: cylinderInventory
+    const cylProductMap = new Map<string, { inv?: (typeof cylinderInventory)[0]; product?: (typeof products)[0] }>();
     for (const inv of cylinderInventory) {
-      cylProductIds.add(inv.productId);
+      cylProductMap.set(inv.productId, {
+        inv,
+        product: products.find((p) => p.id === inv.productId),
+      });
     }
     for (const p of products) {
-      if (p.productType === "cylinder" || (p.uom === "cyl" && p.productType !== "gas")) {
-        cylProductIds.add(p.id);
+      if (
+        (p.productType === "cylinder" || (p.uom === "cyl" && p.productType !== "gas")) &&
+        !cylProductMap.has(p.id)
+      ) {
+        cylProductMap.set(p.id, { product: p });
       }
     }
-    for (const c of filtered) {
-      if (c.productId) cylProductIds.add(c.productId);
-    }
 
-    const rows = Array.from(cylProductIds).map((productId) => {
-      const inv = cylinderInventory.find((i) => i.productId === productId);
-      const product = products.find((p) => p.id === productId);
+    const rows = Array.from(cylProductMap.entries()).map(([productId, { inv, product }]) => {
       const name = inv?.productName || product?.name || productId;
       const list = byProductCylinders.get(productId) ?? [];
       const active = list.filter((c) => !isInactiveCompanyCylinder(c));
 
-      // Full stock from authoritative cylinderInventory onHand (or product stock / active in-stock)
-      const full = inv ? inv.onHand : (product?.stock ?? active.filter((c) => cylinderIsFullStock(c)).length);
+      // With customer (from cylinder tracking)
+      const customer = active.filter((c) => cylinderAtCustomer(c)).length;
+
+      // With supplier (from cylinder tracking)
+      const suppliers = active.filter((c) => cylinderAtSupplier(c) || c.status === "refilling").length;
+
+      // Loss / Damage (from cylinder tracking)
+      const lossDamage = active.filter(
+        (c) => c.status === "lost" || c.status === "damaged",
+      ).length;
 
       // Empty in warehouse
       const empty = active.filter(
         (c) =>
           cylinderIsEmpty(c) &&
-          c.status !== "at_customer" &&
-          c.status !== "in_transit" &&
-          !cylinderAtSupplier(c),
+          !cylinderAtCustomer(c) &&
+          !cylinderAtSupplier(c) &&
+          c.status !== "lost" &&
+          c.status !== "damaged",
       ).length;
 
-      // With customer
-      const customer = active.filter((c) => cylinderAtCustomer(c)).length;
+      // Current onHand stock from authoritative cylinderInventory (Source of Truth)
+      const onHandStock = inv != null ? inv.onHand : (product?.stock ?? active.filter((c) => cylinderIsFullStock(c)).length);
 
-      // With supplier
-      const suppliers = active.filter((c) => cylinderAtSupplier(c)).length;
+      // Full stock in warehouse: onHand minus any empty in warehouse
+      const full = Math.max(0, onHandStock - empty);
 
-      // Loss / Damage
-      const lossDamage = active.filter(
-        (c) => c.status === "lost" || c.status === "damaged",
-      ).length;
+      // Total cylinders for this product (Warehouse Full + Empty + Suppliers + Customer + Loss/Damage)
+      const total = full + empty + suppliers + customer + lossDamage;
 
-      // Total cylinders for this product
-      const total = full + empty + customer + suppliers + lossDamage;
-
-      // Authoritative Unit Cost from inventory or product
+      // Authoritative Unit Cost from inventory (costPrice or fallback to unitPrice / product cost)
       const unitCost = inv
-        ? (inv.costPrice > 0 ? inv.costPrice : inv.unitPrice)
+        ? (inv.costPrice > 0 ? inv.costPrice : (Number(product?.cost) || inv.unitPrice || Number(product?.price) || 0))
         : (Number(product?.cost) || Number(product?.price) || 0);
 
-      const totalValue = total * unitCost;
+      // Stock Value from authoritative inventory stock value (or onHandStock * unitCost)
+      const totalValue = inv != null ? inv.totalValue : onHandStock * unitCost;
 
       return {
         id: productId,
@@ -202,8 +208,8 @@ export function CylinderRegistry() {
         name,
         full,
         empty,
-        customer,
         suppliers,
+        customer,
         lossDamage,
         unitCost,
         total,

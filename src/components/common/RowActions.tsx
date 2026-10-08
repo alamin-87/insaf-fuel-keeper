@@ -23,6 +23,7 @@ export function RowActions({
   deleteLabel,
   className,
   extras,
+  compact = false,
 }: {
   onView?: () => void;
   onEdit?: () => void;
@@ -32,6 +33,7 @@ export function RowActions({
   deleteLabel?: string;
   className?: string;
   extras?: ActionBtn[];
+  compact?: boolean;
 }) {
   const t = useT();
 
@@ -52,6 +54,7 @@ export function RowActions({
             label={t("common.view")}
             onClick={onView}
             icon={<Eye className="h-3.5 w-3.5" />}
+            compact={compact}
           />
         )}
         {onEdit && (
@@ -62,6 +65,7 @@ export function RowActions({
             icon={<Pencil className="h-3.5 w-3.5" />}
             variant="outline"
             emphasize
+            compact={compact}
           />
         )}
         {extras?.map((x) => (
@@ -73,6 +77,7 @@ export function RowActions({
             variant={x.variant ?? "outline"}
             disabled={x.disabled}
             danger={x.danger}
+            compact={compact}
           />
         ))}
         {onDelete && (
@@ -82,6 +87,7 @@ export function RowActions({
             disabled={deleteDisabled}
             icon={<Trash2 className="h-3.5 w-3.5" />}
             danger
+            compact={compact}
           />
         )}
       </div>
@@ -97,6 +103,7 @@ function Action({
   disabled,
   danger,
   emphasize,
+  compact,
 }: {
   label: string;
   onClick: () => void;
@@ -105,6 +112,7 @@ function Action({
   disabled?: boolean;
   danger?: boolean;
   emphasize?: boolean;
+  compact?: boolean;
 }) {
   return (
     <Tooltip>
@@ -115,23 +123,27 @@ function Action({
           variant={danger ? "destructive" : variant}
           disabled={disabled}
           className={cn(
-            "h-8 gap-1.5 px-2.5 shadow-sm",
+            "h-8 gap-1.5 shadow-sm transition-all",
+            compact ? "h-8 w-8 p-0" : "px-2.5",
             emphasize &&
               !danger &&
               "border-primary/40 bg-primary/5 text-primary hover:bg-primary/10",
-            danger && "px-2",
+            danger && (compact ? "h-8 w-8 p-0" : "px-2"),
           )}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
             onClick();
           }}
+          aria-label={label}
         >
           {icon}
-          <span className={cn("hidden text-xs font-medium sm:inline", danger && "sm:hidden")}>
-            {label}
-          </span>
-          <span className="sr-only sm:hidden">{label}</span>
+          {!compact && (
+            <span className={cn("hidden text-xs font-medium sm:inline", danger && "sm:hidden")}>
+              {label}
+            </span>
+          )}
+          <span className="sr-only">{label}</span>
         </Button>
       </TooltipTrigger>
       <TooltipContent side="top">{label}</TooltipContent>

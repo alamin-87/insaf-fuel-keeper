@@ -44,33 +44,37 @@ function readLocalBranding() {
 function applyFaviconToDom(faviconUrl: string) {
   if (typeof document === "undefined") return;
   const href = faviconUrl || DEFAULT_FAVICON;
-  
-  // Find or create favicon link elements
-  let iconLinks = document.querySelectorAll<HTMLLinkElement>("link[rel*='icon']");
-  if (iconLinks.length === 0) {
-    const link = document.createElement("link");
-    link.rel = "icon";
-    link.href = href;
-    document.head.appendChild(link);
-  } else {
-    iconLinks.forEach((link) => {
-      link.href = href;
-    });
-  }
 
-  // Apple touch icon
-  let appleLink = document.querySelector<HTMLLinkElement>("link[rel='apple-touch-icon']");
-  if (appleLink) {
-    appleLink.href = href;
-  }
+  // Remove existing links to force browser refresh
+  const existingIcons = document.querySelectorAll<HTMLLinkElement>(
+    "link[rel~='icon'], link[rel='apple-touch-icon'], link[rel='shortcut icon']",
+  );
+  existingIcons.forEach((el) => el.remove());
+
+  const newIcon = document.createElement("link");
+  newIcon.rel = "icon";
+  newIcon.href = href;
+  document.head.appendChild(newIcon);
+
+  const newApple = document.createElement("link");
+  newApple.rel = "apple-touch-icon";
+  newApple.href = href;
+  document.head.appendChild(newApple);
 }
 
 function applyOgToDom(logoUrl: string) {
   if (typeof document === "undefined") return;
-  const href = logoUrl || DEFAULT_LOGO;
-  
+  const href = logoUrl
+    ? logoUrl.startsWith("data:")
+      ? `${window.location.origin}/api/branding/og-image?t=${Date.now()}`
+      : logoUrl
+    : `${window.location.origin}/api/branding/og-image`;
+
   const ogImg = document.querySelector<HTMLMetaElement>("meta[property='og:image']");
   if (ogImg) ogImg.content = href;
+
+  const ogSecImg = document.querySelector<HTMLMetaElement>("meta[property='og:image:secure_url']");
+  if (ogSecImg) ogSecImg.content = href;
 
   const twImg = document.querySelector<HTMLMetaElement>("meta[name='twitter:image']");
   if (twImg) twImg.content = href;
@@ -99,7 +103,7 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
       const nextFavicon = serverBranding.favicon ?? "";
       const nextLogo = serverBranding.logo ?? "";
       setLocal({ favicon: nextFavicon, logo: nextLogo });
-      
+
       try {
         localStorage.setItem(STORAGE_FAVICON_KEY, nextFavicon);
         localStorage.setItem(STORAGE_LOGO_KEY, nextLogo);
@@ -113,10 +117,10 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
   const saveMutation = useMutation({
     mutationFn: (data: { favicon?: string; logo?: string }) => saveBrandingFn({ data }),
     onSuccess: (saved: AppBranding) => {
-      const nextFavicon = saved.favicon ?? "";
-      const nextLogo = saved.logo ?? "";
+      const nextFavicon = saved.favicon !== undefined ? (saved.favicon ?? "") : local.favicon;
+      const nextLogo = saved.logo !== undefined ? (saved.logo ?? "") : local.logo;
       setLocal({ favicon: nextFavicon, logo: nextLogo });
-      
+
       try {
         localStorage.setItem(STORAGE_FAVICON_KEY, nextFavicon);
         localStorage.setItem(STORAGE_LOGO_KEY, nextLogo);
@@ -137,16 +141,16 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
 
   const setCustomFavicon = useCallback(
     async (favicon: string) => {
-      await saveMutation.mutateAsync({ favicon, logo: local.logo });
+      await saveMutation.mutateAsync({ favicon });
     },
-    [saveMutation, local.logo],
+    [saveMutation],
   );
 
   const setCustomLogo = useCallback(
     async (logo: string) => {
-      await saveMutation.mutateAsync({ favicon: local.favicon, logo });
+      await saveMutation.mutateAsync({ logo });
     },
-    [saveMutation, local.favicon],
+    [saveMutation],
   );
 
   const value = useMemo<BrandingContextValue>(
