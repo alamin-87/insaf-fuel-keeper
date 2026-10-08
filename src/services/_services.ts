@@ -417,6 +417,28 @@ async function hasPostedStock(
   type: "in" | "out",
 ) {
   const all = await call<StockMovement[]>("list", "stockMovements");
+  if (type === "out") {
+    const outQty = all
+      .filter(
+        (m) =>
+          m.refType === refType &&
+          m.refId === refId &&
+          m.productId === productId &&
+          m.type === "out",
+      )
+      .reduce((sum, m) => sum + (Number(m.quantity) || 0), 0);
+    const revInQty = all
+      .filter(
+        (m) =>
+          m.refType === refType &&
+          m.refId === refId &&
+          m.productId === productId &&
+          (m.type === "in" || m.type === "return") &&
+          /Reverse/i.test(m.notes || ""),
+      )
+      .reduce((sum, m) => sum + (Number(m.quantity) || 0), 0);
+    return outQty - revInQty > 0;
+  }
   return all.some(
     (m) =>
       m.refType === refType && m.refId === refId && m.productId === productId && m.type === type,

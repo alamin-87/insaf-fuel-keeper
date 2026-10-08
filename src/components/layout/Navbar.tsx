@@ -29,7 +29,7 @@ export function Navbar() {
     <header className="app-navbar sticky top-0 z-20 flex h-14 items-center gap-2 border-b px-3 backdrop-blur-xl sm:px-4">
       <SidebarTrigger />
       <div className="ml-1 flex min-w-0 items-center gap-2">
-        <BrandLogo size="sm" className="hidden sm:block" />
+        <BrandLogo size="sm" className="block shrink-0" />
         <div className="flex min-w-0 flex-col leading-tight">
           <span className="font-display truncate text-sm font-semibold tracking-tight">
             {t("brand.name")}

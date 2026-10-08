@@ -155,8 +155,8 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<BrandingContextValue>(
     () => ({
-      favicon: local.favicon || DEFAULT_FAVICON,
-      logo: local.logo || DEFAULT_LOGO,
+      favicon: local.favicon || local.logo || DEFAULT_FAVICON,
+      logo: local.logo || local.favicon || DEFAULT_LOGO,
       customFavicon: local.favicon,
       customLogo: local.logo,
       isLoading,

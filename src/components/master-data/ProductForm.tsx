@@ -65,6 +65,7 @@ export function ProductForm({ id }: { id?: string }) {
   } = useForm<FormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: {
+      code: "",
       category: "LPG",
       productType: "gas",
       uom: "kg",
@@ -82,7 +83,7 @@ export function ProductForm({ id }: { id?: string }) {
   useEffect(() => {
     if (!existing) return;
     reset({
-      code: existing.code,
+      code: existing.code || "",
       name: existing.name,
       category: existing.category || "LPG",
       productType: existing.productType ?? (existing.uom === "cyl" ? "cylinder" : "gas"),
@@ -101,7 +102,7 @@ export function ProductForm({ id }: { id?: string }) {
   const mutation = useMutation({
     mutationFn: (v: FormValues) => {
       const payload = {
-        code: v.code,
+        code: v.code?.trim() || undefined,
         name: v.name,
         category: v.category,
         productType: v.productType,
@@ -280,6 +281,9 @@ export function ProductForm({ id }: { id?: string }) {
             </Row>
             <Row label={t("products.reorder")}>
               <Input type="number" {...register("reorderLevel")} />
+            </Row>
+            <Row label={t("products.code")} error={errors.code?.message}>
+              <Input {...register("code")} placeholder={t("products.code")} />
             </Row>
             {mode === "create" && (
               <Row label={t("products.stock")}>

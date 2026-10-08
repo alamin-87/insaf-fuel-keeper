@@ -145,6 +145,18 @@ export async function reconcileDatabaseInventory(db: any, session?: any): Promis
       const qty = Number(m.quantity) || 0;
       if (qty <= 0) continue;
 
+      const isReverse = /Reverse/i.test(m.notes || "");
+      if (isReverse) {
+        if (m.refType === "sales" && (m.type === "in" || m.type === "return")) {
+          stockOut = Math.max(0, stockOut - qty);
+          continue;
+        }
+        if (m.refType === "purchase" && m.type === "out") {
+          stockIn = Math.max(0, stockIn - qty);
+          continue;
+        }
+      }
+
       const isIn =
         m.type === "in" ||
         m.direction === "in" ||
@@ -171,8 +183,20 @@ export async function reconcileDatabaseInventory(db: any, session?: any): Promis
       }
     }
 
+    // Guarantee active posted sales are accounted for
+    const activeSoldQty = sales
+      .filter((s) => ["confirmed", "invoiced", "paid"].includes(s.status))
+      .reduce(
+        (sum, s) =>
+          sum + (Number(s.items?.find((it) => it.productId === p.id)?.quantity) || 0),
+        0,
+      );
+    if (activeSoldQty > stockOut) {
+      stockOut = activeSoldQty;
+    }
+
     // FORMULA: ON HAND = OPENING STOCK + STOCK IN - STOCK OUT
-    const onHand = openingStock + stockIn - stockOut;
+    const onHand = Math.max(0, openingStock + stockIn - stockOut);
     const unitPrice = Number(p.price) || 0;
     const costPrice = Number(p.cost) || 0;
     const totalValue = onHand * (costPrice > 0 ? costPrice : unitPrice);
@@ -236,6 +260,7 @@ export async function reconcileDatabaseInventory(db: any, session?: any): Promis
         { upsert: true, ...opt },
       );
     } else {
+      const displayStockIn = openingStock > 0 && stockIn === 0 ? openingStock : stockIn;
       const prodRow: ProductInventory = {
         id: `prod-${p.id}`,
         productId: p.id,
@@ -243,7 +268,7 @@ export async function reconcileDatabaseInventory(db: any, session?: any): Promis
         productType: "product",
         uom: p.uom || "pcs",
         openingStock,
-        stockIn,
+        stockIn: displayStockIn,
         stockOut,
         onHand,
         unitPrice,
