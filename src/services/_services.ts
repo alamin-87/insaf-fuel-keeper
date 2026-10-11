@@ -1158,7 +1158,18 @@ export const deliveryService = {
   update: async (id: string, data: Partial<Delivery>) => {
     const existing = await call<Delivery | null>("get", "deliveries", id);
     if (!existing) throw new Error("Delivery not found");
-    if (existing.status !== "pending") throw new Error("Only pending deliveries can be edited");
+    if (existing.status !== "pending") {
+      // Delivered challans: allow editing delivery & customer notes/driver/receiver/vehicle without altering stock items
+      const {
+        items: _ignoreItems,
+        status: _ignoreStatus,
+        id: _ignoreId,
+        challanNo: _ignoreNo,
+        confirmedAt: _ignoreConfirmedAt,
+        ...allowedFields
+      } = data;
+      return call<Delivery>("update", "deliveries", id, allowedFields);
+    }
     return call<Delivery>("update", "deliveries", id, data);
   },
   remove: async (id: string) => {

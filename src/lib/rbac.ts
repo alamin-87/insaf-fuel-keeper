@@ -34,6 +34,8 @@ export type AppPermission =
   // Deliveries & Cylinders
   | "deliveries.read"
   | "deliveries.write"
+  | "returns.read"
+  | "returns.write"
   | "cylinders.read"
   | "cylinders.write"
   // Reports & Settings
@@ -69,6 +71,8 @@ const ROLE_PERMISSIONS: Record<AppRole, Set<AppPermission>> = {
     "suppliers.write",
     "deliveries.read",
     "deliveries.write",
+    "returns.read",
+    "returns.write",
     "cylinders.read",
     "cylinders.write",
     "reports.read",
@@ -95,6 +99,8 @@ const ROLE_PERMISSIONS: Record<AppRole, Set<AppPermission>> = {
     "suppliers.write",
     "deliveries.read",
     "deliveries.write",
+    "returns.read",
+    "returns.write",
     "cylinders.read",
     "cylinders.write",
     "reports.read",
@@ -107,6 +113,8 @@ const ROLE_PERMISSIONS: Record<AppRole, Set<AppPermission>> = {
     "customers.read",
     "customers.write",
     "deliveries.read",
+    "returns.read",
+    "returns.write",
     "cylinders.read",
     "reports.read",
   ]),
@@ -118,6 +126,8 @@ const ROLE_PERMISSIONS: Record<AppRole, Set<AppPermission>> = {
     "suppliers.read",
     "deliveries.read",
     "deliveries.write",
+    "returns.read",
+    "returns.write",
     "cylinders.read",
     "cylinders.write",
     "reports.read",
@@ -140,6 +150,8 @@ const ROLE_PERMISSIONS: Record<AppRole, Set<AppPermission>> = {
   Delivery: new Set<AppPermission>([
     "deliveries.read",
     "deliveries.write",
+    "returns.read",
+    "returns.write",
     "customers.read",
     "cylinders.read",
     "cylinders.write",
@@ -153,6 +165,7 @@ const ROLE_PERMISSIONS: Record<AppRole, Set<AppPermission>> = {
     "customers.read",
     "suppliers.read",
     "deliveries.read",
+    "returns.read",
     "cylinders.read",
     "reports.read",
   ]),

@@ -287,6 +287,9 @@ export interface Delivery {
   confirmedAt?: string;
   receiverName?: string;
   emptyReturned?: number;
+  notes?: string;
+  customerPhone?: string;
+  customerAddress?: string;
 }
 
 export type PurchaseStatus =
@@ -519,4 +522,50 @@ export interface StockAlert {
   productName: string;
   stock: number;
   reorderLevel: number;
+}
+
+export type ReturnItemType = "gas" | "cylinder" | "product";
+export type CylinderReturnCondition = "empty" | "full" | "damaged";
+
+export interface ReturnItem {
+  productId: ID;
+  productName: string;
+  category?: string;
+  itemType: ReturnItemType;
+  deliveredQuantity: number;
+  previouslyReturnedQuantity: number;
+  returnQuantity: number;
+  price: number;
+  subtotal: number;
+  cylinderCondition?: CylinderReturnCondition;
+  cylinderIds?: string[];
+  unit?: UnitOfMeasure;
+}
+
+export interface ReturnRecord {
+  id: ID;
+  returnNo: string;
+  deliveryId: ID;
+  challanNo: string;
+  salesOrderId?: ID;
+  orderNo?: string;
+  customerId: ID;
+  customerName: string;
+  customerPhone?: string;
+  customerAddress?: string;
+  driverName?: string;
+  receiverName?: string;
+  vehicleNo?: string;
+  returnDate: string;
+  items: ReturnItem[];
+  itemClassification: "gas" | "cylinder" | "product" | "mixed";
+  totalQuantity: number;
+  totalAmount: number;
+  reason?: string;
+  notes?: string;
+  status: "completed" | "pending" | "cancelled";
+  createdBy: string;
+  createdAt: string;
+  updatedAt?: string;
+  movementIds?: string[];
 }

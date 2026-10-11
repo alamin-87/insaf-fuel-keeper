@@ -9,6 +9,7 @@ export type CrudCollName =
   | "movements"
   | "sales"
   | "deliveries"
+  | "returns"
   | "expenses"
   | "ledger"
   | "purchases"
@@ -32,6 +33,7 @@ const WRITE: Record<CrudCollName, AppModule[]> = {
   movements: ["cylinders", "inventory", "deliveries", "sales", "purchases"],
   sales: ["sales", "deliveries", "inventory"],
   deliveries: ["deliveries", "sales"],
+  returns: ["returns", "deliveries", "sales", "inventory"],
   expenses: ["expenses", "accounting"],
   ledger: ["accounting"],
   purchases: ["purchases", "inventory"],
@@ -72,6 +74,7 @@ const READ: Record<CrudCollName, AppModule[]> = {
   ],
   sales: ["sales", "accounting", "reports", "deliveries", "dashboard"],
   deliveries: ["deliveries", "sales", "reports"],
+  returns: ["returns", "deliveries", "sales", "inventory", "reports"],
   expenses: ["expenses", "accounting", "reports", "dashboard"],
   ledger: ["accounting", "reports"],
   purchases: ["purchases", "accounting", "reports", "inventory"],

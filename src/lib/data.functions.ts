@@ -37,6 +37,7 @@ type CollName =
   | "movements"
   | "sales"
   | "deliveries"
+  | "returns"
   | "expenses"
   | "ledger"
   | "purchases"
@@ -241,6 +242,10 @@ async function collCreate<T extends { id?: string }>(
   } else if (name === "deliveries" && (!doc.challanNo || String(doc.challanNo).startsWith("DC-"))) {
     if (!doc.challanNo || String(doc.challanNo).length < 15) {
       doc.challanNo = await getNextSequence(db, "DC");
+    }
+  } else if (name === "returns" && (!doc.returnNo || String(doc.returnNo).startsWith("RET-"))) {
+    if (!doc.returnNo || String(doc.returnNo).length < 15) {
+      doc.returnNo = await getNextSequence(db, "RET");
     }
   }
 

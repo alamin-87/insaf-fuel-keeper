@@ -11,6 +11,7 @@ export type AppModule =
   | "inventory"
   | "cylinders"
   | "deliveries"
+  | "returns"
   | "accounting"
   | "expenses"
   | "hr"
@@ -46,6 +47,7 @@ export const APP_MODULES: { id: AppModule; label: string }[] = [
   { id: "inventory", label: "Inventory" },
   { id: "cylinders", label: "Cylinders" },
   { id: "deliveries", label: "Deliveries" },
+  { id: "returns", label: "Returns" },
   { id: "accounting", label: "Accounting" },
   { id: "expenses", label: "Expenses" },
   { id: "hr", label: "HR & Payroll" },
@@ -104,6 +106,7 @@ export function defaultMatrix(): Record<AppRole, Record<AppModule, boolean>> {
       products: true,
       sales: true,
       deliveries: true,
+      returns: true,
       reports: true,
     },
     Warehouse: {
@@ -114,6 +117,7 @@ export function defaultMatrix(): Record<AppRole, Record<AppModule, boolean>> {
       inventory: true,
       cylinders: true,
       deliveries: true,
+      returns: true,
       purchases: true,
     },
     Accounts: {
@@ -138,6 +142,7 @@ export function defaultMatrix(): Record<AppRole, Record<AppModule, boolean>> {
       dashboard: true,
       customers: true,
       deliveries: true,
+      returns: true,
       cylinders: true,
     },
     Auditor: {

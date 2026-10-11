@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Printer, Trash2 } from "lucide-react";
+import { Printer, Trash2, Undo2 } from "lucide-react";
 import { deliveryService } from "@/services/delivery.service";
 import { salesService } from "@/services/sales.service";
 import { productService } from "@/services/product.service";
@@ -160,10 +160,16 @@ export function DeliveryChallan({ id }: { id: string }) {
         backLabel={t("deliveries.title")}
         actions={
           <div className="flex items-center gap-2">
-            {d.status === "pending" && (
+            <Button variant="outline" asChild>
+              <Link to="/deliveries/$id/edit" params={{ id: d.id }}>
+                {t("common.edit")}
+              </Link>
+            </Button>
+            {(d.status === "delivered" || d.status === "confirmed") && (
               <Button variant="outline" asChild>
-                <Link to="/deliveries/$id/edit" params={{ id: d.id }}>
-                  {t("common.edit")}
+                <Link to="/deliveries/$id/return" params={{ id: d.id }}>
+                  <Undo2 className="mr-1 h-4 w-4" />
+                  {t("deliveries.return")}
                 </Link>
               </Button>
             )}

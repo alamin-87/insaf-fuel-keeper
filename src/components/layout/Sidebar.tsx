@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard,
@@ -14,6 +15,8 @@ import {
   ShoppingBag,
   Settings,
   Cylinder,
+  RotateCcw,
+  ChevronDown,
 } from "lucide-react";
 import {
   Sidebar,
@@ -28,6 +31,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  SidebarMenuAction,
 } from "@/components/ui/sidebar";
 import { BrandLogo } from "@/components/common/BrandLogo";
 import { useModuleAccess } from "@/hooks/useModuleAccess";
@@ -35,6 +39,7 @@ import { useT, type MessageKey } from "@/i18n";
 
 export function AppSidebar() {
   const t = useT();
+  const [returnsExpanded, setReturnsExpanded] = useState(true);
   const { pathname, search } = useRouterState({
     select: (r) => ({
       pathname: r.location.pathname,
@@ -57,6 +62,7 @@ export function AppSidebar() {
     }
     if (url === "/products/categories") return pathname.startsWith("/products/categories");
     if (url === "/inventory") return pathname.startsWith("/inventory");
+    if (url === "/returns") return pathname.startsWith("/returns");
     return pathname.startsWith(url);
   };
 
@@ -87,6 +93,7 @@ export function AppSidebar() {
         { titleKey: "nav.inventory", url: "/inventory", icon: Warehouse },
         { titleKey: "nav.cylinders", url: "/cylinders", icon: Cylinder },
         { titleKey: "nav.deliveries", url: "/deliveries", icon: ClipboardList },
+        { titleKey: "nav.returns", url: "/returns", icon: RotateCcw },
       ],
     },
     {
@@ -202,6 +209,65 @@ export function AppSidebar() {
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                       </SidebarMenuSub>
+                    )}
+                    {item.url === "/returns" && (
+                      <>
+                        <SidebarMenuAction
+                          className="transition-transform duration-200"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setReturnsExpanded((prev) => !prev);
+                          }}
+                        >
+                          <ChevronDown
+                            className={`h-4 w-4 transition-transform duration-200 ${
+                              !returnsExpanded ? "-rotate-90" : ""
+                            }`}
+                          />
+                          <span className="sr-only">Toggle Returns</span>
+                        </SidebarMenuAction>
+                        {returnsExpanded && (
+                          <SidebarMenuSub>
+                            <SidebarMenuSubItem>
+                              <SidebarMenuSubButton
+                                asChild
+                                isActive={
+                                  pathname === "/returns" &&
+                                  (searchTab === "gas" || (!searchTab && pathname === "/returns"))
+                                }
+                                size="sm"
+                              >
+                                <Link to="/returns" search={{ tab: "gas" }}>
+                                  <span>{t("nav.gasReturn")}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                            <SidebarMenuSubItem>
+                              <SidebarMenuSubButton
+                                asChild
+                                isActive={pathname === "/returns" && searchTab === "cylinder"}
+                                size="sm"
+                              >
+                                <Link to="/returns" search={{ tab: "cylinder" }}>
+                                  <span>{t("nav.cylinderReturn")}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                            <SidebarMenuSubItem>
+                              <SidebarMenuSubButton
+                                asChild
+                                isActive={pathname === "/returns" && searchTab === "product"}
+                                size="sm"
+                              >
+                                <Link to="/returns" search={{ tab: "product" }}>
+                                  <span>{t("nav.productReturn")}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          </SidebarMenuSub>
+                        )}
+                      </>
                     )}
                   </SidebarMenuItem>
                 ))}

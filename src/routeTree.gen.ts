@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ReturnsRouteImport } from './routes/returns'
 import { Route as ReportsRouteImport } from './routes/reports'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as InventoryRouteImport } from './routes/inventory'
@@ -52,6 +53,7 @@ import { Route as SalesIdEditRouteImport } from './routes/sales.$id.edit'
 import { Route as PurchasesIdEditRouteImport } from './routes/purchases.$id.edit'
 import { Route as ProductsIdEditRouteImport } from './routes/products.$id.edit'
 import { Route as HrIdStatementRouteImport } from './routes/hr.$id.statement'
+import { Route as DeliveriesIdReturnRouteImport } from './routes/deliveries.$id.return'
 import { Route as DeliveriesIdEditRouteImport } from './routes/deliveries.$id.edit'
 import { Route as CylindersIdEditRouteImport } from './routes/cylinders.$id.edit'
 import { Route as CustomersIdStatementRouteImport } from './routes/customers.$id.statement'
@@ -60,6 +62,11 @@ import { Route as CustomersIdEditRouteImport } from './routes/customers.$id.edit
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReturnsRoute = ReturnsRouteImport.update({
+  id: '/returns',
+  path: '/returns',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReportsRoute = ReportsRouteImport.update({
@@ -272,6 +279,11 @@ const HrIdStatementRoute = HrIdStatementRouteImport.update({
   path: '/statement',
   getParentRoute: () => HrIdRoute,
 } as any)
+const DeliveriesIdReturnRoute = DeliveriesIdReturnRouteImport.update({
+  id: '/return',
+  path: '/return',
+  getParentRoute: () => DeliveriesIdRoute,
+} as any)
 const DeliveriesIdEditRoute = DeliveriesIdEditRouteImport.update({
   id: '/edit',
   path: '/edit',
@@ -301,6 +313,7 @@ export interface FileRoutesByFullPath {
   '/inventory': typeof InventoryRoute
   '/login': typeof LoginRoute
   '/reports': typeof ReportsRoute
+  '/returns': typeof ReturnsRoute
   '/settings': typeof SettingsRoute
   '/customers/$id': typeof CustomersIdRouteWithChildren
   '/customers/new': typeof CustomersNewRoute
@@ -335,6 +348,7 @@ export interface FileRoutesByFullPath {
   '/customers/$id/statement': typeof CustomersIdStatementRoute
   '/cylinders/$id/edit': typeof CylindersIdEditRoute
   '/deliveries/$id/edit': typeof DeliveriesIdEditRoute
+  '/deliveries/$id/return': typeof DeliveriesIdReturnRoute
   '/hr/$id/statement': typeof HrIdStatementRoute
   '/products/$id/edit': typeof ProductsIdEditRoute
   '/purchases/$id/edit': typeof PurchasesIdEditRoute
@@ -349,6 +363,7 @@ export interface FileRoutesByTo {
   '/inventory': typeof InventoryRoute
   '/login': typeof LoginRoute
   '/reports': typeof ReportsRoute
+  '/returns': typeof ReturnsRoute
   '/settings': typeof SettingsRoute
   '/customers/$id': typeof CustomersIdRouteWithChildren
   '/customers/new': typeof CustomersNewRoute
@@ -383,6 +398,7 @@ export interface FileRoutesByTo {
   '/customers/$id/statement': typeof CustomersIdStatementRoute
   '/cylinders/$id/edit': typeof CylindersIdEditRoute
   '/deliveries/$id/edit': typeof DeliveriesIdEditRoute
+  '/deliveries/$id/return': typeof DeliveriesIdReturnRoute
   '/hr/$id/statement': typeof HrIdStatementRoute
   '/products/$id/edit': typeof ProductsIdEditRoute
   '/purchases/$id/edit': typeof PurchasesIdEditRoute
@@ -399,6 +415,7 @@ export interface FileRoutesById {
   '/inventory': typeof InventoryRoute
   '/login': typeof LoginRoute
   '/reports': typeof ReportsRoute
+  '/returns': typeof ReturnsRoute
   '/settings': typeof SettingsRoute
   '/customers/$id': typeof CustomersIdRouteWithChildren
   '/customers/new': typeof CustomersNewRoute
@@ -433,6 +450,7 @@ export interface FileRoutesById {
   '/customers/$id/statement': typeof CustomersIdStatementRoute
   '/cylinders/$id/edit': typeof CylindersIdEditRoute
   '/deliveries/$id/edit': typeof DeliveriesIdEditRoute
+  '/deliveries/$id/return': typeof DeliveriesIdReturnRoute
   '/hr/$id/statement': typeof HrIdStatementRoute
   '/products/$id/edit': typeof ProductsIdEditRoute
   '/purchases/$id/edit': typeof PurchasesIdEditRoute
@@ -450,6 +468,7 @@ export interface FileRouteTypes {
     | '/inventory'
     | '/login'
     | '/reports'
+    | '/returns'
     | '/settings'
     | '/customers/$id'
     | '/customers/new'
@@ -484,6 +503,7 @@ export interface FileRouteTypes {
     | '/customers/$id/statement'
     | '/cylinders/$id/edit'
     | '/deliveries/$id/edit'
+    | '/deliveries/$id/return'
     | '/hr/$id/statement'
     | '/products/$id/edit'
     | '/purchases/$id/edit'
@@ -498,6 +518,7 @@ export interface FileRouteTypes {
     | '/inventory'
     | '/login'
     | '/reports'
+    | '/returns'
     | '/settings'
     | '/customers/$id'
     | '/customers/new'
@@ -532,6 +553,7 @@ export interface FileRouteTypes {
     | '/customers/$id/statement'
     | '/cylinders/$id/edit'
     | '/deliveries/$id/edit'
+    | '/deliveries/$id/return'
     | '/hr/$id/statement'
     | '/products/$id/edit'
     | '/purchases/$id/edit'
@@ -547,6 +569,7 @@ export interface FileRouteTypes {
     | '/inventory'
     | '/login'
     | '/reports'
+    | '/returns'
     | '/settings'
     | '/customers/$id'
     | '/customers/new'
@@ -581,6 +604,7 @@ export interface FileRouteTypes {
     | '/customers/$id/statement'
     | '/cylinders/$id/edit'
     | '/deliveries/$id/edit'
+    | '/deliveries/$id/return'
     | '/hr/$id/statement'
     | '/products/$id/edit'
     | '/purchases/$id/edit'
@@ -597,6 +621,7 @@ export interface RootRouteChildren {
   InventoryRoute: typeof InventoryRoute
   LoginRoute: typeof LoginRoute
   ReportsRoute: typeof ReportsRoute
+  ReturnsRoute: typeof ReturnsRoute
   SettingsRoute: typeof SettingsRoute
   CustomersIdRoute: typeof CustomersIdRouteWithChildren
   CustomersNewRoute: typeof CustomersNewRoute
@@ -633,6 +658,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/returns': {
+      id: '/returns'
+      path: '/returns'
+      fullPath: '/returns'
+      preLoaderRoute: typeof ReturnsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reports': {
@@ -929,6 +961,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HrIdStatementRouteImport
       parentRoute: typeof HrIdRoute
     }
+    '/deliveries/$id/return': {
+      id: '/deliveries/$id/return'
+      path: '/return'
+      fullPath: '/deliveries/$id/return'
+      preLoaderRoute: typeof DeliveriesIdReturnRouteImport
+      parentRoute: typeof DeliveriesIdRoute
+    }
     '/deliveries/$id/edit': {
       id: '/deliveries/$id/edit'
       path: '/edit'
@@ -1012,10 +1051,12 @@ const CylindersIdRouteWithChildren = CylindersIdRoute._addFileChildren(
 
 interface DeliveriesIdRouteChildren {
   DeliveriesIdEditRoute: typeof DeliveriesIdEditRoute
+  DeliveriesIdReturnRoute: typeof DeliveriesIdReturnRoute
 }
 
 const DeliveriesIdRouteChildren: DeliveriesIdRouteChildren = {
   DeliveriesIdEditRoute: DeliveriesIdEditRoute,
+  DeliveriesIdReturnRoute: DeliveriesIdReturnRoute,
 }
 
 const DeliveriesIdRouteWithChildren = DeliveriesIdRoute._addFileChildren(
@@ -1079,6 +1120,7 @@ const rootRouteChildren: RootRouteChildren = {
   InventoryRoute: InventoryRoute,
   LoginRoute: LoginRoute,
   ReportsRoute: ReportsRoute,
+  ReturnsRoute: ReturnsRoute,
   SettingsRoute: SettingsRoute,
   CustomersIdRoute: CustomersIdRouteWithChildren,
   CustomersNewRoute: CustomersNewRoute,

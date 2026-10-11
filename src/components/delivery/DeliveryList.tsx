@@ -107,16 +107,12 @@ export function DeliveryList() {
             render: (r) => (
               <RowActions
                 onView={() => navigate({ to: "/deliveries/$id", params: { id: r.id } })}
-                onEdit={
-                  r.status === "pending"
-                    ? () => navigate({ to: "/deliveries/$id/edit", params: { id: r.id } })
-                    : undefined
-                }
+                onEdit={() => navigate({ to: "/deliveries/$id/edit", params: { id: r.id } })}
                 extras={[
                   {
                     label: t("deliveries.return"),
                     icon: <Undo2 className="h-3.5 w-3.5" />,
-                    onClick: () => navigate({ to: "/deliveries/$id", params: { id: r.id } }),
+                    onClick: () => navigate({ to: "/deliveries/$id/return", params: { id: r.id } }),
                   },
                 ]}
                 onDelete={

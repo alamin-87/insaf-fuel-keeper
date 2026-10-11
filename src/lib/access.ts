@@ -13,6 +13,7 @@ export const PATH_MODULE_MAP: { prefix: string; module: AppModule }[] = [
   { prefix: "/inventory", module: "inventory" },
   { prefix: "/cylinders", module: "cylinders" },
   { prefix: "/deliveries", module: "deliveries" },
+  { prefix: "/returns", module: "returns" },
   { prefix: "/accounting", module: "accounting" },
   { prefix: "/expenses", module: "expenses" },
   { prefix: "/hr", module: "hr" },
