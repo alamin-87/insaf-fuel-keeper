@@ -25,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatCurrency, formatDateTime } from "@/utils/formatters";
+import { formatCurrency, formatDate, formatDateTime } from "@/utils/formatters";
 import { buildProductInventory, sumInventory } from "@/lib/cylinder-inventory";
 import { buildStockReport, isMovementIn, isMovementOut } from "@/lib/stock-report";
 import { EMPTY_DATE_RANGE } from "@/lib/date-range";
@@ -170,20 +170,23 @@ export function InventoryPage() {
     }
     let received = 0;
     for (const m of movements) {
-      if (isMovementIn(m) && m.refType === "purchase") received += Math.abs(m.quantity || 0);
+      if (isMovementIn(m) && m.refType === "purchase") {
+        const p = products.find((x) => x.id === m.productId);
+        const isCyl =
+          m.productType === "cylinder" ||
+          p?.productType === "cylinder" ||
+          (p?.uom === "cyl" && p?.productType !== "gas");
+        if (isCyl) received += Math.abs(m.quantity || 0);
+      }
     }
     if (received === 0) {
       for (const m of cylMoves) {
         if (m.type === "received") received += 1;
       }
     }
-    const cylinderRows = rows.filter((r) => {
-      const p = products.find((x) => x.id === r.productId);
-      return p?.productType === "cylinder" || (p?.uom === "cyl" && p?.productType !== "gas");
-    });
-    const cylinderOnHand = cylinderRows.reduce((sum, r) => sum + r.full, 0);
-    const cylinderAvailable = cylinderRows.reduce((sum, r) => sum + r.available, 0);
-    const cylinderReserved = cylinderRows.reduce((sum, r) => sum + r.reserved, 0);
+    const cylinderOnHand = cylinderInventory.reduce((sum, c) => sum + (c.onHand || 0), 0);
+    const cylinderAvailable = cylinderInventory.reduce((sum, c) => sum + (c.available || 0), 0);
+    const cylinderReserved = cylinderInventory.reduce((sum, c) => sum + (c.reserved || 0), 0);
 
     return {
       received,
@@ -193,14 +196,13 @@ export function InventoryPage() {
       reserved: cylinderReserved,
       available: cylinderAvailable,
     };
-  }, [customers, cylinders, cylMoves, movements, products, rows]);
+  }, [customers, cylinders, cylMoves, movements, products, cylinderInventory]);
 
   const activity = useMemo(
     () =>
       movements
         .map(activityFromMovement)
-        .sort((a, b) => String(b.date).localeCompare(String(a.date)))
-        .slice(0, 40),
+        .sort((a, b) => String(b.date).localeCompare(String(a.date))),
     [movements],
   );
 
@@ -258,7 +260,12 @@ export function InventoryPage() {
   const adjust = useMutation({
     mutationFn: async () => {
       if (type === "refill")
-        return inventoryService.completeRefill(productId, Number(qty), notes || "Warehouse");
+        return inventoryService.completeRefill(
+          productId,
+          Number(qty),
+          notes || "Warehouse",
+          sendDate || undefined,
+        );
       if (type === "send_supplier") {
         return inventoryService.sendToSupplier({
           supplierId,
@@ -523,7 +530,7 @@ export function InventoryPage() {
             </DropdownMenuContent>
           </DropdownMenu>
           <button type="button" className="text-left" onClick={() => navigate({ to: "/sales" })}>
-            <StatCard title={t("inventory.reserved")} value={String(totals.reserved)} icon={Truck} />
+            <StatCard title={t("inventory.reserved")} value={String(summaryCards.reserved)} icon={Truck} />
           </button>
           <button type="button" className="text-left" onClick={() => navigate({ to: "/cylinders" })}>
             <StatCard
@@ -536,7 +543,7 @@ export function InventoryPage() {
           <button type="button" className="text-left" onClick={() => navigate({ to: "/products" })}>
             <StatCard
               title={t("inventory.available")}
-              value={String(totals.available)}
+              value={String(summaryCards.available)}
               icon={ShoppingCart}
               tone="positive"
             />
@@ -662,6 +669,16 @@ export function InventoryPage() {
                     onChange={(e) => setExpectedReturn(e.target.value)}
                   />
                 </div>
+              </div>
+            )}
+            {type === "refill" && (
+              <div className="space-y-1.5">
+                <Label>{t("inventory.refillDate")}</Label>
+                <Input
+                  type="date"
+                  value={sendDate}
+                  onChange={(e) => setSendDate(e.target.value)}
+                />
               </div>
             )}
             {type === "mark_lost" && (
@@ -1121,6 +1138,18 @@ export function InventoryPage() {
                 header: t("inventory.emptyIn"),
                 render: (r) => r.emptyIn || "—",
                 className: "text-right tabular-nums",
+              },
+              {
+                key: "refillDate",
+                header: t("inventory.refillDate"),
+                sortable: true,
+                sortValue: (r) => r.refillDate || "",
+                render: (r) => {
+                  if (!r.refillDate) return "—";
+                  const d = new Date(r.refillDate);
+                  return Number.isNaN(d.getTime()) ? "—" : formatDate(r.refillDate);
+                },
+                className: "whitespace-nowrap",
               },
               {
                 key: "refill",

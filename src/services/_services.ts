@@ -1593,7 +1593,12 @@ export const purchaseService = {
 
 export const inventoryService = {
   listMovements: () => call<StockMovement[]>("list", "stockMovements"),
-  completeRefill: async (productId: string, quantity: number, by?: string) => {
+  completeRefill: async (
+    productId: string,
+    quantity: number,
+    by?: string,
+    refillDate?: string,
+  ) => {
     const product = await call<Product | null>("get", "products", productId);
     if (!product) throw new Error("Product not found");
     if (quantity <= 0) throw new Error("Quantity must be positive");
@@ -1609,6 +1614,20 @@ export const inventoryService = {
       .sort((a, b) => a.lastMovementAt.localeCompare(b.lastMovementAt));
     if (empties.length < quantity)
       throw new Error(`Only ${empties.length} empty cylinder(s) ready to refill`);
+
+    const now = new Date().toISOString();
+
+    // Idempotency guard: prevent duplicate submission within 3s for same product & quantity
+    const recentMovements = await call<StockMovement[]>("list", "stockMovements");
+    const isDup = recentMovements.find(
+      (m) =>
+        m.refType === "refill" &&
+        m.productId === product.id &&
+        m.quantity === quantity &&
+        Math.abs(new Date(now).getTime() - new Date(m.date).getTime()) < 3000,
+    );
+    if (isDup) return;
+
     const picked = empties.slice(0, quantity);
     for (const c of picked) {
       await cylinderService.addMovement({
@@ -1620,19 +1639,25 @@ export const inventoryService = {
         by: by || "Warehouse",
       });
     }
-    if (!isCylinderProduct(product)) {
-      await call("create", "stockMovements", undefined, {
-        date: new Date().toISOString(),
-        productId: product.id,
-        productName: product.name,
-        type: "in",
-        quantity,
-        balanceAfter: product.stock,
-        refType: "refill",
-        notes: `Refill complete × ${quantity}`,
-        by: by || "Warehouse",
-      });
-    }
+
+    const actualRefillDate = refillDate
+      ? (refillDate.includes("T") ? refillDate : `${refillDate}T00:00:00.000Z`)
+      : now;
+
+    await call("create", "stockMovements", undefined, {
+      date: now,
+      refillDate: actualRefillDate,
+      productId: product.id,
+      productName: product.name,
+      productType: "cylinder",
+      type: "in",
+      movementType: "RECEIPT",
+      quantity,
+      balanceAfter: product.stock,
+      refType: "refill",
+      notes: `Refill complete × ${quantity}`,
+      by: by || "Warehouse",
+    });
   },
   sendToSupplier: async (data: {
     supplierId: string;

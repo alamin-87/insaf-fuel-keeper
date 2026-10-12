@@ -144,6 +144,7 @@ export async function reconcileDatabaseInventory(db: any, session?: any): Promis
       if (m.id === initMove?.id) continue; // opening handled separately
       const qty = Number(m.quantity) || 0;
       if (qty <= 0) continue;
+      if (m.refType === "refill") continue;
 
       const isReverse = /Reverse/i.test(m.notes || "");
       if (isReverse) {

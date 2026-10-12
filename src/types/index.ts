@@ -342,6 +342,7 @@ export interface StockMovement {
   id: ID;
   movementId?: string;
   date: string;
+  refillDate?: string;
   productId: ID;
   productName: string;
   productType?: ProductType;

@@ -528,6 +528,7 @@ export const bn = {
   "inventory.fullOut": "ভরা আউট",
   "inventory.emptyIn": "খালি ইন",
   "inventory.refill": "রিফিল",
+  "inventory.refillDate": "রিফিল তারিখ",
   "inventory.receivedBy": "গ্রহণকারী",
   "inventory.refillComplete": "রিফিল সম্পন্ন",
   "inventory.refilled": "রিফিল সম্পন্ন হয়েছে",

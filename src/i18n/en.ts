@@ -523,6 +523,7 @@ export const en = {
   "inventory.fullOut": "Full Out",
   "inventory.emptyIn": "Empty In",
   "inventory.refill": "Refill",
+  "inventory.refillDate": "Refill Date",
   "inventory.receivedBy": "Received By",
   "inventory.refillComplete": "Complete Refill",
   "inventory.refilled": "Refill completed",
