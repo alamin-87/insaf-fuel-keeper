@@ -1,4 +1,5 @@
 import type {
+  Cylinder,
   CylinderInventory,
   Delivery,
   GasInventory,
@@ -103,12 +104,13 @@ export async function reconcileDatabaseInventory(db: any, session?: any): Promis
   const opt = session ? { session } : {};
   const now = new Date().toISOString();
 
-  const [productsRaw, movementsRaw, salesRaw, deliveriesRaw, purchasesRaw] = await Promise.all([
+  const [productsRaw, movementsRaw, salesRaw, deliveriesRaw, purchasesRaw, cylindersRaw] = await Promise.all([
     db.collection("products").find({}, opt).toArray(),
     db.collection("stockMovements").find({}, opt).toArray(),
     db.collection("sales").find({}, opt).toArray(),
     db.collection("deliveries").find({}, opt).toArray(),
     db.collection("purchases").find({}, opt).toArray(),
+    db.collection("cylinders").find({}, opt).toArray(),
   ]);
 
   const products: Product[] = productsRaw.map((d: any) => clean(d));
@@ -116,13 +118,83 @@ export async function reconcileDatabaseInventory(db: any, session?: any): Promis
   const sales: SalesOrder[] = salesRaw.map((d: any) => clean(d));
   const deliveries: Delivery[] = deliveriesRaw.map((d: any) => clean(d));
   const purchases: PurchaseOrder[] = purchasesRaw.map((d: any) => clean(d));
+  const cylinders: Cylinder[] = cylindersRaw.map((d: any) => clean(d));
+
+  const productsTableIdSet = new Set(products.map((p) => p.id));
+  const productMap = new Map<string, Product>();
+  for (const p of products) {
+    productMap.set(p.id, p);
+  }
+
+  // Find all referenced product IDs across cylinders, movements, sales, and purchases
+  const referencedProductIds = new Set<string>([
+    ...cylinders.map((c) => c.productId).filter(Boolean),
+    ...movements.map((m) => m.productId).filter(Boolean),
+    ...sales.flatMap((s) => (s.items || []).map((i) => i.productId)).filter(Boolean),
+    ...purchases.flatMap((p) => (p.items || []).map((i) => i.productId)).filter(Boolean),
+  ]);
+
+  const missingProductIds = Array.from(referencedProductIds).filter((id) => !productMap.has(id));
+
+  if (missingProductIds.length > 0) {
+    const deleteLogs = await db
+      .collection("auditLogs")
+      .find(
+        {
+          entityType: "products",
+          entityId: { $in: missingProductIds },
+          action: "DELETE",
+        },
+        opt,
+      )
+      .sort({ timestamp: -1 })
+      .toArray();
+
+    for (const log of deleteLogs) {
+      if (log.entityId && !productMap.has(log.entityId) && log.before) {
+        productMap.set(log.entityId, clean<Product>(log.before));
+      }
+    }
+
+    // Fallback reconstruction for any referenced ID still not found
+    for (const pid of missingProductIds) {
+      if (!productMap.has(pid)) {
+        const sm = movements.find((m) => m.productId === pid);
+        const soItem = sales.flatMap((s) => s.items || []).find((i) => i.productId === pid);
+        const poItem = purchases.flatMap((p) => p.items || []).find((i) => i.productId === pid);
+        const cyl = cylinders.find((c) => c.productId === pid);
+        const isCyl = Boolean(cyl) || sm?.productType === "cylinder" || soItem?.itemType === "cylinder";
+
+        productMap.set(pid, {
+          id: pid,
+          code: pid.toUpperCase(),
+          name: sm?.productName || soItem?.productName || poItem?.productName || `Product ${pid}`,
+          productType: (sm?.productType as ProductType) || (soItem?.itemType as ProductType) || (isCyl ? "cylinder" : "product"),
+          uom: (cyl ? "cyl" : isCyl ? "cyl" : "pcs") as any,
+          category: cyl?.gasCategory || "General",
+          stock: 0,
+          cost: sm?.unitCost || poItem?.price || 0,
+          price: soItem?.price || 0,
+          reorderLevel: 0,
+          createdAt: now,
+        });
+      }
+    }
+  }
+
+  const allProducts = Array.from(productMap.values());
 
   const gasList: GasInventory[] = [];
   const cylinderList: CylinderInventory[] = [];
   const productList: ProductInventory[] = [];
 
-  for (const p of products) {
+  for (const p of allProducts) {
     const pType = resolveProductType(p);
+
+    // Active gas inventory catalog is strictly driven by the active products collection
+    if (pType === "gas" && !productsTableIdSet.has(p.id)) {
+      continue;
+    }
     const pMoves = movements.filter((m) => m.productId === p.id);
 
     // Identify opening stock
@@ -202,8 +274,8 @@ export async function reconcileDatabaseInventory(db: any, session?: any): Promis
     const costPrice = Number(p.cost) || 0;
     const totalValue = onHand * (costPrice > 0 ? costPrice : unitPrice);
 
-    // Update product master stock to match authoritative onHand
-    if (p.stock !== onHand || p.productType !== pType) {
+    // Update product master stock to match authoritative onHand (for active catalog products)
+    if (productsTableIdSet.has(p.id) && (p.stock !== onHand || p.productType !== pType)) {
       await db.collection("products").updateOne(
         { id: p.id },
         { $set: { stock: onHand, productType: pType } },

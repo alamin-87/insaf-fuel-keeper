@@ -13,6 +13,7 @@ import type {
 } from "../src/types/index.ts";
 import {
   computeReservedQty,
+  reconcileDatabaseInventory,
   resolveProductType,
 } from "../src/lib/inventory.server.ts";
 
@@ -424,5 +425,181 @@ describe("Authoritative Inventory Accounting & Reconciliation Tests", () => {
     stockOut += purchaseReturn; // Return OUT
     currentStock = opening + stockIn - stockOut;
     assert.strictEqual(currentStock, 115);
+  });
+
+  // TEST 15 — RECONCILIATION RESTORES CYLINDER AND PRODUCT INVENTORIES
+  it("TEST 15: reconcileDatabaseInventory restores Cylinder and Product Inventories from referenced records with Available = On Hand - Reserved", async () => {
+    const mockDb = {
+      collections: {
+        products: [
+          { id: "g1", name: "Fresh 12 kg", productType: "gas", uom: "kg", cost: 1000, price: 1200, stock: 10 },
+        ],
+        cylinders: [
+          { id: "c1", productId: "cyl-p1", serialNumber: "INS-001", status: "in_stock" },
+          { id: "c2", productId: "cyl-p1", serialNumber: "INS-002", status: "at_customer" },
+        ],
+        stockMovements: [
+          { id: "m1", productId: "cyl-p1", productName: "LPG Domestic 12kg", productType: "cylinder", type: "in", movementType: "RECEIPT", quantity: 50, unitCost: 1200 },
+          { id: "m2", productId: "cyl-p1", productName: "LPG Domestic 12kg", productType: "cylinder", type: "out", movementType: "SALE_ISSUE", quantity: 10, unitCost: 1200 },
+          { id: "m3", productId: "prod-s1", productName: "Gas Stove Single", productType: "product", type: "in", movementType: "RECEIPT", quantity: 30, unitCost: 2000 },
+          { id: "m4", productId: "prod-s1", productName: "Gas Stove Single", productType: "product", type: "out", movementType: "SALE_ISSUE", quantity: 5, unitCost: 2000 },
+        ],
+        sales: [
+          {
+            id: "so-1",
+            status: "confirmed",
+            items: [{ productId: "cyl-p1", productName: "LPG Domestic 12kg", quantity: 12 }],
+          },
+        ],
+        deliveries: [
+          {
+            id: "del-1",
+            salesOrderId: "so-1",
+            status: "delivered",
+            items: [{ productId: "cyl-p1", quantity: 4 }],
+          },
+        ],
+        purchases: [],
+        auditLogs: [
+          {
+            entityType: "products",
+            entityId: "cyl-p1",
+            action: "DELETE",
+            before: {
+              id: "cyl-p1",
+              name: "LPG Domestic 12kg",
+              productType: "cylinder",
+              uom: "cyl",
+              cost: 1200,
+              price: 1450,
+            },
+          },
+          {
+            entityType: "products",
+            entityId: "prod-s1",
+            action: "DELETE",
+            before: {
+              id: "prod-s1",
+              name: "Gas Stove Single",
+              productType: "product",
+              uom: "pcs",
+              cost: 2000,
+              price: 3000,
+            },
+          },
+        ],
+        gasInventory: [],
+        cylinderInventory: [],
+        productInventory: [],
+      } as Record<string, any[]>,
+      collection(name: string) {
+        const col = this.collections[name] || (this.collections[name] = []);
+        return {
+          find(query: any = {}) {
+            let filtered = col.filter((item: any) => {
+              for (const [k, v] of Object.entries(query)) {
+                if (v && typeof v === "object" && "$in" in v) {
+                  if (!(v as any).$in.includes(item[k])) return false;
+                } else if (item[k] !== v) {
+                  return false;
+                }
+              }
+              return true;
+            });
+            return {
+              sort() { return this; },
+              async toArray() { return [...filtered]; },
+            };
+          },
+          async updateOne(filter: any, update: any, options: any = {}) {
+            const idx = col.findIndex((item: any) => {
+              for (const [k, v] of Object.entries(filter)) {
+                if (item[k] !== v) return false;
+              }
+              return true;
+            });
+            if (idx >= 0) {
+              col[idx] = { ...col[idx], ...(update.$set || {}) };
+            } else if (options.upsert) {
+              col.push({ ...filter, ...(update.$set || {}) });
+            }
+            return { acknowledged: true };
+          },
+          async deleteMany(filter: any = {}) {
+            mockDb.collections[name] = col.filter((item: any) => {
+              if (filter.productId && typeof filter.productId === "object" && "$nin" in filter.productId) {
+                return filter.productId.$nin.includes(item.productId);
+              }
+              return false;
+            });
+            return { acknowledged: true };
+          },
+        };
+      },
+    };
+
+    const summary = await reconcileDatabaseInventory(mockDb);
+
+    // 1. Gas inventory contains active catalog gas products
+    assert.strictEqual(summary.gas.length, 1);
+    assert.strictEqual(summary.gas[0].productId, "g1");
+
+    // 2. Cylinder inventory restored from cylinders and movements
+    assert.strictEqual(summary.cylinders.length, 1);
+    const cylRow = summary.cylinders[0];
+    assert.strictEqual(cylRow.productId, "cyl-p1");
+    assert.strictEqual(cylRow.productName, "LPG Domestic 12kg");
+    assert.strictEqual(cylRow.uom, "cyl");
+    assert.strictEqual(cylRow.stockIn, 50);
+    // Active posted sale order has 12, which guarantees stockOut is at least 12
+    assert.strictEqual(cylRow.stockOut, 12);
+    assert.strictEqual(cylRow.onHand, 38); // 0 + 50 - 12 = 38
+    // Reserved = 12 ordered - 4 delivered = 8
+    assert.strictEqual(cylRow.reserved, 8);
+    // Available = On Hand - Reserved = 38 - 8 = 30
+    assert.strictEqual(cylRow.available, 30);
+    assert.strictEqual(cylRow.costPrice, 1200);
+    assert.strictEqual(cylRow.totalValue, 38 * 1200);
+
+    // 3. Product inventory restored from movements
+    assert.strictEqual(summary.products.length, 1);
+    const prodRow = summary.products[0];
+    assert.strictEqual(prodRow.productId, "prod-s1");
+    assert.strictEqual(prodRow.productName, "Gas Stove Single");
+    assert.strictEqual(prodRow.uom, "pcs");
+    assert.strictEqual(prodRow.stockIn, 30);
+    assert.strictEqual(prodRow.stockOut, 5);
+    assert.strictEqual(prodRow.onHand, 25); // 0 + 30 - 5 = 25
+    assert.strictEqual(prodRow.costPrice, 2000);
+    assert.strictEqual(prodRow.totalValue, 25 * 2000);
+  });
+
+  // TEST 16 — LEGITIMATE EMPTY RESULTS PRODUCE EMPTY LISTS
+  it("TEST 16: Legitimate empty database yields empty lists without error", async () => {
+    const emptyDb = {
+      collections: {} as Record<string, any[]>,
+      collection(name: string) {
+        const col = this.collections[name] || (this.collections[name] = []);
+        return {
+          find() {
+            return {
+              sort() { return this; },
+              async toArray() { return []; },
+            };
+          },
+          async updateOne() { return { acknowledged: true }; },
+          async deleteMany() { return { acknowledged: true }; },
+        };
+      },
+    };
+
+    const summary = await reconcileDatabaseInventory(emptyDb);
+    assert.strictEqual(summary.gas.length, 0);
+    assert.strictEqual(summary.cylinders.length, 0);
+    assert.strictEqual(summary.products.length, 0);
+    assert.strictEqual(summary.totals.gasOnHand, 0);
+    assert.strictEqual(summary.totals.cylinderOnHand, 0);
+    assert.strictEqual(summary.totals.productOnHand, 0);
+    assert.strictEqual(summary.totals.totalValue, 0);
   });
 });
