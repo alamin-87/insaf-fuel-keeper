@@ -88,7 +88,7 @@ export function ReceiveCylinderDialog({
       if (qty < 0 || qty > remaining) return false;
       if (qty === 0) return true;
       if (tracking === "lot") return Boolean(lotNumber.trim());
-      if (tracking === "serial" && isCylinderProduct(product)) {
+      if (tracking === "serial" && (isCylinderProduct(product) || it.itemType === "cylinder")) {
         const serials = parseSerials(texts[index] || "");
         if (serials.length === 0) return true;
         return serials.length === qty;
@@ -97,7 +97,7 @@ export function ReceiveCylinderDialog({
     }) && lines.some((_, index) => parsedQty(index) > 0);
 
   const hasCylinders = lines.some(
-    (row) => isCylinderProduct(row.product) && parsedQty(row.index) > 0,
+    (row) => (isCylinderProduct(row.product) || row.it.itemType === "cylinder") && parsedQty(row.index) > 0,
   );
 
   return (
@@ -122,7 +122,7 @@ export function ReceiveCylinderDialog({
           {lines.map(({ it, index, product, ordered, received, remaining }) => {
             const qty = parsedQty(index);
             const serials = parseSerials(texts[index] || "");
-            const cyl = isCylinderProduct(product);
+            const cyl = isCylinderProduct(product) || it.itemType === "cylinder";
             return (
               <section key={index} className="space-y-2 rounded-lg border p-3">
                 <p className="font-medium">{it.productName}</p>
@@ -159,7 +159,7 @@ export function ReceiveCylinderDialog({
                           const list = fresh.data ?? cylinders;
                           const existing = [
                             ...list
-                              .filter((c) => c.productId === product?.id)
+                              .filter((c) => c.productId === (product?.id || it.productId))
                               .map((c) => c.serialNumber),
                             ...texts.flatMap((row, i) =>
                               i === index ? [] : parseSerials(row || ""),

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -6,6 +6,7 @@ import { Trash2, Plus } from "lucide-react";
 import { supplierService } from "@/services/supplier.service";
 import { productService } from "@/services/product.service";
 import { purchaseService } from "@/services/purchase.service";
+import { inventoryService } from "@/services/inventory.service";
 import { computeTotals, genOrderNo, lineAmount, paymentStatus } from "@/utils/helpers";
 import { formatCurrency } from "@/utils/formatters";
 import { purchaseOrderSchema } from "@/utils/validators";
@@ -46,6 +47,13 @@ function getProductType(p: { productType?: string; category?: string; uom?: stri
   return "gas";
 }
 
+interface PurchaseItemOption {
+  id: string;
+  name: string;
+  productType: "gas" | "cylinder" | "product";
+  cost: number;
+}
+
 export function PurchaseForm({ id }: { id?: string }) {
   const t = useT();
   const navigate = useNavigate();
@@ -59,11 +67,73 @@ export function PurchaseForm({ id }: { id?: string }) {
     queryKey: ["products"],
     queryFn: productService.list,
   });
+  const { data: cylinderInventory = [] } = useQuery({
+    queryKey: ["cylinderInventory"],
+    queryFn: inventoryService.getCylinderInventory,
+  });
+  const { data: productInventory = [] } = useQuery({
+    queryKey: ["productInventory"],
+    queryFn: inventoryService.getProductInventory,
+  });
   const { data: existing, isLoading } = useQuery({
     queryKey: ["purchases", id],
     queryFn: () => purchaseService.get(id!),
     enabled: editing,
   });
+
+  const availableProducts = useMemo<PurchaseItemOption[]>(() => {
+    const list: PurchaseItemOption[] = [];
+    const seen = new Set<string>();
+
+    for (const p of products) {
+      const type = getProductType(p);
+      list.push({
+        id: p.id,
+        name: p.name,
+        productType: type,
+        cost: p.cost ?? p.price,
+      });
+      seen.add(p.id);
+    }
+
+    for (const c of cylinderInventory) {
+      if (!c.productId || seen.has(c.productId)) continue;
+      list.push({
+        id: c.productId,
+        name: c.productName,
+        productType: "cylinder",
+        cost: c.costPrice ?? c.unitPrice ?? 0,
+      });
+      seen.add(c.productId);
+    }
+
+    for (const p of productInventory) {
+      if (!p.productId || seen.has(p.productId)) continue;
+      list.push({
+        id: p.productId,
+        name: p.productName,
+        productType: "product",
+        cost: p.costPrice ?? p.unitPrice ?? 0,
+      });
+      seen.add(p.productId);
+    }
+
+    if (existing?.items) {
+      for (const it of existing.items) {
+        if (it.productId && !seen.has(it.productId)) {
+          list.push({
+            id: it.productId,
+            name: it.productName,
+            productType: it.itemType || "gas",
+            cost: it.price,
+          });
+          seen.add(it.productId);
+        }
+      }
+    }
+
+    return list;
+  }, [products, cylinderInventory, productInventory, existing]);
 
   const [supplierId, setSupplierId] = useState("");
   const [notes, setNotes] = useState("");
@@ -72,15 +142,15 @@ export function PurchaseForm({ id }: { id?: string }) {
 
   useEffect(() => {
     if (!existing) {
-      if (products.length > 0 && items.length === 0) {
-        const p = products[0];
+      if (availableProducts.length > 0 && items.length === 0) {
+        const p = availableProducts[0];
         setItems([
           {
             productId: p.id,
             productName: p.name,
-            itemType: getProductType(p),
+            itemType: p.productType,
             quantity: 1,
-            price: p.cost ?? p.price,
+            price: p.cost,
             taxRate: 0,
           },
         ]);
@@ -91,28 +161,27 @@ export function PurchaseForm({ id }: { id?: string }) {
     setNotes(existing.notes ?? "");
     setItems(
       existing.items.map((it) => {
-        const p = products.find((x) => x.id === it.productId);
+        const p = availableProducts.find((x) => x.id === it.productId);
         return {
           ...it,
-          itemType: it.itemType || (p ? getProductType(p) : "gas"),
+          itemType: it.itemType || p?.productType || "gas",
         };
       }),
     );
     setHydrated(true);
-  }, [existing, products]);
+  }, [existing, availableProducts]);
 
   const addItem = () => {
-    const p = products[0];
+    const p = availableProducts[0];
     if (!p) return;
-    const pType = getProductType(p);
     setItems((prev) => [
       ...prev,
       {
         productId: p.id,
         productName: p.name,
-        itemType: pType,
+        itemType: p.productType,
         quantity: 1,
-        price: p.cost ?? p.price,
+        price: p.cost,
         taxRate: 0,
       },
     ]);
@@ -123,9 +192,9 @@ export function PurchaseForm({ id }: { id?: string }) {
   };
 
   const setLineType = (idx: number, type: "gas" | "cylinder" | "product") => {
-    const matchingProducts = products.filter((p) => getProductType(p) === type);
-    const current = products.find((p) => p.id === items[idx]?.productId);
-    if (current && getProductType(current) === type) {
+    const matchingProducts = availableProducts.filter((p) => p.productType === type);
+    const current = availableProducts.find((p) => p.id === items[idx]?.productId);
+    if (current && current.productType === type) {
       update(idx, { itemType: type });
       return;
     }
@@ -135,7 +204,7 @@ export function PurchaseForm({ id }: { id?: string }) {
         itemType: type,
         productId: nextProduct.id,
         productName: nextProduct.name,
-        price: nextProduct.cost ?? nextProduct.price,
+        price: nextProduct.cost,
       });
     } else {
       update(idx, { itemType: type, productId: "", productName: "", price: 0 });
@@ -143,14 +212,13 @@ export function PurchaseForm({ id }: { id?: string }) {
   };
 
   const onSelectProduct = (idx: number, productId: string) => {
-    const p = products.find((x) => x.id === productId);
+    const p = availableProducts.find((x) => x.id === productId);
     if (!p) return;
-    const pType = getProductType(p);
     update(idx, {
       productId: p.id,
       productName: p.name,
-      itemType: pType,
-      price: p.cost ?? p.price,
+      itemType: p.productType,
+      price: p.cost,
     });
   };
 
@@ -169,8 +237,8 @@ export function PurchaseForm({ id }: { id?: string }) {
         if (!it.itemType) {
           throw new Error(`Item ${i + 1}: Please select a type`);
         }
-        const prod = products.find((p) => p.id === it.productId);
-        if (prod && getProductType(prod) !== it.itemType) {
+        const prod = availableProducts.find((p) => p.id === it.productId);
+        if (prod && prod.productType !== it.itemType) {
           throw new Error(`Item ${i + 1}: Product does not belong to selected type`);
         }
         if (!Number.isFinite(it.quantity) || it.quantity <= 0) {
@@ -224,6 +292,8 @@ export function PurchaseForm({ id }: { id?: string }) {
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       qc.invalidateQueries({ queryKey: ["vouchers"] });
       qc.invalidateQueries({ queryKey: ["ledger"] });
+      qc.invalidateQueries({ queryKey: ["cylinderInventory"] });
+      qc.invalidateQueries({ queryKey: ["productInventory"] });
       toast.success(editing ? t("purchases.updated") : t("purchases.created"));
       navigate({ to: "/purchases/$id", params: { id: po.id } });
     },
@@ -301,11 +371,11 @@ export function PurchaseForm({ id }: { id?: string }) {
                     </TableRow>
                   )}
                   {items.map((it, idx) => {
-                    const selectedProduct = products.find((x) => x.id === it.productId);
+                    const selectedProduct = availableProducts.find((x) => x.id === it.productId);
                     const rowType =
-                      it.itemType || (selectedProduct ? getProductType(selectedProduct) : "gas");
-                    const filteredProducts = products.filter(
-                      (p) => getProductType(p) === rowType,
+                      it.itemType || selectedProduct?.productType || "gas";
+                    const filteredProducts = availableProducts.filter(
+                      (p) => p.productType === rowType,
                     );
 
                     return (

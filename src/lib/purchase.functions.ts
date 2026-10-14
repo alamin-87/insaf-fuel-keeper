@@ -162,7 +162,7 @@ async function receivePurchaseInDb(
     const qty = receiveNow[i];
     if (qty <= 0) continue;
     const p = products.find((x: Product) => x.id === item.productId);
-    if (!isCylinderProduct(p)) continue;
+    if (!isCylinderProduct(p) && item.itemType !== "cylinder") continue;
     const ids: string[] = [...(item.cylinderIds || [])];
 
     if (method === "quantity" || method === "lot") {
@@ -230,7 +230,7 @@ async function receivePurchaseInDb(
     const qty = receiveNow[i];
     if (qty <= 0) continue;
     const p = products.find((x: Product) => x.id === item.productId);
-    if (isCylinderProduct(p)) continue;
+    if (isCylinderProduct(p) || item.itemType === "cylinder") continue;
     nextItems[i] = { ...item, receivedQty: lineReceivedQty(item, po) + qty };
   }
 
@@ -392,7 +392,44 @@ async function receiveStockInDb(
   const qty = item.quantity;
   if (qty <= 0) return;
   const productDoc = await db.collection("products").findOne({ id: item.productId }, opt);
-  const product = productDoc ? clean<Product>(productDoc) : null;
+  let product = productDoc ? clean<Product>(productDoc) : null;
+  if (!product) {
+    if (item.itemType === "cylinder") {
+      const cylDoc = await db.collection("cylinderInventory").findOne({ productId: item.productId }, opt);
+      if (cylDoc) {
+        product = {
+          id: cylDoc.productId,
+          code: cylDoc.productId,
+          name: cylDoc.productName || item.productName,
+          category: "Cylinder",
+          productType: "cylinder",
+          uom: cylDoc.uom || "cyl",
+          price: cylDoc.unitPrice ?? 0,
+          cost: cylDoc.costPrice ?? 0,
+          stock: cylDoc.onHand ?? 0,
+          reorderLevel: 0,
+          createdAt: cylDoc.createdAt || now,
+        };
+      }
+    } else if (item.itemType === "product") {
+      const pInvDoc = await db.collection("productInventory").findOne({ productId: item.productId }, opt);
+      if (pInvDoc) {
+        product = {
+          id: pInvDoc.productId,
+          code: pInvDoc.productId,
+          name: pInvDoc.productName || item.productName,
+          category: "Product",
+          productType: "product",
+          uom: pInvDoc.uom || "pcs",
+          price: pInvDoc.unitPrice ?? 0,
+          cost: pInvDoc.costPrice ?? 0,
+          stock: pInvDoc.onHand ?? 0,
+          reorderLevel: 0,
+          createdAt: pInvDoc.createdAt || now,
+        };
+      }
+    }
+  }
   if (!product) return;
   const { resolveProductType } = await import("./inventory.server");
   const pType = (item.itemType as "gas" | "cylinder" | "product") || resolveProductType(product);
@@ -437,9 +474,11 @@ async function receiveStockInDb(
   const oldCost = product.cost ?? cost;
   const nextStock = oldStock + qty;
   const nextCost = nextStock > 0 ? (oldStock * oldCost + qty * cost) / nextStock : cost;
-  await db
-    .collection("products")
-    .updateOne({ id: product.id }, { $set: { stock: nextStock, cost: nextCost } }, opt);
+  if (productDoc) {
+    await db
+      .collection("products")
+      .updateOne({ id: product.id }, { $set: { stock: nextStock, cost: nextCost } }, opt);
+  }
 
   const movement: StockMovement = {
     id: newId(),
