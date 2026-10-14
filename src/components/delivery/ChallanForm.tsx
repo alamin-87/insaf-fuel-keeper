@@ -814,8 +814,8 @@ export function ChallanForm({
                       <TableHead className="min-w-[11rem]">{t("common.product")}</TableHead>
                       <TableHead className="w-28">{t("common.category")}</TableHead>
                       <TableHead className="w-32">{t("sales.gasOrCylinder")}</TableHead>
-                      <TableHead className="w-20 text-right">{t("common.quantity")}</TableHead>
-                      <TableHead className="w-36 min-w-[9.5rem] text-right">{t("common.price")}</TableHead>
+                      <TableHead className="w-28 min-w-[7rem] text-right">{t("common.quantity")}</TableHead>
+                      <TableHead className="w-32 min-w-[7.5rem] text-right">{t("common.price")}</TableHead>
                       <TableHead className="w-28 text-right">{t("common.subtotal")}</TableHead>
                       {!isDelivered && <TableHead className="w-10" />}
                     </TableRow>
@@ -960,7 +960,7 @@ export function ChallanForm({
                               </Select>
                             )}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="w-28 min-w-[7rem]">
                             {isDelivered ? (
                               <div className="text-right font-medium tabular-nums">{it.quantity}</div>
                             ) : (
@@ -971,11 +971,11 @@ export function ChallanForm({
                                 onChange={(e) =>
                                   update(idx, { quantity: Number(e.target.value) })
                                 }
-                                className="text-right"
+                                className="w-full text-right font-medium tabular-nums"
                               />
                             )}
                           </TableCell>
-                          <TableCell className="w-36 min-w-[9.5rem]">
+                          <TableCell className="w-32 min-w-[7.5rem]">
                             {isDelivered ? (
                               <div className="text-right tabular-nums">{formatCurrency(it.price)}</div>
                             ) : (
@@ -988,7 +988,7 @@ export function ChallanForm({
                                     price: e.target.value === "" ? 0 : Number(e.target.value),
                                   })
                                 }
-                                className="w-full text-right"
+                                className="w-full text-right font-medium tabular-nums"
                               />
                             )}
                           </TableCell>

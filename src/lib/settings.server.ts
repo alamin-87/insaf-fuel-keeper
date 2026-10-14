@@ -32,12 +32,16 @@ function sanitizeMatrix(raw: unknown): PowerMatrix {
   return base;
 }
 
+let settingsIndexCreated = false;
 async function ensureSettingsColl() {
   const db = await getDb();
   const coll = db.collection("appSettings");
-  try {
-    await coll.createIndex({ id: 1 }, { unique: true });
-  } catch {}
+  if (!settingsIndexCreated) {
+    try {
+      await coll.createIndex({ id: 1 }, { unique: true });
+      settingsIndexCreated = true;
+    } catch {}
+  }
   return coll;
 }
 

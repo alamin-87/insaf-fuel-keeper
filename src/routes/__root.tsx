@@ -127,11 +127,15 @@ function redirectPathFromLocation(location: {
 export const Route = createRootRouteWithContext<RouterContext>()({
   beforeLoad: async ({ location }): Promise<{ user: AuthUser | null }> => {
     const isLogin = location.pathname === "/login";
+    const isPublic =
+      isLogin ||
+      location.pathname.startsWith("/api/branding") ||
+      location.pathname.startsWith("/api/inventory");
     const redirectTo = redirectPathFromLocation(location);
     try {
       const session = await getSessionFn();
       const user = session?.user ?? null;
-      if (!user && !isLogin) {
+      if (!user && !isPublic) {
         throw redirect({
           to: "/login",
           search: { redirect: redirectTo },
@@ -140,8 +144,8 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       return { user };
     } catch (e) {
       if (e && typeof e === "object" && "to" in e) throw e;
-      // Session/Mongo failure should not block the login homepage.
-      if (isLogin) return { user: null };
+      // Session/Mongo failure should not block the login homepage or public endpoints.
+      if (isLogin || isPublic) return { user: null };
       throw redirect({ to: "/login", search: { redirect: redirectTo } });
     }
   },
@@ -203,13 +207,7 @@ function RootShell({ children }: { children: ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <QueryClientProvider client={fallbackQueryClient}>
-          <I18nProvider>
-            <ThemeProvider>
-              <BrandingProvider>{children}</BrandingProvider>
-            </ThemeProvider>
-          </I18nProvider>
-        </QueryClientProvider>
+        {children}
         <Scripts />
       </body>
     </html>
@@ -227,18 +225,20 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
-        <BrandingProvider>
-          <SmoothScrollProvider>
-            {isLogin ? (
-              <Outlet />
-            ) : (
-              <Layout>
+        <ThemeProvider>
+          <BrandingProvider>
+            <SmoothScrollProvider>
+              {isLogin ? (
                 <Outlet />
-              </Layout>
-            )}
-            {mounted && <Toaster richColors position={isLogin ? "bottom-center" : "top-right"} />}
-          </SmoothScrollProvider>
-        </BrandingProvider>
+              ) : (
+                <Layout>
+                  <Outlet />
+                </Layout>
+              )}
+              {mounted && <Toaster richColors position={isLogin ? "bottom-center" : "top-right"} />}
+            </SmoothScrollProvider>
+          </BrandingProvider>
+        </ThemeProvider>
       </I18nProvider>
     </QueryClientProvider>
   );

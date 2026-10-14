@@ -13,8 +13,8 @@ import { getBrandingFn, saveBrandingFn, type AppBranding } from "@/lib/settings.
 const STORAGE_FAVICON_KEY = "insaf-custom-favicon";
 const STORAGE_LOGO_KEY = "insaf-custom-logo";
 
-const DEFAULT_FAVICON = "/favicon.png?v=4";
-const DEFAULT_LOGO = "/favicon.png?v=4";
+const DEFAULT_FAVICON = "/api/branding/favicon";
+const DEFAULT_LOGO = "/api/branding/logo";
 
 export type BrandingContextValue = {
   favicon: string;
@@ -97,43 +97,71 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
     if (initial.logo) applyOgToDom(initial.logo);
   }, []);
 
-  // Sync server branding with local storage and DOM
+  // Sync server branding with local storage and DOM without wiping existing valid values
   useEffect(() => {
     if (serverBranding) {
-      const nextFavicon = serverBranding.favicon ?? "";
-      const nextLogo = serverBranding.logo ?? "";
-      setLocal({ favicon: nextFavicon, logo: nextLogo });
+      setLocal((prev) => {
+        const nextFavicon =
+          typeof serverBranding.favicon === "string" && serverBranding.favicon
+            ? serverBranding.favicon
+            : prev.favicon;
+        const nextLogo =
+          typeof serverBranding.logo === "string" && serverBranding.logo
+            ? serverBranding.logo
+            : prev.logo;
 
-      try {
-        localStorage.setItem(STORAGE_FAVICON_KEY, nextFavicon);
-        localStorage.setItem(STORAGE_LOGO_KEY, nextLogo);
-      } catch {}
+        try {
+          if (nextFavicon) localStorage.setItem(STORAGE_FAVICON_KEY, nextFavicon);
+          else if (serverBranding.favicon === "") localStorage.removeItem(STORAGE_FAVICON_KEY);
 
-      applyFaviconToDom(nextFavicon);
-      applyOgToDom(nextLogo);
+          if (nextLogo) localStorage.setItem(STORAGE_LOGO_KEY, nextLogo);
+          else if (serverBranding.logo === "") localStorage.removeItem(STORAGE_LOGO_KEY);
+        } catch {}
+
+        if (nextFavicon) applyFaviconToDom(nextFavicon);
+        if (nextLogo) applyOgToDom(nextLogo);
+
+        return { favicon: nextFavicon || "", logo: nextLogo || "" };
+      });
     }
   }, [serverBranding]);
 
   const saveMutation = useMutation({
     mutationFn: (data: { favicon?: string; logo?: string }) => saveBrandingFn({ data }),
     onSuccess: (saved: AppBranding) => {
-      const nextFavicon = saved.favicon !== undefined ? (saved.favicon ?? "") : local.favicon;
-      const nextLogo = saved.logo !== undefined ? (saved.logo ?? "") : local.logo;
-      setLocal({ favicon: nextFavicon, logo: nextLogo });
+      setLocal((prev) => {
+        const nextFavicon = saved.favicon !== undefined ? (saved.favicon ?? "") : prev.favicon;
+        const nextLogo = saved.logo !== undefined ? (saved.logo ?? "") : prev.logo;
 
-      try {
-        localStorage.setItem(STORAGE_FAVICON_KEY, nextFavicon);
-        localStorage.setItem(STORAGE_LOGO_KEY, nextLogo);
-      } catch {}
+        try {
+          if (nextFavicon) localStorage.setItem(STORAGE_FAVICON_KEY, nextFavicon);
+          else localStorage.removeItem(STORAGE_FAVICON_KEY);
 
-      applyFaviconToDom(nextFavicon);
-      applyOgToDom(nextLogo);
+          if (nextLogo) localStorage.setItem(STORAGE_LOGO_KEY, nextLogo);
+          else localStorage.removeItem(STORAGE_LOGO_KEY);
+        } catch {}
+
+        if (nextFavicon) applyFaviconToDom(nextFavicon);
+        if (nextLogo) applyOgToDom(nextLogo);
+        return { favicon: nextFavicon, logo: nextLogo };
+      });
       qc.setQueryData(["branding"], saved);
     },
   });
 
   const saveBranding = useCallback(
     async (branding: { favicon?: string; logo?: string }) => {
+      setLocal((prev) => {
+        const nextFavicon = branding.favicon !== undefined ? branding.favicon : prev.favicon;
+        const nextLogo = branding.logo !== undefined ? branding.logo : prev.logo;
+        try {
+          if (nextFavicon) localStorage.setItem(STORAGE_FAVICON_KEY, nextFavicon);
+          if (nextLogo) localStorage.setItem(STORAGE_LOGO_KEY, nextLogo);
+        } catch {}
+        if (nextFavicon) applyFaviconToDom(nextFavicon);
+        if (nextLogo) applyOgToDom(nextLogo);
+        return { favicon: nextFavicon || "", logo: nextLogo || "" };
+      });
       await saveMutation.mutateAsync(branding);
     },
     [saveMutation],
@@ -141,22 +169,22 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
 
   const setCustomFavicon = useCallback(
     async (favicon: string) => {
-      await saveMutation.mutateAsync({ favicon });
+      await saveBranding({ favicon });
     },
-    [saveMutation],
+    [saveBranding],
   );
 
   const setCustomLogo = useCallback(
     async (logo: string) => {
-      await saveMutation.mutateAsync({ logo });
+      await saveBranding({ logo });
     },
-    [saveMutation],
+    [saveBranding],
   );
 
   const value = useMemo<BrandingContextValue>(
     () => ({
       favicon: local.favicon || local.logo || DEFAULT_FAVICON,
-      logo: local.logo || local.favicon || DEFAULT_LOGO,
+      logo: local.logo || DEFAULT_LOGO,
       customFavicon: local.favicon,
       customLogo: local.logo,
       isLoading,
@@ -171,15 +199,15 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
   return <BrandingContext.Provider value={value}>{children}</BrandingContext.Provider>;
 }
 
-export function useBranding() {
+export function useBranding(): BrandingContextValue {
   const ctx = useContext(BrandingContext);
   if (!ctx) {
-    // Fallback if rendered outside provider
+    const local = readLocalBranding();
     return {
-      favicon: DEFAULT_FAVICON,
-      logo: DEFAULT_LOGO,
-      customFavicon: "",
-      customLogo: "",
+      favicon: local.favicon || local.logo || DEFAULT_FAVICON,
+      logo: local.logo || DEFAULT_LOGO,
+      customFavicon: local.favicon,
+      customLogo: local.logo,
       isLoading: false,
       isSaving: false,
       setCustomFavicon: async () => {},

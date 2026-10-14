@@ -134,6 +134,9 @@ export async function reconcileDatabaseInventory(db: any, session?: any): Promis
     ...purchases.flatMap((p) => (p.items || []).map((i) => i.productId)).filter(Boolean),
   ]);
 
+  const existingNames = new Set(products.map((p) => p.name?.trim().toLowerCase()).filter(Boolean));
+  const existingCodes = new Set(products.map((p) => p.code?.trim().toLowerCase()).filter(Boolean));
+
   const missingProductIds = Array.from(referencedProductIds).filter((id) => !productMap.has(id));
 
   if (missingProductIds.length > 0) {
@@ -152,7 +155,14 @@ export async function reconcileDatabaseInventory(db: any, session?: any): Promis
 
     for (const log of deleteLogs) {
       if (log.entityId && !productMap.has(log.entityId) && log.before) {
-        productMap.set(log.entityId, clean<Product>(log.before));
+        const item = clean<Product>(log.before);
+        const nameKey = (item.name || "").trim().toLowerCase();
+        const codeKey = (item.code || "").trim().toLowerCase();
+        // Do not resurrect deleted duplicate products if an active product already exists with that name/code
+        if (existingNames.has(nameKey) || (codeKey && existingCodes.has(codeKey))) {
+          continue;
+        }
+        productMap.set(log.entityId, item);
       }
     }
 
@@ -163,12 +173,18 @@ export async function reconcileDatabaseInventory(db: any, session?: any): Promis
         const soItem = sales.flatMap((s) => s.items || []).find((i) => i.productId === pid);
         const poItem = purchases.flatMap((p) => p.items || []).find((i) => i.productId === pid);
         const cyl = cylinders.find((c) => c.productId === pid);
+        const name = sm?.productName || soItem?.productName || poItem?.productName || `Product ${pid}`;
+        const nameKey = name.trim().toLowerCase();
+        const codeKey = pid.trim().toLowerCase();
+        if (existingNames.has(nameKey) || existingCodes.has(codeKey)) {
+          continue;
+        }
         const isCyl = Boolean(cyl) || sm?.productType === "cylinder" || soItem?.itemType === "cylinder";
 
         productMap.set(pid, {
           id: pid,
           code: pid.toUpperCase(),
-          name: sm?.productName || soItem?.productName || poItem?.productName || `Product ${pid}`,
+          name,
           productType: (sm?.productType as ProductType) || (soItem?.itemType as ProductType) || (isCyl ? "cylinder" : "product"),
           uom: (cyl ? "cyl" : isCyl ? "cyl" : "pcs") as any,
           category: cyl?.gasCategory || "General",
@@ -190,11 +206,6 @@ export async function reconcileDatabaseInventory(db: any, session?: any): Promis
 
   for (const p of allProducts) {
     const pType = resolveProductType(p);
-
-    // Active gas inventory catalog is strictly driven by the active products collection
-    if (pType === "gas" && !productsTableIdSet.has(p.id)) {
-      continue;
-    }
     const pMoves = movements.filter((m) => m.productId === p.id);
 
     // Identify opening stock
@@ -274,8 +285,27 @@ export async function reconcileDatabaseInventory(db: any, session?: any): Promis
     const costPrice = Number(p.cost) || 0;
     const totalValue = onHand * (costPrice > 0 ? costPrice : unitPrice);
 
-    // Update product master stock to match authoritative onHand (for active catalog products)
-    if (productsTableIdSet.has(p.id) && (p.stock !== onHand || p.productType !== pType)) {
+    // Ensure product master collection has this product and synchronized stock
+    if (!productsTableIdSet.has(p.id)) {
+      await db.collection("products").insertOne(
+        {
+          id: p.id,
+          code: p.code || p.id.toUpperCase(),
+          name: p.name,
+          category: p.category || (pType === "cylinder" ? "Cylinder" : pType === "gas" ? "Gas" : "General"),
+          productType: pType,
+          uom: p.uom || (pType === "cylinder" ? "cyl" : pType === "gas" ? "kg" : "pcs"),
+          price: unitPrice,
+          cost: costPrice,
+          stock: onHand,
+          reorderLevel: 0,
+          costingMethod: "fifo",
+          createdAt: now,
+        },
+        opt,
+      );
+      productsTableIdSet.add(p.id);
+    } else if (p.stock !== onHand || p.productType !== pType) {
       await db.collection("products").updateOne(
         { id: p.id },
         { $set: { stock: onHand, productType: pType } },

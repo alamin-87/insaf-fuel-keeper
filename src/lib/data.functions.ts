@@ -289,6 +289,199 @@ async function collCreate<T extends { id?: string }>(
     });
   } catch {}
 
+  if (name === "products") {
+    try {
+      const { resolveProductType } = await import("./inventory.server");
+      const pType = (doc.productType as string) || resolveProductType(doc as any);
+      const now = new Date().toISOString();
+      const stockVal = Number(doc.stock) || 0;
+      const unitPrice = Number(doc.price) || 0;
+      const costPrice = Number(doc.cost) || 0;
+      const totalVal = stockVal * (costPrice > 0 ? costPrice : unitPrice);
+
+      if (pType === "cylinder") {
+        await db.collection("cylinderInventory").updateOne(
+          { productId: id },
+          {
+            $set: {
+              id: `cyl-${id}`,
+              productId: id,
+              productName: doc.name,
+              productType: "cylinder",
+              uom: doc.uom || "cyl",
+              openingStock: stockVal,
+              stockIn: 0,
+              stockOut: 0,
+              reserved: 0,
+              available: stockVal,
+              onHand: stockVal,
+              unitPrice,
+              costPrice,
+              totalValue: totalVal,
+              updatedAt: now,
+            },
+          },
+          { upsert: true },
+        );
+      } else if (pType === "gas") {
+        await db.collection("gasInventory").updateOne(
+          { productId: id },
+          {
+            $set: {
+              id: `gas-${id}`,
+              productId: id,
+              productName: doc.name,
+              productType: "gas",
+              uom: doc.uom || "kg",
+              openingStock: stockVal,
+              stockIn: 0,
+              stockOut: 0,
+              onHand: stockVal,
+              unitPrice,
+              costPrice,
+              totalValue: totalVal,
+              updatedAt: now,
+            },
+          },
+          { upsert: true },
+        );
+      } else {
+        await db.collection("productInventory").updateOne(
+          { productId: id },
+          {
+            $set: {
+              id: `prod-${id}`,
+              productId: id,
+              productName: doc.name,
+              productType: "product",
+              uom: doc.uom || "pcs",
+              openingStock: stockVal,
+              stockIn: 0,
+              stockOut: 0,
+              onHand: stockVal,
+              unitPrice,
+              costPrice,
+              totalValue: totalVal,
+              updatedAt: now,
+            },
+          },
+          { upsert: true },
+        );
+      }
+    } catch {
+      /* ignore sync error */
+    }
+  }
+
+  if (name === "stockMovements" && doc.productId) {
+    try {
+      const pDoc = await db.collection("products").findOne({ id: doc.productId });
+      const { resolveProductType } = await import("./inventory.server");
+      const pType = (doc.productType as string) || resolveProductType(pDoc as any);
+      const qty = Number(doc.quantity) || 0;
+      const type = doc.type; // "in" | "out"
+      const now = new Date().toISOString();
+      const pStock = pDoc ? Number(pDoc.stock) || 0 : undefined;
+      const unitPrice = pDoc ? Number(pDoc.price) || 0 : 0;
+      const costPrice = pDoc ? Number(pDoc.cost) || 0 : 0;
+      const valUnit = costPrice > 0 ? costPrice : unitPrice;
+
+      if (qty > 0) {
+        if (pType === "cylinder") {
+          const cylDoc = await db.collection("cylinderInventory").findOne({ productId: doc.productId });
+          const reserved = cylDoc ? Number(cylDoc.reserved) || 0 : 0;
+          const currentOnHand = cylDoc ? Number(cylDoc.onHand) || 0 : (pStock ?? 0);
+          const nextOnHand = pStock !== undefined ? pStock : Math.max(0, currentOnHand + (type === "in" ? qty : -qty));
+          const available = Math.max(0, nextOnHand - reserved);
+          const incFields: Record<string, number> = type === "in" ? { stockIn: qty } : { stockOut: qty };
+
+          await db.collection("cylinderInventory").updateOne(
+            { productId: doc.productId },
+            {
+              $inc: incFields,
+              $set: {
+                onHand: nextOnHand,
+                available,
+                totalValue: nextOnHand * valUnit,
+                updatedAt: now,
+              },
+              $setOnInsert: {
+                id: `cyl-${doc.productId}`,
+                productId: doc.productId,
+                productName: doc.productName || pDoc?.name || "Cylinder",
+                productType: "cylinder",
+                uom: pDoc?.uom || "cyl",
+                openingStock: 0,
+                reserved: 0,
+                unitPrice,
+                costPrice,
+              },
+            },
+            { upsert: true },
+          );
+        } else if (pType === "gas") {
+          const gasDoc = await db.collection("gasInventory").findOne({ productId: doc.productId });
+          const currentOnHand = gasDoc ? Number(gasDoc.onHand) || 0 : (pStock ?? 0);
+          const nextOnHand = pStock !== undefined ? pStock : Math.max(0, currentOnHand + (type === "in" ? qty : -qty));
+          const incFields: Record<string, number> = type === "in" ? { stockIn: qty } : { stockOut: qty };
+
+          await db.collection("gasInventory").updateOne(
+            { productId: doc.productId },
+            {
+              $inc: incFields,
+              $set: {
+                onHand: nextOnHand,
+                totalValue: nextOnHand * valUnit,
+                updatedAt: now,
+              },
+              $setOnInsert: {
+                id: `gas-${doc.productId}`,
+                productId: doc.productId,
+                productName: doc.productName || pDoc?.name || "Gas",
+                productType: "gas",
+                uom: pDoc?.uom || "kg",
+                openingStock: 0,
+                unitPrice,
+                costPrice,
+              },
+            },
+            { upsert: true },
+          );
+        } else {
+          const prodDoc = await db.collection("productInventory").findOne({ productId: doc.productId });
+          const currentOnHand = prodDoc ? Number(prodDoc.onHand) || 0 : (pStock ?? 0);
+          const nextOnHand = pStock !== undefined ? pStock : Math.max(0, currentOnHand + (type === "in" ? qty : -qty));
+          const incFields: Record<string, number> = type === "in" ? { stockIn: qty } : { stockOut: qty };
+
+          await db.collection("productInventory").updateOne(
+            { productId: doc.productId },
+            {
+              $inc: incFields,
+              $set: {
+                onHand: nextOnHand,
+                totalValue: nextOnHand * valUnit,
+                updatedAt: now,
+              },
+              $setOnInsert: {
+                id: `prod-${doc.productId}`,
+                productId: doc.productId,
+                productName: doc.productName || pDoc?.name || "Product",
+                productType: "product",
+                uom: pDoc?.uom || "pcs",
+                openingStock: 0,
+                unitPrice,
+                costPrice,
+              },
+            },
+            { upsert: true },
+          );
+        }
+      }
+    } catch {
+      /* ignore sync error */
+    }
+  }
+
   return clean<T>(doc);
 }
 
@@ -357,6 +550,81 @@ async function collUpdate<T>(
     });
   } catch {}
 
+  if (name === "products") {
+    try {
+      const stockVal = rest.stock != null ? Number(rest.stock) : undefined;
+      const costVal = rest.cost != null ? Number(rest.cost) : undefined;
+      const priceVal = rest.price != null ? Number(rest.price) : undefined;
+      const nameVal = rest.name != null ? String(rest.name) : undefined;
+
+      const cylDoc = await db.collection("cylinderInventory").findOne({ productId: id });
+      if (cylDoc) {
+        const currentStock = stockVal !== undefined ? stockVal : Number(cylDoc.onHand) || 0;
+        const reserved = Number(cylDoc.reserved) || 0;
+        const costPrice = costVal !== undefined ? costVal : (Number(cylDoc.costPrice) || 0);
+        const unitPrice = priceVal !== undefined ? priceVal : (Number(cylDoc.unitPrice) || 0);
+        const valUnit = costPrice > 0 ? costPrice : unitPrice;
+        await db.collection("cylinderInventory").updateOne(
+          { productId: id },
+          {
+            $set: {
+              ...(stockVal !== undefined ? { onHand: stockVal, available: Math.max(0, stockVal - reserved) } : {}),
+              ...(costVal !== undefined ? { costPrice: costVal } : {}),
+              ...(priceVal !== undefined ? { unitPrice: priceVal } : {}),
+              ...(nameVal !== undefined ? { productName: nameVal } : {}),
+              totalValue: currentStock * valUnit,
+              updatedAt: new Date().toISOString(),
+            },
+          },
+        );
+      }
+
+      const gasDoc = await db.collection("gasInventory").findOne({ productId: id });
+      if (gasDoc) {
+        const currentStock = stockVal !== undefined ? stockVal : Number(gasDoc.onHand) || 0;
+        const costPrice = costVal !== undefined ? costVal : (Number(gasDoc.costPrice) || 0);
+        const unitPrice = priceVal !== undefined ? priceVal : (Number(gasDoc.unitPrice) || 0);
+        const valUnit = costPrice > 0 ? costPrice : unitPrice;
+        await db.collection("gasInventory").updateOne(
+          { productId: id },
+          {
+            $set: {
+              ...(stockVal !== undefined ? { onHand: stockVal } : {}),
+              ...(costVal !== undefined ? { costPrice: costVal } : {}),
+              ...(priceVal !== undefined ? { unitPrice: priceVal } : {}),
+              ...(nameVal !== undefined ? { productName: nameVal } : {}),
+              totalValue: currentStock * valUnit,
+              updatedAt: new Date().toISOString(),
+            },
+          },
+        );
+      }
+
+      const prodDoc = await db.collection("productInventory").findOne({ productId: id });
+      if (prodDoc) {
+        const currentStock = stockVal !== undefined ? stockVal : Number(prodDoc.onHand) || 0;
+        const costPrice = costVal !== undefined ? costVal : (Number(prodDoc.costPrice) || 0);
+        const unitPrice = priceVal !== undefined ? priceVal : (Number(prodDoc.unitPrice) || 0);
+        const valUnit = costPrice > 0 ? costPrice : unitPrice;
+        await db.collection("productInventory").updateOne(
+          { productId: id },
+          {
+            $set: {
+              ...(stockVal !== undefined ? { onHand: stockVal } : {}),
+              ...(costVal !== undefined ? { costPrice: costVal } : {}),
+              ...(priceVal !== undefined ? { unitPrice: priceVal } : {}),
+              ...(nameVal !== undefined ? { productName: nameVal } : {}),
+              totalValue: currentStock * valUnit,
+              updatedAt: new Date().toISOString(),
+            },
+          },
+        );
+      }
+    } catch {
+      /* ignore sync error */
+    }
+  }
+
   return clean<T>(doc);
 }
 
@@ -409,6 +677,18 @@ async function collRemove(name: CollName, id: string, user?: { username?: string
       details: `Deleted record in ${name} (id: ${id})`,
     });
   } catch {}
+
+  if (name === "products") {
+    try {
+      await Promise.all([
+        db.collection("cylinderInventory").deleteMany({ productId: id }),
+        db.collection("gasInventory").deleteMany({ productId: id }),
+        db.collection("productInventory").deleteMany({ productId: id }),
+      ]);
+    } catch {
+      /* ignore sync error */
+    }
+  }
 }
 
 // ---------- Generic CRUD server functions ----------

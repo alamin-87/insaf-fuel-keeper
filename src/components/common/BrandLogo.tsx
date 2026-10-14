@@ -18,9 +18,15 @@ export function BrandLogo({ className, size = "md", alt = "Insaf Gas Corp" }: Br
   const { logo } = useBranding();
   return (
     <img
-      src={logo}
+      src={logo || "/api/branding/logo"}
       alt={alt}
       draggable={false}
+      onError={(e) => {
+        const target = e.currentTarget;
+        if (!target.src.includes("/favicon.png")) {
+          target.src = "/favicon.png?v=4";
+        }
+      }}
       className={cn("shrink-0 rounded-md object-contain", SIZE_CLASS[size], className)}
     />
   );

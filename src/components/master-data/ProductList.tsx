@@ -23,6 +23,10 @@ export function ProductList() {
     mutationFn: (id: string) => productService.remove(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["products"] });
+      qc.invalidateQueries({ queryKey: ["cylinderInventory"] });
+      qc.invalidateQueries({ queryKey: ["gasInventory"] });
+      qc.invalidateQueries({ queryKey: ["productInventory"] });
+      qc.invalidateQueries({ queryKey: ["inventorySummary"] });
       toast.success(t("products.deleted"));
     },
     onError: (e: Error) => toast.error(e.message),

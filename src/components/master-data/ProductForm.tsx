@@ -126,6 +126,10 @@ export function ProductForm({ id }: { id?: string }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["products"] });
       qc.invalidateQueries({ queryKey: ["productCategories"] });
+      qc.invalidateQueries({ queryKey: ["cylinderInventory"] });
+      qc.invalidateQueries({ queryKey: ["gasInventory"] });
+      qc.invalidateQueries({ queryKey: ["productInventory"] });
+      qc.invalidateQueries({ queryKey: ["inventorySummary"] });
       if (id) qc.invalidateQueries({ queryKey: ["products", id] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       toast.success(t("common.save"));

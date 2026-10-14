@@ -507,8 +507,8 @@ export async function processReturnInDb(
     );
   }
 
-  // Authoritatively reconcile database inventory so all summaries, totals, and balances stay synchronized
-  await reconcileDatabaseInventory(db, session);
+  // Run background reconciliation without blocking the return confirmation
+  reconcileDatabaseInventory(db).catch(() => {});
 
   // Audit log
   try {

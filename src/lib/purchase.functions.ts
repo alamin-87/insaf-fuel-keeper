@@ -506,29 +506,75 @@ async function receiveStockInDb(
 
   // Update separated inventory collection
   if (pType === "gas") {
+    const unitPrice = Number(product.price) || 0;
+    const costPrice = cost > 0 ? cost : (Number(product.cost) || 0);
+    const valUnit = costPrice > 0 ? costPrice : unitPrice;
     await db.collection("gasInventory").updateOne(
       { productId: product.id },
       {
-        $inc: { stockIn: qty, onHand: qty },
-        $set: { updatedAt: now },
+        $inc: { stockIn: qty },
+        $set: { onHand: nextStock, costPrice, unitPrice, totalValue: nextStock * valUnit, updatedAt: now },
+        $setOnInsert: {
+          id: `gas-${product.id}`,
+          productId: product.id,
+          productName: product.name,
+          productType: "gas",
+          uom: product.uom || "kg",
+          openingStock: 0,
+          stockOut: 0,
+        },
       },
       { upsert: true, ...opt },
     );
   } else if (pType === "cylinder") {
+    const cylDoc = await db.collection("cylinderInventory").findOne({ productId: product.id }, opt);
+    const reserved = cylDoc ? Number(cylDoc.reserved) || 0 : 0;
+    const unitPrice = Number(product.price) || 0;
+    const costPrice = cost > 0 ? cost : (Number(product.cost) || 0);
+    const valUnit = costPrice > 0 ? costPrice : unitPrice;
     await db.collection("cylinderInventory").updateOne(
       { productId: product.id },
       {
-        $inc: { stockIn: qty, onHand: qty, available: qty },
-        $set: { updatedAt: now },
+        $inc: { stockIn: qty },
+        $set: {
+          onHand: nextStock,
+          available: Math.max(0, nextStock - reserved),
+          costPrice,
+          unitPrice,
+          totalValue: nextStock * valUnit,
+          updatedAt: now,
+        },
+        $setOnInsert: {
+          id: `cyl-${product.id}`,
+          productId: product.id,
+          productName: product.name,
+          productType: "cylinder",
+          uom: product.uom || "cyl",
+          openingStock: 0,
+          stockOut: 0,
+          reserved: 0,
+        },
       },
       { upsert: true, ...opt },
     );
   } else {
+    const unitPrice = Number(product.price) || 0;
+    const costPrice = cost > 0 ? cost : (Number(product.cost) || 0);
+    const valUnit = costPrice > 0 ? costPrice : unitPrice;
     await db.collection("productInventory").updateOne(
       { productId: product.id },
       {
-        $inc: { stockIn: qty, onHand: qty },
-        $set: { updatedAt: now },
+        $inc: { stockIn: qty },
+        $set: { onHand: nextStock, costPrice, unitPrice, totalValue: nextStock * valUnit, updatedAt: now },
+        $setOnInsert: {
+          id: `prod-${product.id}`,
+          productId: product.id,
+          productName: product.name,
+          productType: "product",
+          uom: product.uom || "pcs",
+          openingStock: 0,
+          stockOut: 0,
+        },
       },
       { upsert: true, ...opt },
     );
@@ -587,29 +633,45 @@ export async function issueStockInDb(
 
   // Update separated inventory collection
   if (pType === "gas") {
+    const unitPrice = Number(product.price) || 0;
+    const costPrice = Number(product.cost) || 0;
+    const valUnit = costPrice > 0 ? costPrice : unitPrice;
     await db.collection("gasInventory").updateOne(
       { productId: product.id },
       {
-        $inc: { stockOut: qty, onHand: -qty },
-        $set: { updatedAt: now },
+        $inc: { stockOut: qty },
+        $set: { onHand: nextStock, totalValue: nextStock * valUnit, updatedAt: now },
       },
       { upsert: true, ...opt },
     );
   } else if (pType === "cylinder") {
+    const cylDoc = await db.collection("cylinderInventory").findOne({ productId: product.id }, opt);
+    const reserved = cylDoc ? Number(cylDoc.reserved) || 0 : 0;
+    const unitPrice = Number(product.price) || 0;
+    const costPrice = Number(product.cost) || 0;
+    const valUnit = costPrice > 0 ? costPrice : unitPrice;
     await db.collection("cylinderInventory").updateOne(
       { productId: product.id },
       {
-        $inc: { stockOut: qty, onHand: -qty, available: -qty },
-        $set: { updatedAt: now },
+        $inc: { stockOut: qty },
+        $set: {
+          onHand: nextStock,
+          available: Math.max(0, nextStock - reserved),
+          totalValue: nextStock * valUnit,
+          updatedAt: now,
+        },
       },
       { upsert: true, ...opt },
     );
   } else {
+    const unitPrice = Number(product.price) || 0;
+    const costPrice = Number(product.cost) || 0;
+    const valUnit = costPrice > 0 ? costPrice : unitPrice;
     await db.collection("productInventory").updateOne(
       { productId: product.id },
       {
-        $inc: { stockOut: qty, onHand: -qty },
-        $set: { updatedAt: now },
+        $inc: { stockOut: qty },
+        $set: { onHand: nextStock, totalValue: nextStock * valUnit, updatedAt: now },
       },
       { upsert: true, ...opt },
     );

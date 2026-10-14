@@ -521,8 +521,8 @@ export function SalesOrderForm({
                       <TableHead className="min-w-[11rem]">{t("common.product")}</TableHead>
                       <TableHead className="w-28">{t("common.category")}</TableHead>
                       <TableHead className="w-32">{t("sales.gasOrCylinder")}</TableHead>
-                      <TableHead className="w-20 text-right">{t("common.quantity")}</TableHead>
-                      <TableHead className="w-36 min-w-[9.5rem] text-right">{t("common.price")}</TableHead>
+                      <TableHead className="w-28 min-w-[7rem] text-right">{t("common.quantity")}</TableHead>
+                      <TableHead className="w-32 min-w-[7.5rem] text-right">{t("common.price")}</TableHead>
                       <TableHead className="w-28 text-right">{t("common.subtotal")}</TableHead>
                       <TableHead className="w-10" />
                     </TableRow>
@@ -656,13 +656,13 @@ export function SalesOrderForm({
                               </SelectContent>
                             </Select>
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="w-28 min-w-[7rem]">
                             <Input
                               type="number"
                               min={1}
                               value={it.quantity}
                               onChange={(e) => update(idx, { quantity: Number(e.target.value) })}
-                              className="text-right"
+                              className="w-full text-right font-medium tabular-nums"
                             />
                             {(() => {
                               const row = stockRows.find((r) => r.productId === it.productId);
@@ -681,7 +681,7 @@ export function SalesOrderForm({
                               return null;
                             })()}
                           </TableCell>
-                          <TableCell className="w-36 min-w-[9.5rem]">
+                          <TableCell className="w-32 min-w-[7.5rem]">
                             <Input
                               type="number"
                               step="any"
@@ -691,7 +691,7 @@ export function SalesOrderForm({
                                   price: e.target.value === "" ? 0 : Number(e.target.value),
                                 })
                               }
-                              className="w-full text-right"
+                              className="w-full text-right font-medium tabular-nums"
                             />
                           </TableCell>
                           <TableCell className="text-right font-medium tabular-nums">

@@ -70,6 +70,22 @@ const call = async <T>(op: any, coll: any, id?: string, payload?: any): Promise<
   return (await crudFn({ data: { op, coll, id, payload } })) as T;
 };
 
+function resolveProductType(
+  p: Pick<Product, "productType" | "uom" | "category" | "name"> | null | undefined,
+): ProductType {
+  if (!p) return "gas";
+  const uom = String(p.uom || "").toLowerCase();
+  if (uom === "cyl") return "cylinder";
+  if (uom === "pcs") return "product";
+  if (p.productType === "cylinder" || p.productType === "gas" || p.productType === "product") {
+    return p.productType;
+  }
+  if (uom === "kg" || uom === "ltr") return "gas";
+  const cat = String(p.category || "").toLowerCase();
+  if (cat.includes("cylinder") || cat === "cylinder") return "cylinder";
+  return "gas";
+}
+
 async function takeWarehouseFull(productId: string, qty: number, lotNumber?: string) {
   const method = await getCylinderTrackingFn();
   const product = await call<Product | null>("get", "products", productId);
@@ -235,12 +251,7 @@ async function receiveStock(productId: string, qty: number, unitCost: number, me
     const leftover = await remainingValue(product.id);
     nextCost = leftover.avg || cost;
   }
-  const pType: ProductType =
-    product.productType === "cylinder" || product.productType === "gas" || product.productType === "product"
-      ? product.productType
-      : product.uom === "cyl"
-        ? "cylinder"
-        : "gas";
+  const pType: ProductType = resolveProductType(product);
 
   await call("update", "products", product.id, { stock: nextStock, cost: nextCost });
   await postStockMovement({
@@ -304,12 +315,7 @@ async function issueStock(productId: string, qty: number, meta?: StockMeta) {
   }
   const nextStock = available - take;
   const leftover = await remainingValue(product.id);
-  const pType: ProductType =
-    product.productType === "cylinder" || product.productType === "gas" || product.productType === "product"
-      ? product.productType
-      : product.uom === "cyl"
-        ? "cylinder"
-        : "gas";
+  const pType: ProductType = resolveProductType(product);
 
   await call("update", "products", product.id, {
     stock: nextStock,
@@ -394,10 +400,12 @@ async function restoreStock(
   const nextStock = (product.stock ?? 0) + qty;
   const leftover = await remainingValue(productId);
   await call("update", "products", product.id, { stock: nextStock, cost: leftover.avg });
+  const pType: ProductType = resolveProductType(product);
   await postStockMovement({
     date: new Date().toISOString(),
     productId: product.id,
     productName: product.name,
+    productType: pType,
     type: "in",
     quantity: qty,
     balanceAfter: nextStock,
