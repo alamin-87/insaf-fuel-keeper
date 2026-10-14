@@ -285,6 +285,7 @@ export interface Delivery {
   status: "pending" | "confirmed" | "delivered" | "in_transit" | "returned";
   date: string;
   confirmedAt?: string;
+  expectedReturnAt?: string;
   receiverName?: string;
   emptyReturned?: number;
   notes?: string;

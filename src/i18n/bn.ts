@@ -676,6 +676,7 @@ export const bn = {
   "deliveries.vehicle": "যানবাহন",
   "deliveries.driverMobile": "ড্রাইভার মোবাইল",
   "deliveries.confirm": "ডেলিভারি নিশ্চিত",
+  "deliveries.confirmed": "ডেলিভারি সফলভাবে নিশ্চিত করা হয়েছে",
   "deliveries.return": "রিটার্ন",
   "deliveries.sellGasOnly": "শুধু গ্যাস বিক্রি",
   "deliveries.exchange": "এক্সচেঞ্জ নিশ্চিত",

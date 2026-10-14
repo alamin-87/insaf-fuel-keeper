@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import type { Delivery } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -91,6 +92,63 @@ export function DeliveryCylinderDialog({
       if (row.includes(id)) next[index] = row.filter((x) => x !== id);
       else if (row.length < qty) next[index] = [...row, id];
       return next;
+    });
+  };
+
+  const handleConfirm = (asExchange = false) => {
+    if (pending) return;
+
+    if (!expectedReturn) {
+      toast.error(t("inventory.expectedReturn") + " is required");
+      return;
+    }
+
+    if (tracking === "lot" && !lotNumber.trim()) {
+      toast.error(t("inventory.lotNumber") + " is required");
+      return;
+    }
+
+    if (tracking === "serial") {
+      for (const { it, index } of cylLines) {
+        const selected = issued[index]?.length || 0;
+        if (selected !== it.quantity) {
+          const availableStock = cylinders.filter(
+            (c) =>
+              c.productId === it.productId &&
+              (c.status === "in_stock" || c.status === "in_transit") &&
+              !cylinderIsEmpty(c),
+          ).length;
+          if (availableStock < it.quantity) {
+            toast.error(
+              `${it.productName}: Only ${availableStock} cylinder(s) available in warehouse, but ${it.quantity} required. Please add stock first.`,
+            );
+          } else {
+            toast.error(
+              `${it.productName}: Please select all ${it.quantity} cylinders (${selected}/${it.quantity} selected).`,
+            );
+          }
+          return;
+        }
+      }
+    }
+
+    if (asExchange) {
+      if (issuedCount <= 0 || returned.length <= 0) {
+        toast.error(t("deliveries.exchangeNeed") || "Exchange requires empty returns and full issues");
+        return;
+      }
+      if (issuedCount !== returned.length) {
+        toast.error(t("deliveries.exchangeNeed") || "Exchange requires equal empty returns and full issues");
+        return;
+      }
+    }
+
+    onConfirm({
+      issuedIdsByItem: issued,
+      returnedIds: returned,
+      lotNumber: lotNumber || undefined,
+      expectedReturnAt: expectedReturn,
+      asExchange,
     });
   };
 
@@ -207,39 +265,15 @@ export function DeliveryCylinderDialog({
             {t("common.cancel")}
           </Button>
           <Button
-            disabled={
-              !ready || pending || (tracking === "lot" && !lotNumber.trim()) || !expectedReturn
-            }
-            onClick={() =>
-              onConfirm({
-                issuedIdsByItem: issued,
-                returnedIds: returned,
-                lotNumber: lotNumber || undefined,
-                expectedReturnAt: expectedReturn,
-                asExchange: false,
-              })
-            }
+            disabled={pending}
+            onClick={() => handleConfirm(false)}
           >
             {t("deliveries.confirm")}
           </Button>
           <Button
             variant="outline"
-            disabled={
-              !ready ||
-              !exchangeReady ||
-              pending ||
-              (tracking === "lot" && !lotNumber.trim()) ||
-              !expectedReturn
-            }
-            onClick={() =>
-              onConfirm({
-                issuedIdsByItem: issued,
-                returnedIds: returned,
-                lotNumber: lotNumber || undefined,
-                expectedReturnAt: expectedReturn,
-                asExchange: true,
-              })
-            }
+            disabled={pending}
+            onClick={() => handleConfirm(true)}
           >
             {t("deliveries.exchange")}
           </Button>

@@ -99,7 +99,7 @@ export function DeliveryChallan({ id }: { id: string }) {
       qc.invalidateQueries({ queryKey: ["stockMovements"] });
       qc.invalidateQueries({ queryKey: ["cylAccountability"] });
       setAssignOpen(false);
-      toast.success(t("deliveries.confirm"));
+      toast.success(t("deliveries.confirmed") || "Delivery confirmed successfully");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -262,6 +262,9 @@ export function DeliveryChallan({ id }: { id: string }) {
                 },
                 { label: t("deliveries.emptyReceived"), value: String(d.emptyReturned ?? 0) },
                 { label: t("doc.dispatchDate"), value: dispatchDate },
+                ...(d.expectedReturnAt
+                  ? [{ label: t("inventory.expectedReturn"), value: formatDate(d.expectedReturnAt) }]
+                  : []),
               ]}
             />
           </div>

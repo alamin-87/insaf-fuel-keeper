@@ -1219,6 +1219,7 @@ export const deliveryService = {
         return call<Delivery>("update", "deliveries", id, {
           status: "delivered",
           confirmedAt: new Date().toISOString(),
+          expectedReturnAt: confirmPayload?.expectedReturnAt || undefined,
           items: delivery.items,
         });
       }
@@ -1254,6 +1255,7 @@ export const deliveryService = {
       return call<Delivery>("update", "deliveries", id, {
         status: "delivered",
         confirmedAt: new Date().toISOString(),
+        expectedReturnAt: confirmPayload?.expectedReturnAt || undefined,
         emptyReturned: 0,
         items: nextItems,
       });
@@ -1389,6 +1391,7 @@ export const deliveryService = {
       return call<Delivery>("update", "deliveries", id, {
         status: "delivered",
         confirmedAt: new Date().toISOString(),
+        expectedReturnAt: confirmPayload?.expectedReturnAt || undefined,
         emptyReturned: confirmPayload?.returnedIds?.length || 0,
         items: nextItems,
       });

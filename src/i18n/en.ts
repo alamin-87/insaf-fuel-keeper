@@ -669,6 +669,7 @@ export const en = {
   "deliveries.vehicle": "Vehicle",
   "deliveries.driverMobile": "Driver Mobile",
   "deliveries.confirm": "Confirm Delivery",
+  "deliveries.confirmed": "Delivery confirmed successfully",
   "deliveries.return": "Return",
   "deliveries.sellGasOnly": "Sell Gas Only",
   "deliveries.exchange": "Confirm Exchange",

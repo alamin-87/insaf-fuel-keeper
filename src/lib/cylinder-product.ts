@@ -201,7 +201,7 @@ export function pickFifo(
     .filter(
       (c) =>
         c.productId === productId &&
-        c.status === "in_stock" &&
+        (c.status === "in_stock" || c.status === "in_transit") &&
         !cylinderIsEmpty(c) &&
         !exclude.has(c.id),
     )
