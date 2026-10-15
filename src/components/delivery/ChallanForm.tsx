@@ -174,13 +174,13 @@ export function ChallanForm({
     setItems(
       existing.items?.length
         ? existing.items.map((it) => ({
-            ...it,
-            itemType:
-              it.itemType ||
-              (isCylinderProduct(products.find((p) => p.id === it.productId))
-                ? "cylinder"
-                : "gas"),
-          }))
+          ...it,
+          itemType:
+            it.itemType ||
+            (isCylinderProduct(products.find((p) => p.id === it.productId))
+              ? "cylinder"
+              : "gas"),
+        }))
         : [emptyLine()],
     );
     setHydrated(true);

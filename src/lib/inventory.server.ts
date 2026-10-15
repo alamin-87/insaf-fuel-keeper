@@ -13,6 +13,7 @@ import type {
   SalesOrder,
   StockMovement,
 } from "../types/index.ts";
+import { cylinderIsFullStock, isInactiveCompanyCylinder } from "./cylinder-product.ts";
 
 const clean = <T>(doc: any): T => {
   if (!doc) return doc;
@@ -24,12 +25,12 @@ export function resolveProductType(
   p: Pick<Product, "productType" | "uom" | "category" | "name"> | null | undefined,
 ): ProductType {
   if (!p) return "gas";
-  const uom = String(p.uom || "").toLowerCase();
-  if (uom === "cyl") return "cylinder";
-  if (uom === "pcs") return "product";
-  if (p.productType === "cylinder" || p.productType === "gas" || p.productType === "product") {
+  if (p.productType === "product" || p.productType === "cylinder" || p.productType === "gas") {
     return p.productType;
   }
+  const uom = String(p.uom || "").toLowerCase();
+  if (uom === "pcs") return "product";
+  if (uom === "cyl") return "cylinder";
   if (uom === "kg" || uom === "ltr") return "gas";
   const cat = String(p.category || "").toLowerCase();
   if (cat.includes("cylinder") || cat === "cylinder") return "cylinder";
@@ -267,23 +268,17 @@ export async function reconcileDatabaseInventory(db: any, session?: any): Promis
       }
     }
 
-    // Guarantee active posted sales are accounted for
-    const activeSoldQty = sales
-      .filter((s) => ["confirmed", "invoiced", "paid"].includes(s.status))
-      .reduce(
-        (sum, s) =>
-          sum + (Number(s.items?.find((it) => it.productId === p.id)?.quantity) || 0),
-        0,
-      );
-    if (activeSoldQty > stockOut) {
-      stockOut = activeSoldQty;
-    }
-
     // FORMULA: ON HAND = OPENING STOCK + STOCK IN - STOCK OUT
     const onHand = Math.max(0, openingStock + stockIn - stockOut);
     const unitPrice = Number(p.price) || 0;
     const costPrice = Number(p.cost) || 0;
     const totalValue = onHand * (costPrice > 0 ? costPrice : unitPrice);
+
+    const cylsForP = cylinders.filter((c) => c.productId === p.id && !isInactiveCompanyCylinder(c));
+    const effectiveStock =
+      pType === "cylinder" && cylsForP.length > 0
+        ? cylsForP.filter(cylinderIsFullStock).length
+        : onHand;
 
     // Ensure product master collection has this product and synchronized stock
     if (!productsTableIdSet.has(p.id)) {
@@ -297,7 +292,7 @@ export async function reconcileDatabaseInventory(db: any, session?: any): Promis
           uom: p.uom || (pType === "cylinder" ? "cyl" : pType === "gas" ? "kg" : "pcs"),
           price: unitPrice,
           cost: costPrice,
-          stock: onHand,
+          stock: effectiveStock,
           reorderLevel: 0,
           costingMethod: "fifo",
           createdAt: now,
@@ -305,10 +300,10 @@ export async function reconcileDatabaseInventory(db: any, session?: any): Promis
         opt,
       );
       productsTableIdSet.add(p.id);
-    } else if (p.stock !== onHand || p.productType !== pType) {
+    } else if (p.stock !== effectiveStock || p.productType !== pType) {
       await db.collection("products").updateOne(
         { id: p.id },
-        { $set: { stock: onHand, productType: pType } },
+        { $set: { stock: effectiveStock, productType: pType } },
         opt,
       );
     }
@@ -337,8 +332,9 @@ export async function reconcileDatabaseInventory(db: any, session?: any): Promis
       );
     } else if (pType === "cylinder") {
       const reserved = computeReservedQty(p.id, sales, deliveries);
+      const effectiveOnHand = cylsForP.length > 0 ? cylsForP.filter(cylinderIsFullStock).length : onHand;
       // AVAILABLE = ON HAND - RESERVED (available cannot be negative)
-      const available = Math.max(0, onHand - reserved);
+      const available = Math.max(0, effectiveOnHand - reserved);
       const cylRow: CylinderInventory = {
         id: `cyl-${p.id}`,
         productId: p.id,
@@ -350,10 +346,10 @@ export async function reconcileDatabaseInventory(db: any, session?: any): Promis
         stockOut,
         reserved,
         available,
-        onHand,
+        onHand: effectiveOnHand,
         unitPrice,
         costPrice,
-        totalValue,
+        totalValue: effectiveOnHand * (costPrice > 0 ? costPrice : unitPrice),
         updatedAt: now,
       };
       cylinderList.push(cylRow);

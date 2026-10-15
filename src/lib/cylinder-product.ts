@@ -10,7 +10,17 @@ export function isCylinderProduct(p?: Pick<Product, "uom" | "productType"> | nul
 
 export type SaleItemType = "gas" | "cylinder" | "product";
 
-/** Line classification. Historical rows without itemType follow the product (Gas vs Cylinder). */
+export function defaultProductSaleItemType(
+  p?: Pick<Product, "uom" | "productType"> | null,
+): SaleItemType {
+  if (!p) return "gas";
+  if (p.productType === "product" || p.uom === "pcs") return "product";
+  if (p.productType === "cylinder" || p.uom === "cyl") return "cylinder";
+  if (p.productType === "gas" || p.uom === "kg" || p.uom === "ltr") return "gas";
+  return isCylinderProduct(p) ? "cylinder" : "gas";
+}
+
+/** Line classification. Preserves saved itemType. Falls back to product type (Product, Cylinder, Gas). */
 export function saleItemType(
   item?: Pick<LineItem, "itemType"> | null,
   p?: Pick<Product, "uom" | "productType"> | null,
@@ -18,7 +28,7 @@ export function saleItemType(
   if (item?.itemType === "gas" || item?.itemType === "cylinder" || item?.itemType === "product") {
     return item.itemType;
   }
-  return isCylinderProduct(p) ? "cylinder" : "gas";
+  return defaultProductSaleItemType(p);
 }
 
 /** Serial/cylinder movement applies only to Cylinder-typed lines (or historical cylinder products). */
@@ -28,6 +38,7 @@ export function isCylinderTrackedLine(
 ) {
   const kind = saleItemType(item, p);
   if (kind === "gas" || kind === "product") return false;
+  if (item?.itemType === "cylinder") return true;
   return isCylinderProduct(p);
 }
 
@@ -51,7 +62,7 @@ export function isCylinderSaleLine(
 }
 
 export function lineFromProduct(p: Product, itemType?: SaleItemType): LineItem {
-  const kind = itemType ?? (isCylinderProduct(p) ? "cylinder" : "gas");
+  const kind = itemType ?? defaultProductSaleItemType(p);
   const movementOnly = kind === "cylinder" && p.productType === "cylinder";
   return {
     productId: p.id,
@@ -205,7 +216,7 @@ export function pickFifo(
         !cylinderIsEmpty(c) &&
         !exclude.has(c.id),
     )
-    .sort((a, b) => a.lastMovementAt.localeCompare(b.lastMovementAt))
+    .sort((a, b) => (a.lastMovementAt || "").localeCompare(b.lastMovementAt || ""))
     .slice(0, qty)
     .map((c) => c.id);
 }

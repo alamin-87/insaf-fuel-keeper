@@ -121,14 +121,16 @@ export function buildProductInventory(
       delivered = withCustomer;
       empty = all.filter(cylinderWarehouseEmpty).length;
       refillPending = all.filter((c) => cylinderAtSupplier(c)).length;
+      full = all.filter(cylinderIsFullStock).length;
     } else {
       total = onHand + reserved;
       delivered = deliveredQtyByProduct(deliveries, p.id);
       empty = 0;
       refillPending = 0;
+      full = onHand;
     }
 
-    const available = Math.max(0, onHand - reserved);
+    const available = Math.max(0, (isCyl && all.length > 0 ? full : onHand) - reserved);
     const status: InventoryStockStatus =
       available <= 0 ? "out" : available <= (p.reorderLevel || 0) ? "low" : "normal";
 
@@ -139,7 +141,7 @@ export function buildProductInventory(
       name: p.name,
       category: p.category,
       total,
-      full: onHand,
+      full,
       reserved,
       delivered,
       empty,

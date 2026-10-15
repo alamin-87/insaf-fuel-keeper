@@ -39,6 +39,7 @@ import { deliveryService } from "@/services/delivery.service";
 import { inventoryService } from "@/services/inventory.service";
 import { buildProductInventory } from "@/lib/cylinder-inventory";
 import {
+  defaultProductSaleItemType,
   isCylinderMovementOnly,
   isCylinderProduct,
   isCylinderSaleLine,
@@ -185,8 +186,7 @@ export function SalesOrderForm({
     setItems((prev) =>
       prev.map((it, i) => {
         if (i !== idx) return it;
-        const kind: SaleItemType =
-          it.itemType === "product" ? "product" : isCylinderProduct(p) ? "cylinder" : "gas";
+        const kind: SaleItemType = defaultProductSaleItemType(p);
         return { ...lineFromProduct(p, kind), quantity: it.quantity || 1 };
       }),
     );
@@ -196,8 +196,8 @@ export function SalesOrderForm({
 
   const setLineKind = (idx: number, kind: SaleItemType) => {
     const it = items[idx];
+    const p = products.find((x) => x.id === it.productId);
     if (kind === "product") {
-      const p = products.find((x) => x.id === it.productId);
       update(idx, {
         itemType: "product",
         sellCylinder: false,
@@ -205,23 +205,10 @@ export function SalesOrderForm({
       });
       return;
     }
-    const current = products.find((x) => x.id === it.productId);
-    const matches = (p: Product) =>
-      kind === "cylinder" ? isCylinderProduct(p) : !isCylinderProduct(p);
-    if (current && matches(current)) {
-      update(idx, { itemType: kind, category: it.category || current.category });
-      return;
-    }
-    const next = products.find(matches);
-    if (next) {
-      setItems((prev) =>
-        prev.map((row, i) =>
-          i === idx ? { ...lineFromProduct(next, kind), quantity: row.quantity || 1 } : row,
-        ),
-      );
-      return;
-    }
-    update(idx, { itemType: kind });
+    update(idx, {
+      itemType: kind,
+      category: it.category || p?.category,
+    });
   };
 
   const mutation = useMutation({
@@ -246,10 +233,16 @@ export function SalesOrderForm({
         for (const it of workingItems) {
           const row = stockRows.find((r) => r.productId === it.productId);
           const p = products.find((x) => x.id === it.productId);
-          const avail =
+          const baseAvail =
             sellGasOnly || saleItemType(it, p) === "product"
               ? Math.max(0, p?.stock ?? 0)
               : (row?.available ?? p?.stock ?? 0);
+          const heldByThisOrder = editing
+            ? (existing?.items
+                ?.filter((x) => x.productId === it.productId)
+                .reduce((acc, x) => acc + (Number(x.quantity) || 0), 0) ?? 0)
+            : 0;
+          const avail = baseAvail + heldByThisOrder;
           if (it.quantity > avail) {
             throw new Error(
               t("sales.insufficientStock", { available: avail, requested: it.quantity }),
@@ -596,7 +589,13 @@ export function SalesOrderForm({
                                     .slice(0, 40)
                                     .map((prod) => {
                                       const row = stockRows.find((r) => r.productId === prod.id);
-                                      const avail = row?.available ?? prod.stock ?? 0;
+                                      const baseAvail = row?.available ?? prod.stock ?? 0;
+                                      const heldByThisOrder = editing
+                                        ? (existing?.items
+                                            ?.filter((x) => x.productId === prod.id)
+                                            .reduce((acc, x) => acc + (Number(x.quantity) || 0), 0) ?? 0)
+                                        : 0;
+                                      const avail = baseAvail + heldByThisOrder;
                                       return (
                                         <li key={prod.id}>
                                           <button
@@ -667,10 +666,16 @@ export function SalesOrderForm({
                             {(() => {
                               const row = stockRows.find((r) => r.productId === it.productId);
                               if (!p && !row) return null;
-                              const avail =
+                              const baseAvail =
                                 saleItemType(it, p) === "product"
                                   ? Math.max(0, p?.stock ?? 0)
                                   : (row?.available ?? p?.stock ?? 0);
+                              const heldByThisOrder = editing
+                                ? (existing?.items
+                                    ?.filter((x) => x.productId === it.productId)
+                                    .reduce((acc, x) => acc + (Number(x.quantity) || 0), 0) ?? 0)
+                                : 0;
+                              const avail = baseAvail + heldByThisOrder;
                               if (it.quantity > avail) {
                                 return (
                                   <p className="mt-1 text-[10px] text-destructive">

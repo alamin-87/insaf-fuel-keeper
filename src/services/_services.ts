@@ -503,12 +503,23 @@ async function assertSalesStock(
   opts?: { sellGasOnly?: boolean; excludeOrderId?: string },
 ) {
   const products = await call<Product[]>("list", "products");
+  let existingOrderItems: LineItem[] = [];
+  if (opts?.excludeOrderId) {
+    const existingOrder = await call<SalesOrder | null>("get", "sales", opts.excludeOrderId);
+    if (existingOrder && isOpenSalesStatus(existingOrder.status)) {
+      existingOrderItems = existingOrder.items || [];
+    }
+  }
+
   for (const item of items) {
     const qty = Number(item.quantity) || 0;
     if (qty <= 0) continue;
     const p = products.find((x) => x.id === item.productId);
     if (!p) throw new Error(`Product not found (${item.productId})`);
-    const available = Math.max(0, p.stock ?? 0);
+    const heldByThisOrder = existingOrderItems
+      .filter((it) => it.productId === item.productId)
+      .reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
+    const available = Math.max(0, (p.stock ?? 0) + heldByThisOrder);
     if (qty > available) {
       throw new Error(`Insufficient stock. Available: ${available}, Requested: ${qty}.`);
     }

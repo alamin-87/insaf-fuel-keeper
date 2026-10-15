@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { cylinderService } from "@/services/cylinder.service";
 import { productService } from "@/services/product.service";
@@ -60,6 +60,9 @@ export function DeliveryCylinderDialog({
     return d.toISOString().slice(0, 10);
   });
 
+  const prevOpenRef = useRef(false);
+  const prevDeliveryIdRef = useRef<string | null>(null);
+
   const cylLines = useMemo(
     () =>
       delivery.items
@@ -69,10 +72,15 @@ export function DeliveryCylinderDialog({
   );
 
   useEffect(() => {
-    if (!open) return;
-    setIssued(delivery.items.map((it) => [...(it.cylinderIds || [])]));
-    setReturned([]);
-  }, [open, delivery]);
+    if (open && (!prevOpenRef.current || prevDeliveryIdRef.current !== delivery.id)) {
+      setIssued(
+        delivery.items.map((it) => (Array.isArray(it.cylinderIds) ? [...it.cylinderIds] : [])),
+      );
+      setReturned([]);
+      prevDeliveryIdRef.current = delivery.id;
+    }
+    prevOpenRef.current = open;
+  }, [open, delivery.id, delivery.items]);
 
   const selectedAll = useMemo(() => new Set(issued.flat()), [issued]);
   const empties = cylinders.filter(
@@ -87,7 +95,10 @@ export function DeliveryCylinderDialog({
 
   const toggle = (index: number, id: string, qty: number) => {
     setIssued((prev) => {
-      const next = prev.map((row) => [...row]);
+      const next: string[][] = Array.from(
+        { length: delivery.items.length },
+        (_, i) => (prev[i] ? [...prev[i]] : []),
+      );
       const row = next[index] || [];
       if (row.includes(id)) next[index] = row.filter((x) => x !== id);
       else if (row.length < qty) next[index] = [...row, id];
@@ -201,9 +212,18 @@ export function DeliveryCylinderDialog({
                     variant="outline"
                     onClick={() => {
                       const exclude = new Set(issued.flatMap((ids, i) => (i === index ? [] : ids)));
+                      const picked = pickFifo(cylinders, it.productId, it.quantity, exclude);
+                      if (picked.length < it.quantity) {
+                        toast.warning(
+                          `${it.productName}: Only ${picked.length} of ${it.quantity} eligible cylinders available in warehouse.`,
+                        );
+                      }
                       setIssued((prev) => {
-                        const next = prev.map((row) => [...row]);
-                        next[index] = pickFifo(cylinders, it.productId, it.quantity, exclude);
+                        const next: string[][] = Array.from(
+                          { length: delivery.items.length },
+                          (_, i) => (prev[i] ? [...prev[i]] : []),
+                        );
+                        next[index] = picked;
                         return next;
                       });
                     }}
@@ -215,20 +235,39 @@ export function DeliveryCylinderDialog({
                   <p className="text-xs text-destructive">{t("deliveries.noStock")}</p>
                 ) : (
                   <ul className="max-h-40 space-y-1 overflow-y-auto text-sm">
-                    {stock.map((c) => (
-                      <li key={c.id} className="flex items-center gap-2">
-                        <Checkbox
-                          checked={issued[index]?.includes(c.id) || false}
-                          onCheckedChange={() => toggle(index, c.id, it.quantity)}
-                          disabled={!issued[index]?.includes(c.id) && count >= it.quantity}
-                        />
-                        <span className="font-mono text-xs">{c.serialNumber}</span>
-                        <span className="text-[10px] text-muted-foreground">{c.location}</span>
-                        {product?.code && (
-                          <span className="text-[10px] text-muted-foreground">{product.code}</span>
-                        )}
-                      </li>
-                    ))}
+                    {stock.map((c) => {
+                      const isChecked = issued[index]?.includes(c.id) || false;
+                      const isDisabled = !isChecked && count >= it.quantity;
+                      return (
+                        <li
+                          key={c.id}
+                          className={`flex items-center gap-2 rounded px-1.5 py-1 transition-colors ${
+                            isDisabled
+                              ? "cursor-not-allowed opacity-50"
+                              : "cursor-pointer hover:bg-muted/50"
+                          }`}
+                          onClick={(e) => {
+                            if ((e.target as HTMLElement).closest('[role="checkbox"]')) {
+                              return;
+                            }
+                            if (!isDisabled) {
+                              toggle(index, c.id, it.quantity);
+                            }
+                          }}
+                        >
+                          <Checkbox
+                            checked={isChecked}
+                            onCheckedChange={() => toggle(index, c.id, it.quantity)}
+                            disabled={isDisabled}
+                          />
+                          <span className="font-mono text-xs select-none">{c.serialNumber}</span>
+                          <span className="text-[10px] text-muted-foreground select-none">{c.location}</span>
+                          {product?.code && (
+                            <span className="text-[10px] text-muted-foreground select-none">{product.code}</span>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </section>
@@ -242,20 +281,34 @@ export function DeliveryCylinderDialog({
               <p className="text-xs text-muted-foreground">{t("common.noRecords")}</p>
             ) : (
               <ul className="max-h-36 space-y-1 overflow-y-auto text-sm">
-                {empties.map((c) => (
-                  <li key={c.id} className="flex items-center gap-2">
-                    <Checkbox
-                      checked={returned.includes(c.id)}
-                      onCheckedChange={() =>
+                {empties.map((c) => {
+                  const isChecked = returned.includes(c.id);
+                  return (
+                    <li
+                      key={c.id}
+                      className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 hover:bg-muted/50 transition-colors"
+                      onClick={(e) => {
+                        if ((e.target as HTMLElement).closest('[role="checkbox"]')) {
+                          return;
+                        }
                         setReturned((prev) =>
                           prev.includes(c.id) ? prev.filter((x) => x !== c.id) : [...prev, c.id],
-                        )
-                      }
-                    />
-                    <span className="font-mono text-xs">{c.serialNumber}</span>
-                    <span className="text-[10px] text-muted-foreground">{c.location}</span>
-                  </li>
-                ))}
+                        );
+                      }}
+                    >
+                      <Checkbox
+                        checked={isChecked}
+                        onCheckedChange={() =>
+                          setReturned((prev) =>
+                            prev.includes(c.id) ? prev.filter((x) => x !== c.id) : [...prev, c.id],
+                          )
+                        }
+                      />
+                      <span className="font-mono text-xs select-none">{c.serialNumber}</span>
+                      <span className="text-[10px] text-muted-foreground select-none">{c.location}</span>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </section>
@@ -265,6 +318,7 @@ export function DeliveryCylinderDialog({
             {t("common.cancel")}
           </Button>
           <Button
+            data-testid="confirm-delivery-dialog-btn"
             disabled={pending}
             onClick={() => handleConfirm(false)}
           >
