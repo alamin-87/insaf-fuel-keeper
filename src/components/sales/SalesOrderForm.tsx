@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { Check, ChevronDown, Trash2 } from "lucide-react";
 import { customerService } from "@/services/customer.service";
 import { productService } from "@/services/product.service";
 import { productCategoryService } from "@/services/product-category.service";
@@ -50,7 +50,7 @@ import {
 } from "@/lib/cylinder-product";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 function emptyLine(): LineItem {
   return { productId: "", productName: "", quantity: 1, price: 0, taxRate: 0 };
@@ -62,6 +62,184 @@ function customerMatches(c: Customer, q: string) {
   return [c.name, c.phone, c.whatsapp, c.email, c.address]
     .filter(Boolean)
     .some((v) => String(v).toLowerCase().includes(n));
+}
+
+interface EditableComboboxOption {
+  value: string;
+  label: string;
+}
+
+function EditableCombobox({
+  value,
+  onChange,
+  options,
+  placeholder = "—",
+  className,
+  id,
+  align = "start",
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  options: Array<EditableComboboxOption | string>;
+  placeholder?: string;
+  className?: string;
+  id?: string;
+  align?: "start" | "end" | "center";
+}) {
+  const [open, setOpen] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+
+  const normalizedOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const list: EditableComboboxOption[] = [];
+    for (const item of options) {
+      const opt = typeof item === "string" ? { value: item, label: item } : item;
+      const trimmedVal = opt.value.trim();
+      if (!trimmedVal || seen.has(trimmedVal)) continue;
+      seen.add(trimmedVal);
+      list.push({ value: trimmedVal, label: opt.label.trim() || trimmedVal });
+    }
+    return list;
+  }, [options]);
+
+  const filteredOptions = useMemo(() => {
+    if (!isTyping || !value.trim()) return normalizedOptions;
+    const q = value.trim().toLowerCase();
+    return normalizedOptions.filter(
+      (opt) => opt.label.toLowerCase().includes(q) || opt.value.toLowerCase().includes(q),
+    );
+  }, [normalizedOptions, isTyping, value]);
+
+  const hasExactMatch = useMemo(() => {
+    const trimmed = value.trim().toLowerCase();
+    return normalizedOptions.some((opt) => opt.value.toLowerCase() === trimmed);
+  }, [normalizedOptions, value]);
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setIsTyping(false);
+      }}
+    >
+      <PopoverAnchor asChild>
+        <div className={cn("relative flex w-full items-center", className)}>
+          <Input
+            id={id}
+            value={value}
+            placeholder={placeholder}
+            className="pr-8"
+            onChange={(e) => {
+              onChange(e.target.value);
+              setIsTyping(true);
+              setOpen(true);
+            }}
+            onClick={() => setOpen(true)}
+            onFocus={() => {
+              setIsTyping(false);
+              setOpen(true);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === "Escape") {
+                e.preventDefault();
+                setOpen(false);
+                setIsTyping(false);
+              } else if (e.key === "ArrowDown" && !open) {
+                e.preventDefault();
+                setOpen(true);
+                setIsTyping(false);
+              }
+            }}
+          />
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label="Toggle options"
+            className="absolute right-0 top-0 bottom-0 flex w-8 items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer focus:outline-none"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsTyping(false);
+              setOpen((prev) => !prev);
+            }}
+          >
+            <ChevronDown className="h-4 w-4 opacity-50" />
+          </button>
+        </div>
+      </PopoverAnchor>
+      <PopoverContent
+        align={align}
+        sideOffset={4}
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        onCloseAutoFocus={(e) => e.preventDefault()}
+        className="z-50 min-w-[var(--radix-popover-anchor-width,10rem)] max-w-sm max-h-56 overflow-auto p-1 text-sm shadow-md"
+      >
+        <div className="space-y-0.5">
+          <button
+            type="button"
+            className={cn(
+              "flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer",
+              !value && "bg-accent/60 font-medium",
+            )}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              onChange("");
+              setOpen(false);
+              setIsTyping(false);
+            }}
+          >
+            <span>—</span>
+            {!value && <Check className="ml-2 h-3.5 w-3.5 shrink-0 opacity-70" />}
+          </button>
+
+          {value.trim() && !hasExactMatch && (
+            <button
+              type="button"
+              className="flex w-full items-center justify-between rounded-sm border-b border-border/50 px-2 py-1.5 pb-2 text-left text-xs font-medium text-primary hover:bg-accent cursor-pointer"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                setOpen(false);
+                setIsTyping(false);
+              }}
+            >
+              <span className="truncate">Use &quot;{value.trim()}&quot;</span>
+              <Check className="ml-2 h-3.5 w-3.5 shrink-0" />
+            </button>
+          )}
+
+          {filteredOptions.map((opt) => {
+            const isSelected = opt.value.toLowerCase() === value.trim().toLowerCase();
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                className={cn(
+                  "flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer",
+                  isSelected && "bg-accent font-medium",
+                )}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onChange(opt.value);
+                  setOpen(false);
+                  setIsTyping(false);
+                }}
+              >
+                <span className="truncate">{opt.label}</span>
+                {isSelected && <Check className="ml-2 h-3.5 w-3.5 shrink-0 opacity-70" />}
+              </button>
+            );
+          })}
+
+          {filteredOptions.length === 0 && !value.trim() && (
+            <div className="px-2 py-2 text-center text-xs text-muted-foreground">
+              No options
+            </div>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export function SalesOrderForm({
@@ -155,6 +333,17 @@ export function SalesOrderForm({
     [customers, customerName],
   );
 
+  const deliveryOptions = useMemo(() => {
+    const list = deliveryStaff.map((e) => ({
+      value: e.name,
+      label: `${e.name} · ${e.designation}`,
+    }));
+    if (driverName && !deliveryStaff.some((e) => e.name === driverName)) {
+      list.unshift({ value: driverName, label: driverName });
+    }
+    return list;
+  }, [deliveryStaff, driverName]);
+
   const update = (idx: number, patch: Partial<LineItem>) => {
     setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
   };
@@ -187,7 +376,11 @@ export function SalesOrderForm({
       prev.map((it, i) => {
         if (i !== idx) return it;
         const kind: SaleItemType = defaultProductSaleItemType(p);
-        return { ...lineFromProduct(p, kind), quantity: it.quantity || 1 };
+        return {
+          ...lineFromProduct(p, kind),
+          quantity: it.quantity || 1,
+          category: it.category !== undefined ? it.category : p.category,
+        };
       }),
     );
     setProductOpenIdx(null);
@@ -207,7 +400,7 @@ export function SalesOrderForm({
     }
     update(idx, {
       itemType: kind,
-      category: it.category || p?.category,
+      category: it.category !== undefined ? it.category : p?.category,
     });
   };
 
@@ -224,7 +417,7 @@ export function SalesOrderForm({
         customerName: name,
         notes,
         items: workingItems,
-        driverName: driverName || undefined,
+        driverName: driverName.trim() || undefined,
         receiverName: receiverName || undefined,
       });
       if (!parsed.success) throw new Error(parsed.error.errors[0]?.message || "Invalid form");
@@ -280,6 +473,7 @@ export function SalesOrderForm({
         const movementOnly = isCylinderMovementOnly(it, p);
         return {
           ...it,
+          category: (it.category !== undefined ? it.category : p?.category)?.trim() || undefined,
           taxRate: 0,
           price: movementOnly ? 0 : it.price,
           sellCylinder: isCylinderSaleLine(it, p),
@@ -310,7 +504,7 @@ export function SalesOrderForm({
           tax: 0,
           total: nextTotals.total,
           notes,
-          driverName: driverName || undefined,
+          driverName: driverName.trim() || undefined,
           receiverName: receiverName.trim() || undefined,
           status: asQuote ? "draft" : existing.status === "draft" ? "confirmed" : existing.status,
           ...extra,
@@ -329,7 +523,7 @@ export function SalesOrderForm({
         paid: 0,
         status: asQuote || mode === "quotation" ? "draft" : "confirmed",
         notes,
-        driverName: driverName || undefined,
+        driverName: driverName.trim() || undefined,
         receiverName: receiverName.trim() || undefined,
         ...extra,
       });
@@ -442,33 +636,12 @@ export function SalesOrderForm({
             </div>
             <div className="space-y-1.5">
               <Label>{t("deliveries.deliveryman")}</Label>
-              {deliveryStaff.length > 0 ? (
-                <Select
-                  value={driverName || "__none"}
-                  onValueChange={(v) => setDriverName(v === "__none" ? "" : v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("common.select")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none">—</SelectItem>
-                    {deliveryStaff.map((e) => (
-                      <SelectItem key={e.id} value={e.name}>
-                        {e.name} · {e.designation}
-                      </SelectItem>
-                    ))}
-                    {driverName && !deliveryStaff.some((e) => e.name === driverName) && (
-                      <SelectItem value={driverName}>{driverName}</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Input
-                  value={driverName}
-                  onChange={(e) => setDriverName(e.target.value)}
-                  placeholder={t("common.select")}
-                />
-              )}
+              <EditableCombobox
+                value={driverName}
+                onChange={setDriverName}
+                options={deliveryOptions}
+                placeholder="—"
+              />
             </div>
             <div className="space-y-1.5">
               <Label>{t("sales.contactNo")}</Label>
@@ -537,7 +710,8 @@ export function SalesOrderForm({
                       const categoryNames = [
                         ...new Set(categoryRows.map((c) => c.name).filter(Boolean)),
                       ];
-                      const lineCategory = it.category || p?.category || "";
+                      const lineCategory =
+                        it.category !== undefined ? it.category : (p?.category || "");
                       if (lineCategory && !categoryNames.includes(lineCategory))
                         categoryNames.unshift(lineCategory);
                       return (
@@ -617,24 +791,14 @@ export function SalesOrderForm({
                             </Popover>
                           </TableCell>
                           <TableCell>
-                            <Select
-                              value={lineCategory || "__none"}
-                              onValueChange={(v) =>
-                                update(idx, { category: v === "__none" ? "" : v })
+                            <EditableCombobox
+                              value={lineCategory}
+                              onChange={(v) =>
+                                update(idx, { category: v })
                               }
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder={t("common.select")} />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="__none">—</SelectItem>
-                                {categoryNames.map((c) => (
-                                  <SelectItem key={c} value={c}>
-                                    {c}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              options={categoryNames}
+                              placeholder="—"
+                            />
                           </TableCell>
                           <TableCell>
                             <Select
