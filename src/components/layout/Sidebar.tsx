@@ -68,7 +68,14 @@ export function AppSidebar() {
         (pathname.startsWith("/products/") && !pathname.startsWith("/products/categories"))
       );
     }
-    if (url === "/products/categories") return pathname.startsWith("/products/categories");
+    if (url === "/cylinders") {
+      return (
+        pathname === "/cylinders" ||
+        pathname === "/cylinders/" ||
+        (pathname.startsWith("/cylinders/") && !pathname.startsWith("/cylinders/damage"))
+      );
+    }
+    if (url === "/cylinders/damage") return pathname.startsWith("/cylinders/damage");
     if (url === "/inventory") return pathname.startsWith("/inventory");
     if (url === "/returns") return pathname.startsWith("/returns");
     return pathname.startsWith(url);
@@ -228,6 +235,21 @@ export function AppSidebar() {
                           >
                             <Link to="/inventory" search={{ tab: "summary" }}>
                               <span>{t("nav.inventorySummary")}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      </SidebarMenuSub>
+                    )}
+                    {item.url === "/cylinders" && canAccessUrl("/cylinders/damage") && (
+                      <SidebarMenuSub>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={isActive("/cylinders/damage")}
+                            size="sm"
+                          >
+                            <Link to="/cylinders/damage">
+                              <span>{t("nav.damageCylinder")}</span>
                             </Link>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>

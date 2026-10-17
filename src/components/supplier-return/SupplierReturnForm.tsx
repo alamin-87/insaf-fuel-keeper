@@ -7,6 +7,7 @@ import { supplierService } from "@/services/supplier.service";
 import { productService } from "@/services/product.service";
 import { supplierReturnService } from "@/services/supplier-return.service";
 import { inventoryService } from "@/services/inventory.service";
+import { purchaseService } from "@/services/purchase.service";
 import { computeTotals, lineAmount } from "@/utils/helpers";
 import { formatCurrency } from "@/utils/formatters";
 import { supplierReturnSchema } from "@/utils/validators";
@@ -286,7 +287,7 @@ function getProductType(p: Product): "gas" | "cylinder" | "product" {
   return "gas";
 }
 
-export function SupplierReturnForm({ id }: { id?: string }) {
+export function SupplierReturnForm({ id, purchaseId }: { id?: string; purchaseId?: string }) {
   const t = useT();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -305,6 +306,25 @@ export function SupplierReturnForm({ id }: { id?: string }) {
     queryFn: () => supplierReturnService.get(id!),
     enabled: editing,
   });
+  const { data: sourcePo, isFetched: isPoFetched } = useQuery({
+    queryKey: ["purchases", "prefill", purchaseId],
+    queryFn: async () => {
+      if (!purchaseId) return null;
+      try {
+        const direct = await purchaseService.get(purchaseId);
+        if (direct) return direct;
+      } catch {
+        // continue to list lookup
+      }
+      try {
+        const all = await purchaseService.list();
+        return all.find((p) => p.id === purchaseId || p.orderNo === purchaseId) || null;
+      } catch {
+        return null;
+      }
+    },
+    enabled: Boolean(purchaseId) && !editing,
+  });
 
   const availableProducts = useMemo<ReturnItemOption[]>(() => {
     return products.map((p) => ({
@@ -320,7 +340,7 @@ export function SupplierReturnForm({ id }: { id?: string }) {
   const [supplierName, setSupplierName] = useState("");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<LineItem[]>([]);
-  const [hydrated, setHydrated] = useState(!editing);
+  const [hydrated, setHydrated] = useState(!editing && !purchaseId);
 
   const supplierOptions = useMemo(() => {
     return suppliers.map((s) => ({
@@ -342,8 +362,49 @@ export function SupplierReturnForm({ id }: { id?: string }) {
   };
 
   useEffect(() => {
-    if (!existing) {
+    if (sourcePo && !existing && !hydrated) {
+      setSupplierId(sourcePo.supplierId || "");
+      setSupplierName(sourcePo.supplierName || "");
+      setNotes((prev) => prev || `Return against PO #${sourcePo.orderNo}`);
+      if (sourcePo.items && sourcePo.items.length > 0) {
+        setItems(
+          sourcePo.items.map((it) => {
+            const p = availableProducts.find((x) => x.id === it.productId);
+            return {
+              productId: it.productId,
+              productName: it.productName,
+              itemType: it.itemType || p?.productType || "gas",
+              quantity: it.quantity,
+              price: it.price || p?.cost || 0,
+              taxRate: 0,
+            };
+          }),
+        );
+      }
+      setHydrated(true);
+      return;
+    }
+
+    if (purchaseId && isPoFetched && !hydrated) {
       if (availableProducts.length > 0 && items.length === 0) {
+        const p = availableProducts[0];
+        setItems([
+          {
+            productId: p.id,
+            productName: p.name,
+            itemType: p.productType,
+            quantity: 1,
+            price: p.cost,
+            taxRate: 0,
+          },
+        ]);
+      }
+      setHydrated(true);
+      return;
+    }
+
+    if (!existing) {
+      if (availableProducts.length > 0 && items.length === 0 && !purchaseId) {
         const p = availableProducts[0];
         setItems([
           {
@@ -375,7 +436,7 @@ export function SupplierReturnForm({ id }: { id?: string }) {
       }),
     );
     setHydrated(true);
-  }, [existing, availableProducts, suppliers]);
+  }, [existing, sourcePo, availableProducts, suppliers, hydrated, purchaseId]);
 
   const addItem = () => {
     const p = availableProducts[0];
@@ -449,6 +510,8 @@ export function SupplierReturnForm({ id }: { id?: string }) {
           supplierName: finalSupplierName,
           items: items.map((it) => ({ ...it, taxRate: 0 })),
           notes,
+          purchaseOrderId: existing?.purchaseOrderId || purchaseId || undefined,
+          purchaseOrderNo: existing?.purchaseOrderNo || sourcePo?.orderNo || undefined,
         });
       }
 
@@ -458,6 +521,8 @@ export function SupplierReturnForm({ id }: { id?: string }) {
         date: new Date().toISOString(),
         items: items.map((it) => ({ ...it, taxRate: 0 })),
         notes,
+        purchaseOrderId: purchaseId || undefined,
+        purchaseOrderNo: sourcePo?.orderNo || undefined,
       });
     },
     onSuccess: (ret) => {
@@ -490,6 +555,7 @@ export function SupplierReturnForm({ id }: { id?: string }) {
     <div>
       <PageHeader
         title={editing ? t("supplierReturns.editTitle") : t("supplierReturns.newTitle")}
+        description={sourcePo ? `Return against Purchase Order #${sourcePo.orderNo}` : undefined}
         backTo={editing ? { to: "/suppliers/returns/$id", params: { id: id! } } : "/suppliers/returns"}
       />
       <Card>

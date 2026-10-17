@@ -336,6 +336,8 @@ export interface SupplierReturn {
   total: number;
   status: SupplierReturnStatus;
   notes?: string;
+  purchaseOrderId?: ID;
+  purchaseOrderNo?: string;
   createdAt: string;
   updatedAt?: string;
 }

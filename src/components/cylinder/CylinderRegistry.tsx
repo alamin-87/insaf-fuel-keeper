@@ -16,6 +16,9 @@ import { cylinderService } from "@/services/cylinder.service";
 import { productService } from "@/services/product.service";
 import { customerService } from "@/services/customer.service";
 import { supplierService } from "@/services/supplier.service";
+import { supplierReturnService } from "@/services/supplier-return.service";
+import { purchaseService } from "@/services/purchase.service";
+import { returnService } from "@/services/return.service";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -106,6 +109,22 @@ export function CylinderRegistry() {
     queryKey: ["suppliers"],
     queryFn: supplierService.list,
   });
+  const { data: supplierReturns = [] } = useQuery({
+    queryKey: ["supplierReturns"],
+    queryFn: supplierReturnService.list,
+  });
+  const { data: purchases = [] } = useQuery({
+    queryKey: ["purchases"],
+    queryFn: purchaseService.list,
+  });
+  const { data: customerReturns = [] } = useQuery({
+    queryKey: ["returns"],
+    queryFn: () => returnService.list(),
+  });
+  const { data: stockMovements = [] } = useQuery({
+    queryKey: ["stockMovements"],
+    queryFn: inventoryService.listMovements,
+  });
   const warehouses = useMemo(
     () => Array.from(new Set(data.map((c) => c.location).filter(Boolean))).sort(),
     [data],
@@ -170,10 +189,44 @@ export function CylinderRegistry() {
       // With supplier (from cylinder tracking)
       const suppliers = active.filter((c) => cylinderAtSupplier(c) || c.status === "refilling").length;
 
-      // Loss / Damage (from cylinder tracking)
-      const lossDamage = active.filter(
+      // Suppliers Return: Quantity of cylinders returned to suppliers
+      const suppliersReturn = supplierReturns
+        .filter((sr) => sr.status !== "cancelled")
+        .reduce((sum, sr) => {
+          const lineSum = (sr.items || [])
+            .filter((it) => it.productId === productId)
+            .reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+          return sum + lineSum;
+        }, 0);
+
+      // Total Purchase: Total quantity of cylinders purchased
+      const totalPurchase = purchases
+        .filter((po) => po.status !== "cancelled")
+        .reduce((sum, po) => {
+          const lineSum = (po.items || [])
+            .filter((it) => it.productId === productId)
+            .reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+          return sum + lineSum;
+        }, 0);
+
+      // Customer Return: Quantity of cylinders returned by customers
+      const customerReturn = customerReturns
+        .filter((cr) => cr.status !== "cancelled")
+        .reduce((sum, cr) => {
+          const lineSum = (cr.items || [])
+            .filter((it) => it.productId === productId)
+            .reduce((s, it) => s + (Number(it.returnQuantity) || 0), 0);
+          return sum + lineSum;
+        }, 0);
+
+      // Loss / Damage: Number of damage entries/units recorded through the Damage Cylinder feature without double counting
+      const damageFromMovements = stockMovements
+        .filter((sm) => sm.movementType === "DAMAGE" && sm.productId === productId)
+        .reduce((sum, sm) => sum + (Number(sm.quantity) || 0), 0);
+      const serializedDamaged = active.filter(
         (c) => c.status === "lost" || c.status === "damaged",
       ).length;
+      const lossDamage = Math.max(damageFromMovements, serializedDamaged);
 
       // Empty in warehouse
       const empty = active.filter(
@@ -210,6 +263,9 @@ export function CylinderRegistry() {
         empty,
         suppliers,
         customer,
+        suppliersReturn,
+        totalPurchase,
+        customerReturn,
         lossDamage,
         unitCost,
         total,
@@ -226,7 +282,7 @@ export function CylinderRegistry() {
       })
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((r, i) => ({ ...r, sl: i + 1 }));
-  }, [cylinderInventory, products, filtered, sizeFilter]);
+  }, [cylinderInventory, products, filtered, sizeFilter, supplierReturns, purchases, customerReturns, stockMovements]);
 
   const summaryTotals = useMemo(() => {
     const warehouse = productRows.reduce((sum, r) => sum + r.full + r.empty, 0);
@@ -290,6 +346,9 @@ export function CylinderRegistry() {
         empty: a.empty + r.empty,
         customer: a.customer + r.customer,
         suppliers: a.suppliers + r.suppliers,
+        suppliersReturn: a.suppliersReturn + r.suppliersReturn,
+        totalPurchase: a.totalPurchase + r.totalPurchase,
+        customerReturn: a.customerReturn + r.customerReturn,
         lossDamage: a.lossDamage + r.lossDamage,
         unitCost: 0,
         total: a.total + r.total,
@@ -300,6 +359,9 @@ export function CylinderRegistry() {
         empty: 0,
         customer: 0,
         suppliers: 0,
+        suppliersReturn: 0,
+        totalPurchase: 0,
+        customerReturn: 0,
         lossDamage: 0,
         unitCost: 0,
         total: 0,
@@ -462,27 +524,27 @@ export function CylinderRegistry() {
                 className: "text-right tabular-nums",
               },
               {
-                key: "empty",
-                header: t("cylinders.rptEmpty"),
+                key: "suppliersReturn",
+                header: t("cylinders.suppliersReturn"),
                 sortable: true,
-                sortValue: (r) => r.empty,
-                render: (r) => r.empty,
+                sortValue: (r) => r.suppliersReturn,
+                render: (r) => r.suppliersReturn,
                 className: "text-right tabular-nums",
               },
               {
-                key: "suppliers",
-                header: t("cylinders.rptSuppliers"),
+                key: "totalPurchase",
+                header: t("cylinders.totalPurchase"),
                 sortable: true,
-                sortValue: (r) => r.suppliers,
-                render: (r) => r.suppliers,
+                sortValue: (r) => r.totalPurchase,
+                render: (r) => r.totalPurchase,
                 className: "text-right tabular-nums",
               },
               {
-                key: "customer",
-                header: t("cylinders.head.customer"),
+                key: "customerReturn",
+                header: t("cylinders.customerReturn"),
                 sortable: true,
-                sortValue: (r) => r.customer,
-                render: (r) => r.customer,
+                sortValue: (r) => r.customerReturn,
+                render: (r) => r.customerReturn,
                 className: "text-right tabular-nums",
               },
               {

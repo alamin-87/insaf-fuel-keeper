@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Plus } from "lucide-react";
+import { Plus, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { purchaseService } from "@/services/purchase.service";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -143,13 +144,29 @@ export function PurchaseList() {
           {
             key: "actions",
             header: t("common.actions"),
-            className: actionsColumnClass,
+            className: cn(actionsColumnClass, "min-w-[170px]"),
             render: (r) => (
               <RowActions
                 onView={() => navigate({ to: "/purchases/$id", params: { id: r.id } })}
                 onEdit={
                   r.status !== "cancelled"
                     ? () => navigate({ to: "/purchases/$id/edit", params: { id: r.id } })
+                    : undefined
+                }
+                extras={
+                  r.status !== "cancelled"
+                    ? [
+                        {
+                          label: t("purchases.returnAction") || "Return",
+                          icon: <RotateCcw className="h-3.5 w-3.5" />,
+                          iconOnly: true,
+                          onClick: () =>
+                            navigate({
+                              to: "/suppliers/returns/new",
+                              search: { purchaseId: r.id },
+                            }),
+                        },
+                      ]
                     : undefined
                 }
                 onDelete={

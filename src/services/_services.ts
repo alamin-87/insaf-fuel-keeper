@@ -1913,7 +1913,7 @@ export const inventoryService = {
       });
     }
   },
-  markDamaged: async (productId: string, quantity: number, notes?: string) => {
+  markDamaged: async (productId: string, quantity: number, notes?: string, date?: string) => {
     const product = await call<Product | null>("get", "products", productId);
     if (!product) throw new Error("Product not found");
     const qty = Number(quantity);
@@ -1923,15 +1923,21 @@ export const inventoryService = {
       const cylinders = await call<Cylinder[]>("list", "cylinders");
       const pool = cylinders
         .filter(
-          (c) => c.productId === productId && cylinderIsFullStock(c) && c.ownedBy !== "customer",
+          (c) =>
+            c.productId === productId &&
+            c.ownedBy !== "customer" &&
+            c.status !== "damaged" &&
+            c.status !== "lost" &&
+            c.status !== "scrapped" &&
+            c.status !== "written_off",
         )
         .sort((a, b) => a.lastMovementAt.localeCompare(b.lastMovementAt));
-      if (pool.length < qty) throw new Error(`Only ${pool.length} full cylinder(s) in warehouse`);
-      for (const c of pool.slice(0, qty)) {
+      const toMark = pool.slice(0, Math.min(qty, pool.length));
+      for (const c of toMark) {
         await cylinderService.addMovement({
           cylinderId: c.id,
           type: "damaged",
-          fromLocation: "Warehouse",
+          fromLocation: c.location || "Warehouse",
           toLocation: "Damaged",
           notes: notes?.trim() || `Damaged · ${product.name}`,
           by: "Warehouse",
@@ -1945,6 +1951,7 @@ export const inventoryService = {
       refId,
       movementType: "DAMAGE",
       notes: `Damaged · ${product.name}${notes ? ` · ${notes}` : ""}`,
+      date: date || new Date().toISOString(),
       by: "Warehouse",
     });
   },

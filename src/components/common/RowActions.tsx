@@ -12,6 +12,7 @@ type ActionBtn = {
   variant?: "default" | "outline" | "destructive" | "secondary" | "ghost";
   disabled?: boolean;
   danger?: boolean;
+  iconOnly?: boolean;
 };
 
 export function RowActions({
@@ -77,7 +78,7 @@ export function RowActions({
             variant={x.variant ?? "outline"}
             disabled={x.disabled}
             danger={x.danger}
-            compact={compact}
+            compact={compact || x.iconOnly}
           />
         ))}
         {onDelete && (

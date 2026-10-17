@@ -43,6 +43,7 @@ import { Route as DeliveriesNewRouteImport } from './routes/deliveries.new'
 import { Route as DeliveriesIdRouteImport } from './routes/deliveries.$id'
 import { Route as CylindersReportRouteImport } from './routes/cylinders.report'
 import { Route as CylindersNewRouteImport } from './routes/cylinders.new'
+import { Route as CylindersDamageRouteImport } from './routes/cylinders.damage'
 import { Route as CylindersIdRouteImport } from './routes/cylinders.$id'
 import { Route as CustomersReportRouteImport } from './routes/customers.report'
 import { Route as CustomersNewRouteImport } from './routes/customers.new'
@@ -233,6 +234,11 @@ const CylindersNewRoute = CylindersNewRouteImport.update({
   path: '/cylinders/new',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CylindersDamageRoute = CylindersDamageRouteImport.update({
+  id: '/cylinders/damage',
+  path: '/cylinders/damage',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CylindersIdRoute = CylindersIdRouteImport.update({
   id: '/cylinders/$id',
   path: '/cylinders/$id',
@@ -343,6 +349,7 @@ export interface FileRoutesByFullPath {
   '/customers/new': typeof CustomersNewRoute
   '/customers/report': typeof CustomersReportRoute
   '/cylinders/$id': typeof CylindersIdRouteWithChildren
+  '/cylinders/damage': typeof CylindersDamageRoute
   '/cylinders/new': typeof CylindersNewRoute
   '/cylinders/report': typeof CylindersReportRoute
   '/deliveries/$id': typeof DeliveriesIdRouteWithChildren
@@ -397,6 +404,7 @@ export interface FileRoutesByTo {
   '/customers/new': typeof CustomersNewRoute
   '/customers/report': typeof CustomersReportRoute
   '/cylinders/$id': typeof CylindersIdRouteWithChildren
+  '/cylinders/damage': typeof CylindersDamageRoute
   '/cylinders/new': typeof CylindersNewRoute
   '/cylinders/report': typeof CylindersReportRoute
   '/deliveries/$id': typeof DeliveriesIdRouteWithChildren
@@ -453,6 +461,7 @@ export interface FileRoutesById {
   '/customers/new': typeof CustomersNewRoute
   '/customers/report': typeof CustomersReportRoute
   '/cylinders/$id': typeof CylindersIdRouteWithChildren
+  '/cylinders/damage': typeof CylindersDamageRoute
   '/cylinders/new': typeof CylindersNewRoute
   '/cylinders/report': typeof CylindersReportRoute
   '/deliveries/$id': typeof DeliveriesIdRouteWithChildren
@@ -510,6 +519,7 @@ export interface FileRouteTypes {
     | '/customers/new'
     | '/customers/report'
     | '/cylinders/$id'
+    | '/cylinders/damage'
     | '/cylinders/new'
     | '/cylinders/report'
     | '/deliveries/$id'
@@ -564,6 +574,7 @@ export interface FileRouteTypes {
     | '/customers/new'
     | '/customers/report'
     | '/cylinders/$id'
+    | '/cylinders/damage'
     | '/cylinders/new'
     | '/cylinders/report'
     | '/deliveries/$id'
@@ -619,6 +630,7 @@ export interface FileRouteTypes {
     | '/customers/new'
     | '/customers/report'
     | '/cylinders/$id'
+    | '/cylinders/damage'
     | '/cylinders/new'
     | '/cylinders/report'
     | '/deliveries/$id'
@@ -675,6 +687,7 @@ export interface RootRouteChildren {
   CustomersNewRoute: typeof CustomersNewRoute
   CustomersReportRoute: typeof CustomersReportRoute
   CylindersIdRoute: typeof CylindersIdRouteWithChildren
+  CylindersDamageRoute: typeof CylindersDamageRoute
   CylindersNewRoute: typeof CylindersNewRoute
   CylindersReportRoute: typeof CylindersReportRoute
   DeliveriesIdRoute: typeof DeliveriesIdRouteWithChildren
@@ -940,6 +953,13 @@ declare module '@tanstack/react-router' {
       path: '/cylinders/new'
       fullPath: '/cylinders/new'
       preLoaderRoute: typeof CylindersNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cylinders/damage': {
+      id: '/cylinders/damage'
+      path: '/cylinders/damage'
+      fullPath: '/cylinders/damage'
+      preLoaderRoute: typeof CylindersDamageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cylinders/$id': {
@@ -1216,6 +1236,7 @@ const rootRouteChildren: RootRouteChildren = {
   CustomersNewRoute: CustomersNewRoute,
   CustomersReportRoute: CustomersReportRoute,
   CylindersIdRoute: CylindersIdRouteWithChildren,
+  CylindersDamageRoute: CylindersDamageRoute,
   CylindersNewRoute: CylindersNewRoute,
   CylindersReportRoute: CylindersReportRoute,
   DeliveriesIdRoute: DeliveriesIdRouteWithChildren,

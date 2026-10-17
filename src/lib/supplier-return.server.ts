@@ -37,6 +37,8 @@ export type CreateSupplierReturnPayload = {
   date?: string;
   notes?: string;
   items: LineItem[];
+  purchaseOrderId?: string;
+  purchaseOrderNo?: string;
 };
 
 export async function createSupplierReturnInDb(
@@ -179,6 +181,8 @@ export async function createSupplierReturnInDb(
     total: subtotal,
     status: "confirmed",
     notes: payload.notes || "",
+    purchaseOrderId: payload.purchaseOrderId || undefined,
+    purchaseOrderNo: payload.purchaseOrderNo || undefined,
     createdAt: now,
   };
 
@@ -331,6 +335,8 @@ export async function updateSupplierReturnInDb(
     tax: 0,
     total: subtotal,
     notes: payload.notes !== undefined ? payload.notes : existing.notes,
+    purchaseOrderId: payload.purchaseOrderId !== undefined ? payload.purchaseOrderId : existing.purchaseOrderId,
+    purchaseOrderNo: payload.purchaseOrderNo !== undefined ? payload.purchaseOrderNo : existing.purchaseOrderNo,
     updatedAt: now,
   };
 
