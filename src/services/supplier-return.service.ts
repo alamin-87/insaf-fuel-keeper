@@ -4,8 +4,12 @@ import {
   createSupplierReturnFn,
   updateSupplierReturnFn,
   removeSupplierReturnFn,
+  receiveSupplierReturnDeliveryFn,
 } from "@/lib/supplier-return.functions";
-import type { CreateSupplierReturnPayload } from "@/lib/supplier-return.server";
+import type {
+  CreateSupplierReturnPayload,
+  ReceiveSupplierReturnPayload,
+} from "@/lib/supplier-return.server";
 import type { SupplierReturn } from "@/types";
 
 export const supplierReturnService = {
@@ -26,5 +30,8 @@ export const supplierReturnService = {
   },
   remove: async (id: string): Promise<{ ok: true }> => {
     return (await removeSupplierReturnFn({ data: { id } })) as { ok: true };
+  },
+  receiveDelivery: async (payload: ReceiveSupplierReturnPayload): Promise<SupplierReturn> => {
+    return (await receiveSupplierReturnDeliveryFn({ data: payload })) as SupplierReturn;
   },
 };

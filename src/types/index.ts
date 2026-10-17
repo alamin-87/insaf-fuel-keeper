@@ -322,7 +322,21 @@ export interface PurchaseOrder {
   grns?: PurchaseGrn[];
 }
 
-export type SupplierReturnStatus = "confirmed" | "draft" | "cancelled";
+export type SupplierReturnStatus = "confirmed" | "draft" | "cancelled" | "partial" | "received";
+
+export type SupplierReturnDelivery = {
+  id: string;
+  receiptNo: string;
+  date: string;
+  receivedAt: string;
+  items: Array<{
+    productId: ID;
+    productName?: string;
+    quantity: number;
+  }>;
+  notes?: string;
+  by?: string;
+};
 
 export interface SupplierReturn {
   id: ID;
@@ -335,6 +349,8 @@ export interface SupplierReturn {
   tax: number;
   total: number;
   status: SupplierReturnStatus;
+  receivingStatus?: "none" | "partial" | "received";
+  deliveries?: SupplierReturnDelivery[];
   notes?: string;
   purchaseOrderId?: ID;
   purchaseOrderNo?: string;

@@ -24,6 +24,7 @@ export function RowActions({
   deleteLabel,
   className,
   extras,
+  leadingExtras,
   compact = false,
 }: {
   onView?: () => void;
@@ -34,6 +35,7 @@ export function RowActions({
   deleteLabel?: string;
   className?: string;
   extras?: ActionBtn[];
+  leadingExtras?: ActionBtn[];
   compact?: boolean;
 }) {
   const t = useT();
@@ -50,6 +52,18 @@ export function RowActions({
         onClick={stop}
         onKeyDown={(e) => e.stopPropagation()}
       >
+        {leadingExtras?.map((x) => (
+          <Action
+            key={x.label}
+            label={x.label}
+            onClick={x.onClick}
+            icon={x.icon}
+            variant={x.variant ?? "outline"}
+            disabled={x.disabled}
+            danger={x.danger}
+            compact={compact || x.iconOnly}
+          />
+        ))}
         {onView && (
           <Action
             label={t("common.view")}

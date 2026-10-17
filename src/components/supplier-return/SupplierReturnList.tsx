@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Plus } from "lucide-react";
+import { Plus, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { supplierReturnService } from "@/services/supplier-return.service";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -12,17 +14,32 @@ import { PartyNameLink } from "@/components/common/PartyNameLink";
 import { formatCurrency, formatDate } from "@/utils/formatters";
 import type { SupplierReturn } from "@/types";
 import { useT } from "@/i18n";
+import { ReceiveSupplierDeliveryDialog } from "./ReceiveSupplierDeliveryDialog";
 
 const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   confirmed: "default",
+  received: "default",
+  partial: "secondary",
   draft: "secondary",
   cancelled: "destructive",
 };
+
+function isFullyReceived(sr: SupplierReturn): boolean {
+  if (sr.status === "received") return true;
+  if (!sr.items || sr.items.length === 0) return true;
+  return sr.items.every((it) => {
+    const ordered = Number(it.quantity) || 0;
+    const received = Number(it.receivedQty) || 0;
+    return received >= ordered;
+  });
+}
 
 export function SupplierReturnList() {
   const t = useT();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const [selectedForReceive, setSelectedForReceive] = useState<SupplierReturn | null>(null);
+
   const { data = [] } = useQuery({
     queryKey: ["supplierReturns"],
     queryFn: supplierReturnService.list,
@@ -108,27 +125,52 @@ export function SupplierReturnList() {
           {
             key: "actions",
             header: t("common.actions"),
-            className: actionsColumnClass,
-            render: (r) => (
-              <RowActions
-                onView={() => navigate({ to: "/suppliers/returns/$id", params: { id: r.id } })}
-                onEdit={
-                  r.status !== "cancelled"
-                    ? () => navigate({ to: "/suppliers/returns/$id/edit", params: { id: r.id } })
-                    : undefined
-                }
-                onDelete={
-                  r.status !== "cancelled"
-                    ? () => {
-                        if (confirm(t("supplierReturns.deleteConfirm"))) remove.mutate(r.id);
-                      }
-                    : undefined
-                }
-                deleteDisabled={remove.isPending}
-              />
-            ),
+            className: cn(actionsColumnClass, "min-w-[215px]"),
+            render: (r) => {
+              const fully = isFullyReceived(r);
+              return (
+                <RowActions
+                  leadingExtras={
+                    r.status !== "cancelled"
+                      ? [
+                          {
+                            label: fully
+                              ? t("supplierReturns.fullyReceived") || "Fully Received"
+                              : t("supplierReturns.receiveDelivery") || "Receive Delivery",
+                            icon: <Truck className="h-3.5 w-3.5 text-primary" />,
+                            iconOnly: true,
+                            disabled: fully,
+                            onClick: () => setSelectedForReceive(r),
+                          },
+                        ]
+                      : undefined
+                  }
+                  onView={() => navigate({ to: "/suppliers/returns/$id", params: { id: r.id } })}
+                  onEdit={
+                    r.status !== "cancelled" && !fully
+                      ? () => navigate({ to: "/suppliers/returns/$id/edit", params: { id: r.id } })
+                      : undefined
+                  }
+                  onDelete={
+                    r.status !== "cancelled"
+                      ? () => {
+                          if (confirm(t("supplierReturns.deleteConfirm"))) remove.mutate(r.id);
+                        }
+                      : undefined
+                  }
+                  deleteDisabled={remove.isPending}
+                />
+              );
+            },
           },
         ]}
+      />
+      <ReceiveSupplierDeliveryDialog
+        open={Boolean(selectedForReceive)}
+        onOpenChange={(v) => {
+          if (!v) setSelectedForReceive(null);
+        }}
+        supplierReturn={selectedForReceive}
       />
     </div>
   );

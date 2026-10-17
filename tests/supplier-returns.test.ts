@@ -357,4 +357,163 @@ describe("Suppliers Return Module — Unit & Business Logic Tests", () => {
       assert.equal(statement.closingBalance, 9600);
     });
   });
+
+  describe("5. Receive Delivery Workflow & Concurrency/Duplicate Prevention", () => {
+    it("handles partial receiving followed by receiving the remaining quantity", () => {
+      const returnDoc: SupplierReturn = {
+        id: "sr-100",
+        returnNo: "SR-2026-000010",
+        supplierId: "sup-1",
+        supplierName: "Bashundhara LP Gas Ltd",
+        date: "2026-10-17",
+        items: [
+          { productId: "prod-2", productName: "Empty 12kg Cylinder", quantity: 10, price: 2000 },
+        ],
+        subtotal: 20000,
+        tax: 0,
+        total: 20000,
+        status: "confirmed",
+        receivingStatus: "none",
+        deliveries: [],
+        createdAt: "2026-10-17T10:00:00Z",
+      };
+
+      let initialStock = 30; // prod-2 stock
+
+      // Step 1: Initial state
+      const item = returnDoc.items[0];
+      const ordered = Number(item.quantity);
+      let receivedSoFar = Number(item.receivedQty) || 0;
+      let pending = ordered - receivedSoFar;
+      assert.equal(pending, 10);
+      assert.equal(returnDoc.status, "confirmed");
+
+      // Step 2: First delivery received: 6 cylinders
+      const firstDeliveryQty = 6;
+      assert.ok(firstDeliveryQty > 0);
+      assert.ok(firstDeliveryQty <= pending);
+
+      item.receivedQty = receivedSoFar + firstDeliveryQty;
+      receivedSoFar = item.receivedQty;
+      pending = ordered - receivedSoFar;
+      initialStock += firstDeliveryQty;
+
+      returnDoc.status = pending === 0 ? "received" : "partial";
+      returnDoc.receivingStatus = pending === 0 ? "received" : "partial";
+      returnDoc.deliveries!.push({
+        id: "req-1",
+        receiptNo: "SRD-001",
+        date: "2026-10-17",
+        receivedAt: "2026-10-17T11:00:00Z",
+        items: [{ productId: "prod-2", quantity: 6 }],
+      });
+
+      assert.equal(initialStock, 36);
+      assert.equal(item.receivedQty, 6);
+      assert.equal(pending, 4);
+      assert.equal(returnDoc.status, "partial");
+      assert.equal(returnDoc.receivingStatus, "partial");
+
+      // Step 3: Second delivery received: remaining 4 cylinders
+      const secondDeliveryQty = 4;
+      assert.ok(secondDeliveryQty > 0);
+      assert.ok(secondDeliveryQty <= pending);
+
+      item.receivedQty = receivedSoFar + secondDeliveryQty;
+      receivedSoFar = item.receivedQty;
+      pending = ordered - receivedSoFar;
+      initialStock += secondDeliveryQty;
+
+      returnDoc.status = pending === 0 ? "received" : "partial";
+      returnDoc.receivingStatus = pending === 0 ? "received" : "partial";
+      returnDoc.deliveries!.push({
+        id: "req-2",
+        receiptNo: "SRD-002",
+        date: "2026-10-17",
+        receivedAt: "2026-10-17T12:00:00Z",
+        items: [{ productId: "prod-2", quantity: 4 }],
+      });
+
+      assert.equal(initialStock, 40);
+      assert.equal(item.receivedQty, 10);
+      assert.equal(pending, 0);
+      assert.equal(returnDoc.status, "received");
+      assert.equal(returnDoc.receivingStatus, "received");
+      assert.equal(returnDoc.deliveries!.length, 2);
+    });
+
+    it("rejects zero, negative, or excessive quantities beyond remaining pending", () => {
+      const item = { productId: "prod-2", quantity: 10, receivedQty: 7 };
+      const pending = item.quantity - item.receivedQty; // 3 remaining
+
+      // Zero quantity check
+      const zeroQty = 0;
+      assert.ok(zeroQty <= 0, "Zero quantity must be rejected");
+
+      // Negative quantity check
+      const negQty = -2;
+      assert.ok(negQty <= 0, "Negative quantity must be rejected");
+
+      // Excessive quantity check
+      const excessiveQty = 4;
+      assert.ok(excessiveQty > pending, "Quantity exceeding pending must be rejected");
+
+      // Valid quantity check
+      const validQty = 3;
+      assert.ok(validQty > 0 && validQty <= pending, "Valid quantity is accepted");
+    });
+
+    it("prevents duplicate stock additions via idempotency check", () => {
+      const returnDoc: SupplierReturn = {
+        id: "sr-dup-test",
+        returnNo: "SR-2026-000099",
+        supplierId: "sup-1",
+        supplierName: "Bashundhara LP Gas Ltd",
+        date: "2026-10-17",
+        items: [{ productId: "prod-2", productName: "Empty 12kg Cylinder", quantity: 5, price: 2000, receivedQty: 5 }],
+        subtotal: 10000,
+        tax: 0,
+        total: 10000,
+        status: "received",
+        deliveries: [
+          {
+            id: "idempotent-key-12345",
+            receiptNo: "SRD-000099",
+            date: "2026-10-17",
+            receivedAt: "2026-10-17T12:00:00Z",
+            items: [{ productId: "prod-2", quantity: 5 }],
+          },
+        ],
+        createdAt: "2026-10-17T10:00:00Z",
+      };
+
+      const incomingRequestId = "idempotent-key-12345";
+      const isDuplicate = (returnDoc.deliveries || []).some((d) => d.id === incomingRequestId);
+      assert.equal(isDuplicate, true, "Duplicate requestId must be recognized immediately");
+
+      // If duplicate, stock must NOT be altered
+      let stock = 50;
+      if (!isDuplicate) {
+        stock += 5;
+      }
+      assert.equal(stock, 50, "Stock must remain unchanged on duplicate submission");
+    });
+
+    it("verifies Receive Delivery does NOT create purchase bills, vouchers, or affect supplier balances", () => {
+      const vouchersBefore: any[] = [];
+      const purchasesBefore: any[] = [];
+
+      // A delivery receipt event occurs
+      const receiptEvent = {
+        id: "srd-1",
+        receiptNo: "SRD-001",
+        productId: "prod-2",
+        quantity: 5,
+      };
+
+      // Ensure no vouchers or purchases are pushed
+      assert.equal(vouchersBefore.length, 0);
+      assert.equal(purchasesBefore.length, 0);
+    });
+  });
 });

@@ -7,7 +7,9 @@ import {
   createSupplierReturnInDb,
   updateSupplierReturnInDb,
   removeSupplierReturnInDb,
+  receiveSupplierReturnDeliveryInDb,
   type CreateSupplierReturnPayload,
+  type ReceiveSupplierReturnPayload,
 } from "./supplier-return.server";
 import type { SupplierReturn } from "@/types";
 import { assertPermission } from "./rbac";
@@ -59,4 +61,14 @@ export const removeSupplierReturnFn = createServerFn({ method: "POST" })
     assertPermission(user, "suppliers.write");
     const db = await getDb();
     return await removeSupplierReturnInDb(db, data.id, user);
+  });
+
+export const receiveSupplierReturnDeliveryFn = createServerFn({ method: "POST" })
+  .validator((d: ReceiveSupplierReturnPayload) => d)
+  .handler(async ({ data }): Promise<SupplierReturn> => {
+    const user = await requireUser();
+    assertPermission(user, "suppliers.write");
+    const db = await getDb();
+    const result = await receiveSupplierReturnDeliveryInDb(db, data, user);
+    return JSON.parse(JSON.stringify(result)) as SupplierReturn;
   });

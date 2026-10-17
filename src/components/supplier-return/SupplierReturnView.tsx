@@ -1,10 +1,11 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Printer, Pencil } from "lucide-react";
+import { Printer, Pencil, Truck } from "lucide-react";
 import { supplierReturnService } from "@/services/supplier-return.service";
 import { supplierService } from "@/services/supplier.service";
 import { formatCurrency, formatDate } from "@/utils/formatters";
-import { lineAmount } from "@/utils/helpers";
+import { isSupplierReturnFullyReceived, lineAmount } from "@/utils/helpers";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,10 +22,12 @@ import { PrintDocHeader } from "@/components/common/PrintDocHeader";
 import { PrintMeta, PrintSignatures, PrintTotals } from "@/components/common/PrintParts";
 import { PartyNameLink } from "@/components/common/PartyNameLink";
 import { useT } from "@/i18n";
+import { ReceiveSupplierDeliveryDialog } from "./ReceiveSupplierDeliveryDialog";
 
 export function SupplierReturnView({ id }: { id: string }) {
   const t = useT();
   const navigate = useNavigate();
+  const [receiveOpen, setReceiveOpen] = useState(false);
 
   const {
     data: ret,
@@ -59,8 +62,13 @@ export function SupplierReturnView({ id }: { id: string }) {
               <Button variant="outline" size="sm" onClick={() => window.print()}>
                 <Printer className="mr-1 h-4 w-4" /> {t("common.print")}
               </Button>
-              {ret.status !== "cancelled" && (
-                <Button asChild size="sm">
+              {ret.status !== "cancelled" && !isSupplierReturnFullyReceived(ret) && (
+                <Button size="sm" onClick={() => setReceiveOpen(true)}>
+                  <Truck className="mr-1 h-4 w-4" /> {t("supplierReturns.receiveDelivery")}
+                </Button>
+              )}
+              {ret.status !== "cancelled" && !isSupplierReturnFullyReceived(ret) && (
+                <Button asChild size="sm" variant="outline">
                   <Link to="/suppliers/returns/$id/edit" params={{ id: ret.id }}>
                     <Pencil className="mr-1 h-4 w-4" /> {t("common.edit")}
                   </Link>
@@ -173,6 +181,11 @@ export function SupplierReturnView({ id }: { id: string }) {
           />
         </CardContent>
       </Card>
+      <ReceiveSupplierDeliveryDialog
+        open={receiveOpen}
+        onOpenChange={setReceiveOpen}
+        supplierReturn={ret}
+      />
     </div>
   );
 }
