@@ -53,6 +53,14 @@ export function AppSidebar() {
     if (url === "/hr") return pathname === "/hr" || pathname === "/hr/";
     if (url === "/hr/employees")
       return pathname.startsWith("/hr/employees") || /^\/hr\/[^/]+/.test(pathname);
+    if (url === "/suppliers") {
+      return (
+        pathname === "/suppliers" ||
+        pathname === "/suppliers/" ||
+        (pathname.startsWith("/suppliers/") && !pathname.startsWith("/suppliers/returns"))
+      );
+    }
+    if (url === "/suppliers/returns") return pathname.startsWith("/suppliers/returns");
     if (url === "/products") {
       return (
         pathname === "/products" ||
@@ -147,6 +155,21 @@ export function AppSidebar() {
                         <span>{t(item.titleKey)}</span>
                       </Link>
                     </SidebarMenuButton>
+                    {item.url === "/suppliers" && canAccessUrl("/suppliers/returns") && (
+                      <SidebarMenuSub>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={isActive("/suppliers/returns")}
+                            size="sm"
+                          >
+                            <Link to="/suppliers/returns">
+                              <span>{t("nav.suppliersReturn")}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      </SidebarMenuSub>
+                    )}
                     {item.url === "/products" && canAccessUrl("/products/categories") && (
                       <SidebarMenuSub>
                         <SidebarMenuSubItem>

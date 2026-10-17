@@ -8,6 +8,7 @@ import { supplierService } from "@/services/supplier.service";
 import { hrService } from "@/services/hr.service";
 import { salesService } from "@/services/sales.service";
 import { purchaseService } from "@/services/purchase.service";
+import { supplierReturnService } from "@/services/supplier-return.service";
 import { accountingService } from "@/services/accounting.service";
 import { PageHeader } from "@/components/common/PageHeader";
 import { DateRangeFilter } from "@/components/common/DateRangeFilter";
@@ -83,6 +84,11 @@ export function PartyStatement({ kind, id }: { kind: PartyKind; id: string }) {
     queryFn: purchaseService.list,
     enabled: kind === "supplier",
   });
+  const { data: supplierReturns = [] } = useQuery({
+    queryKey: ["supplierReturns"],
+    queryFn: supplierReturnService.list,
+    enabled: kind === "supplier",
+  });
   const { data: payroll = [] } = useQuery({
     queryKey: ["payroll"],
     queryFn: hrService.listPayroll,
@@ -109,11 +115,11 @@ export function PartyStatement({ kind, id }: { kind: PartyKind; id: string }) {
     }
     if (kind === "supplier") {
       if (!supplier) return null;
-      return buildPartyStatement({ kind: "supplier", party: supplier, purchases, vouchers, range });
+      return buildPartyStatement({ kind: "supplier", party: supplier, purchases, supplierReturns, vouchers, range });
     }
     if (!employee) return null;
     return buildPartyStatement({ kind: "employee", party: employee, payroll, vouchers, range });
-  }, [kind, customer, supplier, employee, sales, purchases, payroll, vouchers, range]);
+  }, [kind, customer, supplier, employee, sales, purchases, supplierReturns, payroll, vouchers, range]);
 
   const monthGroups = useMemo(
     () => (kind === "employee" && statement ? groupStatementByMonth(statement.lines, locale) : []),

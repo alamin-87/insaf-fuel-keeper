@@ -52,7 +52,8 @@ type CollName =
   | "costLayers"
   | "gasInventory"
   | "cylinderInventory"
-  | "productInventory";
+  | "productInventory"
+  | "supplierReturns";
 
 // Strip Mongo's _id so returned docs are plain and serializable.
 const clean = <T>(doc: any): T => {
@@ -98,6 +99,11 @@ async function ensureSeeded() {
       if (name === "deliveries") {
         try {
           await coll.createIndex({ challanNo: 1 }, { unique: true, sparse: true });
+        } catch {}
+      }
+      if (name === "supplierReturns") {
+        try {
+          await coll.createIndex({ returnNo: 1 }, { unique: true, sparse: true });
         } catch {}
       }
       const count = await coll.estimatedDocumentCount();
@@ -246,6 +252,10 @@ async function collCreate<T extends { id?: string }>(
   } else if (name === "returns" && (!doc.returnNo || String(doc.returnNo).startsWith("RET-"))) {
     if (!doc.returnNo || String(doc.returnNo).length < 15) {
       doc.returnNo = await getNextSequence(db, "RET");
+    }
+  } else if (name === "supplierReturns" && (!doc.returnNo || String(doc.returnNo).startsWith("SR-"))) {
+    if (!doc.returnNo || String(doc.returnNo).length < 15) {
+      doc.returnNo = await getNextSequence(db, "SR");
     }
   }
 

@@ -21,7 +21,8 @@ export type CrudCollName =
   | "accounts"
   | "chartOfAccounts"
   | "assets"
-  | "costLayers";
+  | "costLayers"
+  | "supplierReturns";
 
 export type CrudOp = "list" | "get" | "create" | "update" | "remove" | "claim";
 
@@ -46,6 +47,7 @@ const WRITE: Record<CrudCollName, AppModule[]> = {
   chartOfAccounts: ["accounting"],
   assets: ["accounting"],
   costLayers: ["inventory"],
+  supplierReturns: ["suppliers", "purchases", "inventory"],
 };
 
 const READ: Record<CrudCollName, AppModule[]> = {
@@ -87,6 +89,7 @@ const READ: Record<CrudCollName, AppModule[]> = {
   chartOfAccounts: ["accounting", "reports"],
   assets: ["accounting", "reports"],
   costLayers: ["inventory", "purchases", "sales", "reports"],
+  supplierReturns: ["suppliers", "purchases", "inventory", "accounting", "reports"],
 };
 
 const WRITE_OPS = new Set<CrudOp>(["create", "update", "remove", "claim"]);
@@ -148,6 +151,9 @@ export function permissionForCrud(coll: CrudCollName, op: CrudOp): AppPermission
 
     case "purchases":
       return isRead ? "suppliers.read" : "inventory.create";
+
+    case "supplierReturns":
+      return isRead ? "suppliers.read" : "suppliers.write";
 
     case "deliveries":
       return isRead ? "deliveries.read" : "deliveries.write";

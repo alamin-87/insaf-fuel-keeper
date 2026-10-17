@@ -5,6 +5,7 @@ import type {
   PurchaseOrder,
   SalesOrder,
   Supplier,
+  SupplierReturn,
   Voucher,
 } from "@/types";
 import { parseRecordTime, type DateRange } from "@/lib/date-range";
@@ -16,7 +17,9 @@ export type StatementLineType =
   "opening" | "invoice" | "purchase" | "payment" | "receipt" | "salary" | "adjustment" | "return";
 
 export type StatementLineHref =
-  { to: "/sales/$id"; params: { id: string } } | { to: "/purchases/$id"; params: { id: string } };
+  | { to: "/sales/$id"; params: { id: string } }
+  | { to: "/purchases/$id"; params: { id: string } }
+  | { to: "/suppliers/returns/$id"; params: { id: string } };
 
 export type StatementLine = {
   id: string;
@@ -192,6 +195,7 @@ function buildSupplierRaws(
   purchases: PurchaseOrder[],
   vouchers: Voucher[],
   partyId: string,
+  supplierReturns: SupplierReturn[] = [],
 ): RawLine[] {
   const lines: RawLine[] = [];
   for (const po of purchases) {
@@ -222,6 +226,21 @@ function buildSupplierRaws(
         href: { to: "/purchases/$id", params: { id: po.id } },
       });
     }
+  }
+  for (const ret of supplierReturns) {
+    if (ret.supplierId !== partyId) continue;
+    if (ret.status === "cancelled") continue;
+    lines.push({
+      id: `sr-${ret.id}`,
+      date: ret.date,
+      particulars: ret.returnNo,
+      reference: ret.returnNo,
+      description: ret.notes || "",
+      type: "return",
+      debit: ret.total || 0,
+      credit: 0,
+      href: { to: "/suppliers/returns/$id", params: { id: ret.id } },
+    });
   }
   for (const v of vouchers) {
     if (v.partyType !== "supplier" || v.partyId !== partyId) continue;
@@ -321,6 +340,7 @@ export function buildPartyStatement(opts: {
   party: Supplier;
   sales?: SalesOrder[];
   purchases: PurchaseOrder[];
+  supplierReturns?: SupplierReturn[];
   payroll?: PayrollRun[];
   vouchers: Voucher[];
   range: DateRange;
@@ -330,6 +350,7 @@ export function buildPartyStatement(opts: {
   party: Employee;
   sales?: SalesOrder[];
   purchases?: PurchaseOrder[];
+  supplierReturns?: SupplierReturn[];
   payroll: PayrollRun[];
   vouchers: Voucher[];
   range: DateRange;
@@ -339,6 +360,7 @@ export function buildPartyStatement(opts: {
   party: Customer | Supplier | Employee;
   sales?: SalesOrder[];
   purchases?: PurchaseOrder[];
+  supplierReturns?: SupplierReturn[];
   payroll?: PayrollRun[];
   vouchers: Voucher[];
   range: DateRange;
@@ -348,7 +370,7 @@ export function buildPartyStatement(opts: {
     kind === "customer"
       ? buildCustomerRaws(opts.sales ?? [], vouchers, party.id)
       : kind === "supplier"
-        ? buildSupplierRaws(opts.purchases ?? [], vouchers, party.id)
+        ? buildSupplierRaws(opts.purchases ?? [], vouchers, party.id, opts.supplierReturns ?? [])
         : buildEmployeeRaws(opts.payroll ?? [], vouchers, party.id)
   ).sort(sortByDate);
 

@@ -322,6 +322,24 @@ export interface PurchaseOrder {
   grns?: PurchaseGrn[];
 }
 
+export type SupplierReturnStatus = "confirmed" | "draft" | "cancelled";
+
+export interface SupplierReturn {
+  id: ID;
+  returnNo: string;
+  supplierId: ID;
+  supplierName: string;
+  date: string;
+  items: LineItem[];
+  subtotal: number;
+  tax: number;
+  total: number;
+  status: SupplierReturnStatus;
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export type StockMovementType = "in" | "out" | "adjust" | "return";
 
 export type MovementTypeKind =

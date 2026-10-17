@@ -14,6 +14,7 @@ import type {
   SalesOrder,
   StockMovement,
   Supplier,
+  SupplierReturn,
   Voucher,
 } from "../types/index.ts";
 import { parseRecordTime, type DateRange } from "./date-range.ts";
@@ -228,6 +229,7 @@ export function computeSupplierPayables(
   suppliers: Supplier[],
   purchases: PurchaseOrder[],
   vouchers: Voucher[] = [],
+  supplierReturns: SupplierReturn[] = [],
 ): { rows: SupplierApRow[]; totalDue: number; totalBilled: number; totalPaid: number } {
   const supplierMap = new Map<string, SupplierApRow>();
 
@@ -292,8 +294,11 @@ export function computeSupplierPayables(
     }
 
     const totalPaid = roundMoney(voucherPaid + unvoucheredPaid);
+    const returnsForSupplier = supplierReturns
+      .filter((r) => r.supplierId === row.id && r.status !== "cancelled")
+      .reduce((sum, r) => sum + (r.total || 0), 0);
     row.paid = totalPaid;
-    row.due = roundMoney(row.openingBalance + row.billed - totalPaid);
+    row.due = roundMoney(row.openingBalance + row.billed - totalPaid - returnsForSupplier);
   }
 
   const rows = Array.from(supplierMap.values()).filter(

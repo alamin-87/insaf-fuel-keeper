@@ -47,6 +47,9 @@ import { Route as CylindersIdRouteImport } from './routes/cylinders.$id'
 import { Route as CustomersReportRouteImport } from './routes/customers.report'
 import { Route as CustomersNewRouteImport } from './routes/customers.new'
 import { Route as CustomersIdRouteImport } from './routes/customers.$id'
+import { Route as SuppliersReturnsIndexRouteImport } from './routes/suppliers.returns.index'
+import { Route as SuppliersReturnsNewRouteImport } from './routes/suppliers.returns.new'
+import { Route as SuppliersReturnsIdRouteImport } from './routes/suppliers.returns.$id'
 import { Route as SuppliersIdStatementRouteImport } from './routes/suppliers.$id.statement'
 import { Route as SuppliersIdEditRouteImport } from './routes/suppliers.$id.edit'
 import { Route as SalesIdEditRouteImport } from './routes/sales.$id.edit'
@@ -58,6 +61,7 @@ import { Route as DeliveriesIdEditRouteImport } from './routes/deliveries.$id.ed
 import { Route as CylindersIdEditRouteImport } from './routes/cylinders.$id.edit'
 import { Route as CustomersIdStatementRouteImport } from './routes/customers.$id.statement'
 import { Route as CustomersIdEditRouteImport } from './routes/customers.$id.edit'
+import { Route as SuppliersReturnsIdEditRouteImport } from './routes/suppliers.returns.$id.edit'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
@@ -249,6 +253,21 @@ const CustomersIdRoute = CustomersIdRouteImport.update({
   path: '/customers/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SuppliersReturnsIndexRoute = SuppliersReturnsIndexRouteImport.update({
+  id: '/suppliers/returns/',
+  path: '/suppliers/returns/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SuppliersReturnsNewRoute = SuppliersReturnsNewRouteImport.update({
+  id: '/suppliers/returns/new',
+  path: '/suppliers/returns/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SuppliersReturnsIdRoute = SuppliersReturnsIdRouteImport.update({
+  id: '/suppliers/returns/$id',
+  path: '/suppliers/returns/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SuppliersIdStatementRoute = SuppliersIdStatementRouteImport.update({
   id: '/statement',
   path: '/statement',
@@ -304,6 +323,11 @@ const CustomersIdEditRoute = CustomersIdEditRouteImport.update({
   path: '/edit',
   getParentRoute: () => CustomersIdRoute,
 } as any)
+const SuppliersReturnsIdEditRoute = SuppliersReturnsIdEditRouteImport.update({
+  id: '/edit',
+  path: '/edit',
+  getParentRoute: () => SuppliersReturnsIdRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -355,6 +379,10 @@ export interface FileRoutesByFullPath {
   '/sales/$id/edit': typeof SalesIdEditRoute
   '/suppliers/$id/edit': typeof SuppliersIdEditRoute
   '/suppliers/$id/statement': typeof SuppliersIdStatementRoute
+  '/suppliers/returns/$id': typeof SuppliersReturnsIdRouteWithChildren
+  '/suppliers/returns/new': typeof SuppliersReturnsNewRoute
+  '/suppliers/returns/': typeof SuppliersReturnsIndexRoute
+  '/suppliers/returns/$id/edit': typeof SuppliersReturnsIdEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -405,6 +433,10 @@ export interface FileRoutesByTo {
   '/sales/$id/edit': typeof SalesIdEditRoute
   '/suppliers/$id/edit': typeof SuppliersIdEditRoute
   '/suppliers/$id/statement': typeof SuppliersIdStatementRoute
+  '/suppliers/returns/$id': typeof SuppliersReturnsIdRouteWithChildren
+  '/suppliers/returns/new': typeof SuppliersReturnsNewRoute
+  '/suppliers/returns': typeof SuppliersReturnsIndexRoute
+  '/suppliers/returns/$id/edit': typeof SuppliersReturnsIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -457,6 +489,10 @@ export interface FileRoutesById {
   '/sales/$id/edit': typeof SalesIdEditRoute
   '/suppliers/$id/edit': typeof SuppliersIdEditRoute
   '/suppliers/$id/statement': typeof SuppliersIdStatementRoute
+  '/suppliers/returns/$id': typeof SuppliersReturnsIdRouteWithChildren
+  '/suppliers/returns/new': typeof SuppliersReturnsNewRoute
+  '/suppliers/returns/': typeof SuppliersReturnsIndexRoute
+  '/suppliers/returns/$id/edit': typeof SuppliersReturnsIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -510,6 +546,10 @@ export interface FileRouteTypes {
     | '/sales/$id/edit'
     | '/suppliers/$id/edit'
     | '/suppliers/$id/statement'
+    | '/suppliers/returns/$id'
+    | '/suppliers/returns/new'
+    | '/suppliers/returns/'
+    | '/suppliers/returns/$id/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -560,6 +600,10 @@ export interface FileRouteTypes {
     | '/sales/$id/edit'
     | '/suppliers/$id/edit'
     | '/suppliers/$id/statement'
+    | '/suppliers/returns/$id'
+    | '/suppliers/returns/new'
+    | '/suppliers/returns'
+    | '/suppliers/returns/$id/edit'
   id:
     | '__root__'
     | '/'
@@ -611,6 +655,10 @@ export interface FileRouteTypes {
     | '/sales/$id/edit'
     | '/suppliers/$id/edit'
     | '/suppliers/$id/statement'
+    | '/suppliers/returns/$id'
+    | '/suppliers/returns/new'
+    | '/suppliers/returns/'
+    | '/suppliers/returns/$id/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -649,6 +697,9 @@ export interface RootRouteChildren {
   PurchasesIndexRoute: typeof PurchasesIndexRoute
   SalesIndexRoute: typeof SalesIndexRoute
   SuppliersIndexRoute: typeof SuppliersIndexRoute
+  SuppliersReturnsIdRoute: typeof SuppliersReturnsIdRouteWithChildren
+  SuppliersReturnsNewRoute: typeof SuppliersReturnsNewRoute
+  SuppliersReturnsIndexRoute: typeof SuppliersReturnsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -919,6 +970,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CustomersIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/suppliers/returns/': {
+      id: '/suppliers/returns/'
+      path: '/suppliers/returns'
+      fullPath: '/suppliers/returns/'
+      preLoaderRoute: typeof SuppliersReturnsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/suppliers/returns/new': {
+      id: '/suppliers/returns/new'
+      path: '/suppliers/returns/new'
+      fullPath: '/suppliers/returns/new'
+      preLoaderRoute: typeof SuppliersReturnsNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/suppliers/returns/$id': {
+      id: '/suppliers/returns/$id'
+      path: '/suppliers/returns/$id'
+      fullPath: '/suppliers/returns/$id'
+      preLoaderRoute: typeof SuppliersReturnsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/suppliers/$id/statement': {
       id: '/suppliers/$id/statement'
       path: '/statement'
@@ -995,6 +1067,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/customers/$id/edit'
       preLoaderRoute: typeof CustomersIdEditRouteImport
       parentRoute: typeof CustomersIdRoute
+    }
+    '/suppliers/returns/$id/edit': {
+      id: '/suppliers/returns/$id/edit'
+      path: '/edit'
+      fullPath: '/suppliers/returns/$id/edit'
+      preLoaderRoute: typeof SuppliersReturnsIdEditRouteImport
+      parentRoute: typeof SuppliersReturnsIdRoute
     }
   }
 }
@@ -1112,6 +1191,17 @@ const SuppliersIdRouteWithChildren = SuppliersIdRoute._addFileChildren(
   SuppliersIdRouteChildren,
 )
 
+interface SuppliersReturnsIdRouteChildren {
+  SuppliersReturnsIdEditRoute: typeof SuppliersReturnsIdEditRoute
+}
+
+const SuppliersReturnsIdRouteChildren: SuppliersReturnsIdRouteChildren = {
+  SuppliersReturnsIdEditRoute: SuppliersReturnsIdEditRoute,
+}
+
+const SuppliersReturnsIdRouteWithChildren =
+  SuppliersReturnsIdRoute._addFileChildren(SuppliersReturnsIdRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountingRoute: AccountingRoute,
@@ -1148,6 +1238,9 @@ const rootRouteChildren: RootRouteChildren = {
   PurchasesIndexRoute: PurchasesIndexRoute,
   SalesIndexRoute: SalesIndexRoute,
   SuppliersIndexRoute: SuppliersIndexRoute,
+  SuppliersReturnsIdRoute: SuppliersReturnsIdRouteWithChildren,
+  SuppliersReturnsNewRoute: SuppliersReturnsNewRoute,
+  SuppliersReturnsIndexRoute: SuppliersReturnsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

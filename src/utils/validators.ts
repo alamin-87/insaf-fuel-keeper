@@ -128,6 +128,13 @@ export const purchaseOrderSchema = z.object({
   items: z.array(lineItemSchema).min(1, "Add at least one item"),
 });
 
+export const supplierReturnSchema = z.object({
+  supplierId: z.string().optional(),
+  supplierName: z.string().min(1, "Select or enter a supplier"),
+  notes: z.string().optional(),
+  items: z.array(lineItemSchema).min(1, "Add at least one item"),
+});
+
 export const deliverySchema = z.object({
   customerId: z.string().min(1, "Select a customer"),
   salesOrderId: z.string().optional(),
