@@ -91,7 +91,10 @@ async function takeWarehouseFull(productId: string, qty: number, lotNumber?: str
   const product = await call<Product | null>("get", "products", productId);
   if (!product) throw new Error("Product not found");
   if (method === "lot" && !lotNumber?.trim()) throw new Error("Lot number required");
-  const pool = (await call<Cylinder[]>("list", "cylinders"))
+  const allCyl = await call<Cylinder[]>("list", "cylinders");
+  const hasSerials = allCyl.some((c) => c.productId === productId);
+  if (!hasSerials) return [];
+  const pool = allCyl
     .filter(
       (c) =>
         c.productId === productId &&
@@ -502,12 +505,23 @@ async function assertSalesStock(
   items: LineItem[],
   opts?: { sellGasOnly?: boolean; excludeOrderId?: string },
 ) {
-  const products = await call<Product[]>("list", "products");
+  const [products, sales, deliveries] = await Promise.all([
+    call<Product[]>("list", "products"),
+    call<SalesOrder[]>("list", "sales"),
+    call<Delivery[]>("list", "deliveries"),
+  ]);
+
+  const relevantSales = opts?.excludeOrderId
+    ? sales.filter((s) => s.id !== opts.excludeOrderId)
+    : sales;
+
   let existingOrderItems: LineItem[] = [];
+  let existingOrderAlreadyOut = false;
   if (opts?.excludeOrderId) {
-    const existingOrder = await call<SalesOrder | null>("get", "sales", opts.excludeOrderId);
+    const existingOrder = sales.find((s) => s.id === opts.excludeOrderId);
     if (existingOrder && isOpenSalesStatus(existingOrder.status)) {
       existingOrderItems = existingOrder.items || [];
+      existingOrderAlreadyOut = await hasStockOut("sales", opts.excludeOrderId);
     }
   }
 
@@ -516,12 +530,34 @@ async function assertSalesStock(
     if (qty <= 0) continue;
     const p = products.find((x) => x.id === item.productId);
     if (!p) throw new Error(`Product not found (${item.productId})`);
-    const heldByThisOrder = existingOrderItems
-      .filter((it) => it.productId === item.productId)
-      .reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
-    const available = Math.max(0, (p.stock ?? 0) + heldByThisOrder);
+
+    let otherReserved = 0;
+    for (const so of relevantSales) {
+      if (!isOpenSalesStatus(so.status)) continue;
+      const it = (so.items || []).find((x) => x.productId === item.productId);
+      if (!it) continue;
+      const ord = Number(it.quantity) || 0;
+      if (ord <= 0) continue;
+      let del = 0;
+      for (const d of deliveries) {
+        if (d.salesOrderId !== so.id) continue;
+        if (d.status !== "delivered" && d.status !== "confirmed") continue;
+        for (const dit of d.items || []) {
+          if (dit.productId === item.productId) del += Number(dit.quantity) || 0;
+        }
+      }
+      otherReserved += Math.max(0, ord - del);
+    }
+
+    const heldByThisOrder = existingOrderAlreadyOut
+      ? existingOrderItems
+          .filter((it) => it.productId === item.productId)
+          .reduce((sum, it) => sum + (Number(it.quantity) || 0), 0)
+      : 0;
+
+    const available = Math.max(0, (p.stock ?? 0) + heldByThisOrder - otherReserved);
     if (qty > available) {
-      throw new Error(`Insufficient stock. Available: ${available}, Requested: ${qty}.`);
+      throw new Error(`Insufficient stock for ${p.name}. Available: ${available}, Requested: ${qty}.`);
     }
   }
 }
@@ -569,10 +605,7 @@ async function deliveredForSales(salesOrderId: string, excludeDeliveryId?: strin
 
 async function salesAlreadyFulfilled(order: SalesOrder, excludeDeliveryId?: string) {
   const delivered = await deliveredForSales(order.id, excludeDeliveryId);
-  if (delivered.length === 0) {
-    if (await hasStockOut("sales", order.id)) return true;
-    return false;
-  }
+  if (delivered.length === 0) return false;
   return order.items.every((item) => remainingOrderQty(order, delivered, item.productId) <= 0);
 }
 
@@ -957,17 +990,6 @@ export const salesService = {
       createdAt: data.createdAt ?? new Date().toISOString(),
     });
     if (isOpenSalesStatus(order.status)) {
-      for (const item of order.items) {
-        if (Number(item.quantity) > 0) {
-          await issueStock(item.productId, Number(item.quantity), {
-            refType: "sales",
-            refId: order.id,
-            movementType: "SALE_ISSUE",
-            notes: order.orderNo,
-            by: "Sales",
-          });
-        }
-      }
       await fulfillSalesOrder(order);
     }
     return (await call<SalesOrder | null>("get", "sales", order.id)) ?? order;
@@ -977,20 +999,15 @@ export const salesService = {
     if (!existing) throw new Error("Order not found");
     if (existing.status === "cancelled") throw new Error("Cancelled orders cannot be edited");
     if (data.items) {
-      await unfulfillSalesOrder(existing);
-    } else if (await hasStockOut("sales", id)) {
-      await adjustStock(existing.items, 1, {
-        refType: "sales",
-        refId: id,
-        notes: `Edit reverse ${existing.orderNo}`,
-        by: "Sales",
-      });
-      await adjustStock(data.items || existing.items, -1, {
-        refType: "sales",
-        refId: id,
-        notes: `Edit apply ${existing.orderNo}`,
-        by: "Sales",
-      });
+      const deliveries = await call<Delivery[]>("list", "deliveries");
+      const pendingDc = deliveries.find(
+        (d) => d.salesOrderId === id && (d.status === "pending" || d.status === "in_transit"),
+      );
+      if (pendingDc) {
+        await call("update", "deliveries", pendingDc.id, { items: data.items });
+      } else {
+        await unfulfillSalesOrder(existing);
+      }
     }
     const paid = existing.paid || 0;
     const total = data.total != null ? Number(data.total) : existing.total;
@@ -1016,21 +1033,7 @@ export const salesService = {
       status,
       tax: 0,
     });
-    if (data.items && isOpenSalesStatus(updated.status)) {
-      for (const item of updated.items) {
-        if (
-          Number(item.quantity) > 0 &&
-          !(await hasPostedStock("sales", updated.id, item.productId, "out"))
-        ) {
-          await issueStock(item.productId, Number(item.quantity), {
-            refType: "sales",
-            refId: updated.id,
-            movementType: "SALE_ISSUE",
-            notes: updated.orderNo,
-            by: "Sales",
-          });
-        }
-      }
+    if (isOpenSalesStatus(updated.status)) {
       await fulfillSalesOrder(updated);
     }
     return updated;
@@ -1066,20 +1069,6 @@ export const salesService = {
     }
     const updated = await call<SalesOrder>("update", "sales", id, { status });
     if (order.status === "draft" && isOpenSalesStatus(status)) {
-      for (const item of order.items) {
-        if (
-          Number(item.quantity) > 0 &&
-          !(await hasPostedStock("sales", order.id, item.productId, "out"))
-        ) {
-          await issueStock(item.productId, Number(item.quantity), {
-            refType: "sales",
-            refId: order.id,
-            movementType: "SALE_ISSUE",
-            notes: order.orderNo,
-            by: "Sales",
-          });
-        }
-      }
       await fulfillSalesOrder({ ...updated, status });
     }
     return updated;
@@ -1093,20 +1082,6 @@ export const salesService = {
       status: "confirmed",
       orderNo: order.orderNo.startsWith("QT") ? order.orderNo.replace(/^QT/, "SO") : order.orderNo,
     });
-    for (const item of order.items) {
-      if (
-        Number(item.quantity) > 0 &&
-        !(await hasPostedStock("sales", order.id, item.productId, "out"))
-      ) {
-        await issueStock(item.productId, Number(item.quantity), {
-          refType: "sales",
-          refId: order.id,
-          movementType: "SALE_ISSUE",
-          notes: updated.orderNo,
-          by: "Sales",
-        });
-      }
-    }
     await fulfillSalesOrder(updated);
     return updated;
   },
@@ -1273,10 +1248,15 @@ export const deliveryService = {
     }
 
     const used = new Set<string>();
+    const isSerializedProduct = (productId: string) =>
+      allCyl.some((c) => c.productId === productId);
+
     for (let i = 0; i < nextItems.length; i += 1) {
       const item = nextItems[i];
       const p = products.find((x) => x.id === item.productId);
       if (!isCylinderTrackedLine(item, p)) continue;
+      if (!isSerializedProduct(item.productId)) continue;
+
       const sold = isCylinderSaleLine(item, p);
       if (!sold && item.quantity > 0 && !expectedReturnAt) {
         throw new Error("Expected return date is required for customer cylinder send");
@@ -1303,10 +1283,26 @@ export const deliveryService = {
 
     const claimedIds: string[] = [];
     try {
+      const soAlreadyOut = delivery.salesOrderId
+        ? await hasStockOut("sales", delivery.salesOrderId)
+        : false;
+
       for (let i = 0; i < nextItems.length; i += 1) {
         const item = nextItems[i];
         const p = products.find((x) => x.id === item.productId);
         if (!isCylinderTrackedLine(item, p)) continue;
+
+        if (!isSerializedProduct(item.productId)) {
+          // Quantity-based cylinder product
+          nextItems[i] = { ...item, cylinderIds: [] };
+          if (!soAlreadyOut && (p?.stock ?? 0) < item.quantity) {
+            throw new Error(
+              `Insufficient warehouse stock for ${item.productName}. Available: ${p?.stock ?? 0}, Required: ${item.quantity}. Please add stock first.`,
+            );
+          }
+          continue;
+        }
+
         let ids = item.cylinderIds || [];
         if (ids.length !== item.quantity) {
           const picked = await takeWarehouseFull(
@@ -1323,14 +1319,12 @@ export const deliveryService = {
       }
 
       const alreadyOut = await hasStockOut("delivery", id);
-      const soAlreadyOut = delivery.salesOrderId
-        ? await hasStockOut("sales", delivery.salesOrderId)
-        : false;
       const stockItems = productStockLines(nextItems, products, false);
       if (!alreadyOut && !soAlreadyOut && stockItems.length) {
         await adjustStock(stockItems, -1, {
           refType: "delivery",
           refId: id,
+          movementType: "SALE_ISSUE",
           notes: delivery.challanNo,
           by: delivery.receiverName || "Delivery",
         });
@@ -1345,10 +1339,12 @@ export const deliveryService = {
       const issuedCount = nextItems.reduce((n, item) => n + (item.cylinderIds?.length || 0), 0);
       const returnedCount = confirmPayload?.returnedIds?.length || 0;
       if (confirmPayload?.asExchange) {
-        if (issuedCount <= 0 || returnedCount <= 0) {
+        const totalDeliveredQty = nextItems.reduce((n, item) => n + (item.quantity || 0), 0);
+        const exchangeIssueCount = issuedCount > 0 ? issuedCount : totalDeliveredQty;
+        if (exchangeIssueCount <= 0 || returnedCount <= 0) {
           throw new Error("Exchange requires empty returns and full issues");
         }
-        if (issuedCount !== returnedCount) {
+        if (exchangeIssueCount !== returnedCount) {
           throw new Error("Exchange requires equal empty returns and full issues");
         }
       }

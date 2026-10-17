@@ -67,6 +67,7 @@ export function computeReservedQty(
   productId: string,
   sales: SalesOrder[],
   deliveries: Delivery[],
+  deductedSoIds?: Set<string>,
 ): number {
   const openStatuses = new Set(["confirmed", "invoiced", "paid"]);
   const doneDeliveryStatuses = new Set(["delivered", "confirmed"]);
@@ -74,6 +75,7 @@ export function computeReservedQty(
 
   for (const so of sales) {
     if (!openStatuses.has(so.status)) continue;
+    if (deductedSoIds?.has(so.id)) continue;
     const item = (so.items || []).find((it) => it.productId === productId);
     if (!item) continue;
     const orderedQty = Number(item.quantity) || 0;
@@ -201,6 +203,12 @@ export async function reconcileDatabaseInventory(db: any, session?: any): Promis
 
   const allProducts = Array.from(productMap.values());
 
+  const deductedSoIds = new Set(
+    movements
+      .filter((m) => m.refType === "sales" && m.type === "out" && m.refId)
+      .map((m) => m.refId as string),
+  );
+
   const gasList: GasInventory[] = [];
   const cylinderList: CylinderInventory[] = [];
   const productList: ProductInventory[] = [];
@@ -232,7 +240,7 @@ export async function reconcileDatabaseInventory(db: any, session?: any): Promis
 
       const isReverse = /Reverse/i.test(m.notes || "");
       if (isReverse) {
-        if (m.refType === "sales" && (m.type === "in" || m.type === "return")) {
+        if ((m.refType === "sales" || m.refType === "delivery") && (m.type === "in" || m.type === "return")) {
           stockOut = Math.max(0, stockOut - qty);
           continue;
         }
@@ -331,7 +339,7 @@ export async function reconcileDatabaseInventory(db: any, session?: any): Promis
         { upsert: true, ...opt },
       );
     } else if (pType === "cylinder") {
-      const reserved = computeReservedQty(p.id, sales, deliveries);
+      const reserved = computeReservedQty(p.id, sales, deliveries, deductedSoIds);
       const effectiveOnHand = cylsForP.length > 0 ? cylsForP.filter(cylinderIsFullStock).length : onHand;
       // AVAILABLE = ON HAND - RESERVED (available cannot be negative)
       const available = Math.max(0, effectiveOnHand - reserved);

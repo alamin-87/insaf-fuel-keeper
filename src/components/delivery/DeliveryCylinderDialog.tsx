@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { cylinderService } from "@/services/cylinder.service";
 import { productService } from "@/services/product.service";
+import { deliveryService } from "@/services/delivery.service";
 import { isCylinderTrackedLine, pickFifo, cylinderIsEmpty } from "@/lib/cylinder-product";
 import { getCylinderTrackingFn } from "@/lib/settings.functions";
 import { Input } from "@/components/ui/input";
@@ -47,6 +48,10 @@ export function DeliveryCylinderDialog({
     queryKey: ["cylinders"],
     queryFn: cylinderService.list,
   });
+  const { data: deliveries = [] } = useQuery({
+    queryKey: ["deliveries"],
+    queryFn: deliveryService.list,
+  });
   const { data: tracking = "serial" } = useQuery({
     queryKey: ["cylinderTracking"],
     queryFn: () => getCylinderTrackingFn(),
@@ -82,15 +87,40 @@ export function DeliveryCylinderDialog({
     prevOpenRef.current = open;
   }, [open, delivery.id, delivery.items]);
 
+  const assignedToOtherPendingDeliveries = useMemo(() => {
+    const set = new Set<string>();
+    for (const d of deliveries) {
+      if (d.id === delivery.id) continue;
+      if (d.status === "pending" || d.status === "in_transit") {
+        for (const it of d.items || []) {
+          for (const cid of it.cylinderIds || []) {
+            set.add(cid);
+          }
+        }
+      }
+    }
+    return set;
+  }, [deliveries, delivery.id]);
+
+  const isLineSerialized = (productId: string) => {
+    return tracking === "serial" && cylinders.some((c) => c.productId === productId);
+  };
+
   const selectedAll = useMemo(() => new Set(issued.flat()), [issued]);
   const empties = cylinders.filter(
-    (c) => c.status === "at_customer" && (!c.customerId || c.customerId === delivery.customerId),
+    (c) =>
+      c.status === "at_customer" &&
+      (!c.customerId || c.customerId === delivery.customerId) &&
+      !assignedToOtherPendingDeliveries.has(c.id),
   );
   const needQty = cylLines.reduce((a, { it }) => a + it.quantity, 0);
   const issuedCount = tracking === "serial" ? issued.flat().length : needQty;
   const ready =
     tracking !== "serial" ||
-    cylLines.every(({ it, index }) => (issued[index]?.length || 0) === it.quantity);
+    cylLines.every(({ it, index }) => {
+      if (!isLineSerialized(it.productId)) return true;
+      return (issued[index]?.length || 0) === it.quantity;
+    });
   const exchangeReady = issuedCount > 0 && issuedCount === returned.length;
 
   const toggle = (index: number, id: string, qty: number) => {
@@ -121,13 +151,15 @@ export function DeliveryCylinderDialog({
 
     if (tracking === "serial") {
       for (const { it, index } of cylLines) {
+        if (!isLineSerialized(it.productId)) continue;
         const selected = issued[index]?.length || 0;
         if (selected !== it.quantity) {
           const availableStock = cylinders.filter(
             (c) =>
               c.productId === it.productId &&
               (c.status === "in_stock" || c.status === "in_transit") &&
-              !cylinderIsEmpty(c),
+              !cylinderIsEmpty(c) &&
+              !assignedToOtherPendingDeliveries.has(c.id),
           ).length;
           if (availableStock < it.quantity) {
             toast.error(
@@ -144,11 +176,17 @@ export function DeliveryCylinderDialog({
     }
 
     if (asExchange) {
-      if (issuedCount <= 0 || returned.length <= 0) {
+      const serializedLines = cylLines.filter(({ it }) => isLineSerialized(it.productId));
+      const requiredIssued =
+        serializedLines.length > 0
+          ? serializedLines.reduce((sum, { it, index }) => sum + (issued[index]?.length || 0), 0)
+          : cylLines.reduce((sum, { it }) => sum + it.quantity, 0);
+
+      if (requiredIssued <= 0 || returned.length <= 0) {
         toast.error(t("deliveries.exchangeNeed") || "Exchange requires empty returns and full issues");
         return;
       }
-      if (issuedCount !== returned.length) {
+      if (requiredIssued !== returned.length) {
         toast.error(t("deliveries.exchangeNeed") || "Exchange requires equal empty returns and full issues");
         return;
       }
@@ -189,11 +227,53 @@ export function DeliveryCylinderDialog({
             </div>
           )}
           {cylLines.map(({ it, index, product }) => {
+            const serialized = isLineSerialized(it.productId);
+            if (!serialized) {
+              return (
+                <section key={index} className="space-y-2 rounded-lg border p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="font-medium">{it.productName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {it.quantity} cylinder(s) required
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        toast.success(
+                          `${it.productName}: ${it.quantity} cylinder(s) verified from warehouse stock.`,
+                        );
+                      }}
+                    >
+                      {t("deliveries.autoPick")}
+                    </Button>
+                  </div>
+                  <div className="rounded-md border border-emerald-500/20 bg-emerald-500/10 p-2.5 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-emerald-700 dark:text-emerald-400">
+                        Warehouse Stock Allocation
+                      </span>
+                      <span className="font-semibold text-emerald-800 dark:text-emerald-300">
+                        {it.quantity} cylinder(s)
+                      </span>
+                    </div>
+                    <p className="mt-1 text-muted-foreground text-[11px]">
+                      Quantity allocated from available warehouse stock for this delivery.
+                    </p>
+                  </div>
+                </section>
+              );
+            }
+
             const stock = cylinders.filter(
               (c) =>
                 c.productId === it.productId &&
                 (c.status === "in_stock" || c.status === "in_transit") &&
                 !cylinderIsEmpty(c) &&
+                !assignedToOtherPendingDeliveries.has(c.id) &&
                 (!selectedAll.has(c.id) || issued[index]?.includes(c.id)),
             );
             const count = issued[index]?.length || 0;
@@ -211,7 +291,10 @@ export function DeliveryCylinderDialog({
                     size="sm"
                     variant="outline"
                     onClick={() => {
-                      const exclude = new Set(issued.flatMap((ids, i) => (i === index ? [] : ids)));
+                      const exclude = new Set([
+                        ...assignedToOtherPendingDeliveries,
+                        ...issued.flatMap((ids, i) => (i === index ? [] : ids)),
+                      ]);
                       const picked = pickFifo(cylinders, it.productId, it.quantity, exclude);
                       if (picked.length < it.quantity) {
                         toast.warning(

@@ -129,8 +129,28 @@ export function buildStockReport(
       );
 
       const nonInitMovements = all.filter((m) => m !== initMovement);
-      const totalIn = nonInitMovements.reduce((sum, m) => sum + getMovementQtyIn(m), 0);
-      const totalOut = nonInitMovements.reduce((sum, m) => sum + getMovementQtyOut(m), 0);
+      let totalIn = 0;
+      let totalOut = 0;
+      for (const m of nonInitMovements) {
+        const qty = Number(m.quantity) || 0;
+        if (qty <= 0) continue;
+        const isReverse = /Reverse/i.test(m.notes || "");
+        if (isReverse) {
+          if ((m.refType === "sales" || m.refType === "delivery") && (m.type === "in" || m.type === "return")) {
+            totalOut = Math.max(0, totalOut - qty);
+            continue;
+          }
+          if (m.refType === "purchase" && m.type === "out") {
+            totalIn = Math.max(0, totalIn - qty);
+            continue;
+          }
+        }
+        if (isMovementIn(m)) {
+          totalIn += qty;
+        } else if (isMovementOut(m)) {
+          totalOut += qty;
+        }
+      }
 
       const baseOpening = initMovement
         ? Math.abs(initMovement.quantity || 0)
@@ -149,8 +169,19 @@ export function buildStockReport(
         const qIn = getMovementQtyIn(m);
         const qOut = getMovementQtyOut(m);
 
+        const isReverse = /Reverse/i.test(m.notes || "");
+        const qty = Number(m.quantity) || 0;
+
         if (fromTs != null && t < fromTs) {
-          openingQty += qIn - qOut;
+          if (isReverse) {
+            if ((m.refType === "sales" || m.refType === "delivery") && (m.type === "in" || m.type === "return")) {
+              openingQty += qty;
+            } else if (m.refType === "purchase" && m.type === "out") {
+              openingQty = Math.max(0, openingQty - qty);
+            }
+          } else {
+            openingQty += qIn - qOut;
+          }
           if (m.unitCost != null && m.unitCost > 0) effectiveCost = m.unitCost;
           continue;
         }
@@ -181,11 +212,29 @@ export function buildStockReport(
       let periodOut = 0;
 
       for (const m of period) {
-        const qIn = getMovementQtyIn(m);
-        const qOut = getMovementQtyOut(m);
-        periodIn += qIn;
-        periodOut += qOut;
-        run = run + qIn - qOut;
+        const qty = Number(m.quantity) || 0;
+        const isReverse = /Reverse/i.test(m.notes || "");
+        let qIn = 0;
+        let qOut = 0;
+
+        if (isReverse) {
+          if ((m.refType === "sales" || m.refType === "delivery") && (m.type === "in" || m.type === "return")) {
+            periodOut = Math.max(0, periodOut - qty);
+            run = run + qty;
+            qIn = qty;
+          } else if (m.refType === "purchase" && m.type === "out") {
+            periodIn = Math.max(0, periodIn - qty);
+            run = Math.max(0, run - qty);
+            qOut = qty;
+          }
+        } else {
+          qIn = getMovementQtyIn(m);
+          qOut = getMovementQtyOut(m);
+          periodIn += qIn;
+          periodOut += qOut;
+          run = run + qIn - qOut;
+        }
+
         if (m.unitCost != null && m.unitCost > 0) effectiveCost = m.unitCost;
 
         const lineCost = m.unitCost ?? effectiveCost;

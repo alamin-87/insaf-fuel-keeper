@@ -434,13 +434,10 @@ describe("Authoritative Inventory Accounting & Reconciliation Tests", () => {
         products: [
           { id: "g1", name: "Fresh 12 kg", productType: "gas", uom: "kg", cost: 1000, price: 1200, stock: 10 },
         ],
-        cylinders: [
-          { id: "c1", productId: "cyl-p1", serialNumber: "INS-001", status: "in_stock" },
-          { id: "c2", productId: "cyl-p1", serialNumber: "INS-002", status: "at_customer" },
-        ],
+        cylinders: [],
         stockMovements: [
           { id: "m1", productId: "cyl-p1", productName: "LPG Domestic 12kg", productType: "cylinder", type: "in", movementType: "RECEIPT", quantity: 50, unitCost: 1200 },
-          { id: "m2", productId: "cyl-p1", productName: "LPG Domestic 12kg", productType: "cylinder", type: "out", movementType: "SALE_ISSUE", quantity: 10, unitCost: 1200 },
+          { id: "m2", productId: "cyl-p1", productName: "LPG Domestic 12kg", productType: "cylinder", type: "out", movementType: "SALE_ISSUE", quantity: 12, unitCost: 1200 },
           { id: "m3", productId: "prod-s1", productName: "Gas Stove Single", productType: "product", type: "in", movementType: "RECEIPT", quantity: 30, unitCost: 2000 },
           { id: "m4", productId: "prod-s1", productName: "Gas Stove Single", productType: "product", type: "out", movementType: "SALE_ISSUE", quantity: 5, unitCost: 2000 },
         ],
@@ -524,6 +521,10 @@ describe("Authoritative Inventory Accounting & Reconciliation Tests", () => {
               col.push({ ...filter, ...(update.$set || {}) });
             }
             return { acknowledged: true };
+          },
+          async insertOne(doc: any) {
+            col.push(doc);
+            return { acknowledged: true, insertedId: doc.id || doc._id };
           },
           async deleteMany(filter: any = {}) {
             mockDb.collections[name] = col.filter((item: any) => {
